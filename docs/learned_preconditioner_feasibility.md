@@ -213,18 +213,44 @@ fidelity-independent and on its own justifies a prototype. Scope: holds
 for *small-n* robot classes (Helhest-like, active ≲ a few hundred);
 iterative PCR remains correct for genuinely large active sets.
 
-### Recommendation (final — supersedes the Eisenstat–Walker fallback)
+### De-risking REVERSES the speed claim (the "6×" was a bad proxy)
 
-Build a **small-n direct-dense fast path**: assemble J·M⁻¹·Jᵀ+C into a
-fixed graph-safe bucket (n_max≈64–128) and batched-Cholesky solve it
-exactly, per NR iter, replacing iterative PCR for robots whose active
-constraint count fits the bucket. Validate the multiplier with an
-in-engine prototype (real Warp PCR cost vs the dense path). This makes
-the learned/classical preconditioner question moot for this regime —
-the right answer was never a better preconditioner, it was *no
-preconditioner*: solve the small system directly. Eisenstat–Walker
-remains a complementary lever for the large-n regime where iterative
-PCR is still the right tool.
+The "6× faster" above was measured against a torch-einsum *proxy* of
+PCR. The project's own recorded per-component profile gives the **real**
+number: obstacle_benchmark, num_worlds=1, `cr_solve` = **0.386 ms per
+NR iter** (captured-graph, the deployed path). Apples-to-apples dense
+factor+solve+assembly at W=1: n_max=64 → 0.527 ms, compacted n=45 →
+0.452 ms — i.e. the dense path is **~1.4× SLOWER than real PCR at W=1**,
+not faster. The proxy was ~25× too slow and produced a misleading
+conclusion.
+
+Honest status of the architectural option:
+
+* The *speed* win is **not demonstrated**; at W=1 it is a slowdown.
+* The comparison is **overhead-contaminated → inconclusive**, not
+  cleanly negative: 0.386 ms PCR is graph-replayed (no dispatch
+  overhead); the 0.527 ms dense is torch-eager (full overhead, and a
+  64×64 Cholesky at W=1 is pure launch overhead). A graph-captured
+  Warp dense path could be faster — unmeasured.
+* The only regime where dense might still win — **large batched W**
+  (one cuSOLVER call vs 26 latency-bound iters × replays) — is
+  **unmeasured for real PCR** (recorded profile is W=1 only).
+* The **exactness/simplicity** benefit is real (1e-14 vs ~1e-3; no
+  preconditioner, tol tuning, or convergence loop) but is not a speed
+  argument.
+
+### Recommendation (final)
+
+No demonstrated cheap performance win exists anywhere — preconditioner
+(learned/classical) **or** architectural. The solid, durable outputs of
+this study are the de-risked negatives (which save misdirected effort),
+the reusable harness, and corrections to `pcr_warm_start_options.md`
+(Option 4 recycling; the per-body-pair premise). The direct-dense idea
+is *not recommended* on current evidence; it would only be worth a real
+in-engine batched A/B if the large-W regime specifically matters (RL
+training), and even then with no strong prior it wins. Eisenstat–Walker
+(PCR-doc Option 5) remains the one untouched, genuinely-cheap,
+independent lever and is the recommended thing to actually pursue.
 
 ### (Earlier fallback, now superseded)
 
