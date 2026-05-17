@@ -93,6 +93,8 @@ class SystemCapture:
         self.engine = engine
         self.max_systems = max_systems
         self.records = []
+        self.step = 0           # set by the driver loop before engine.step
+        self.iter_in_step = 0   # reset per step; ++ per captured PCR solve
         self._orig_solve = engine.cr_solver.solve
         engine.cr_solver.solve = self._wrapped_solve
 
@@ -110,9 +112,12 @@ class SystemCapture:
                 "b": b.numpy(),                                   # (W,Nc)
                 "regularization": float(getattr(A, "regularization", 1e-6)),
                 "c_all_zero": bool(np.all(C == 0.0)),
+                "step_idx": int(self.step),
+                "iter_in_step": int(self.iter_in_step),
             }
         else:
             rec = None
+        self.iter_in_step += 1
 
         ret = self._orig_solve(A, b, x, preconditioner, iters, tol, atol, log=log)
 
@@ -129,6 +134,8 @@ class SystemCapture:
         out = {k: np.stack([r[k] for r in self.records]) for k in keys_arr}
         out["regularization"] = np.array([r["regularization"] for r in self.records])
         out["c_all_zero"] = np.array([r["c_all_zero"] for r in self.records])
+        out["step_idx"] = np.array([r["step_idx"] for r in self.records])
+        out["iter_in_step"] = np.array([r["iter_in_step"] for r in self.records])
         return out
 
 
@@ -171,6 +178,8 @@ def main():
               f"N_ctrl={engine.dims.N_ctrl} N_n={engine.dims.N_n} N_f={engine.dims.N_f})")
 
         for s in range(args.steps):
+            cap.step = s
+            cap.iter_in_step = 0
             current_state.clear_forces()
             contacts = model.collide(current_state)
             wp.copy(control.joint_target_vel, joint_target)

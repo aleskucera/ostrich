@@ -267,7 +267,51 @@ preconditioner) that none of these failure modes touch. One
 scene/robot/trajectory throughout; that caveat stands but does not
 change the recommendation.
 
+## Postscript 2 — two structured paths that DID survive (supersedes the blanket negative)
+
+The "no win anywhere" above was true for *learned* and *cheap-recycling*
+preconditioners. Following the structure further found two genuinely
+positive directions:
+
+* **`null(Jᵀ)` analytic coarse space (`coarse_null_probe.py`).** Proven
+  exactly: for x with Jᵀx=0, A x = C x (‖Zᵀ(A−C)Z‖/‖ZᵀAZ‖ = 1e-16) —
+  the redundancy directions have eigenvalue ≈ the tiny compliance C;
+  that *is* the κ source. Deflating `null(Jᵀ)` (a cheap SVD of Jm — no
+  eigensolve, no learning, no recycling) gives val **18.2→15.1 (+17%)**,
+  beats Jacobi 55/67 — the first analytic structured preconditioner to
+  beat Jacobi. It covers only ~30% of the bad band (the other ~70% is
+  the stiff joint/control coupling in `range(Jᵀ)`); the untested
+  completion is `Z = [null(Jᵀ) ‖ joint/control block]`.
+
+* **Cross-step exact-subspace pipeline (`cross_step_stability.py`).**
+  Reusing step N−1's converged exact bottom-16 subspace to deflate ALL
+  of step N: held-out late steps **18.5→11.9 (+36%), 79/80, ≈ ideal
+  11.5**. So one accurate eigensolve per step (on N−1's data) suffices
+  for the whole next step. Metric caveat: padded-402 subspace overlap
+  is saturated (random-pair 0.99 — joint block ≈46% of energy); the
+  evidence is the *operational* iteration result, not the overlaps;
+  the subspace does shift at the boundary (last(N−1)→first(N)=0.44) but
+  deflation is forgiving over ~16 iters. This is the one path whose
+  numerical premise survived every honest check. It does NOT revive
+  cheap recycling — it needs the *exact* subspace, which is exactly
+  what async-computing it off the critical path would buy.
+
+### Recommendation (revised again)
+
+Two live options, both no-ML:
+1. **`null(Jᵀ)`-⊕-joint enrichment** — cheap, fully analytic, offline-
+   testable now; +17% already, completion untested.
+2. **Cross-step async pipeline** — numerical premise validated (+36%
+   held-out); remaining gates are in-engine only (eigensolve cost,
+   hiding behind step slack, net vs the 0.386 ms/NR-iter real PCR).
+   Offline harness exhausted for this thread → needs an in-engine
+   prototype.
+
+Eisenstat–Walker (Option 5) remains an independent, complementary lever
+that stacks with either. One scene/robot/trajectory throughout.
+
 ## Files
 
-`test_scripts/{dump_linear_systems,precond_lab,precond_gnn,precond_train,equilibration_diag,eigenspectrum_probe,coarse_probe,ideal_target_stability,recycle_probe,recycle_validate}.py`,
-data `data/baselines/helhest_systems.npz`, log `runs/precond_focus.log`.
+`test_scripts/{dump_linear_systems,precond_lab,precond_gnn,precond_train,equilibration_diag,eigenspectrum_probe,coarse_probe,ideal_target_stability,recycle_probe,recycle_validate,recycle_approx,recycle_gcrodr,dense_vs_pcr_bench,coarse_null_probe,cross_step_stability}.py`,
+data `data/baselines/helhest_systems.npz` (gitignored; carries
+step_idx/iter_in_step), log `runs/precond_focus.log`.
