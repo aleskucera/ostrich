@@ -86,6 +86,45 @@ def build_helhest_obstacle_model(friction: float = 0.5):
     return builder.finalize_replicated(num_worlds=1, gravity=-9.81)
 
 
+def build_helhest_surface_model(friction: float = 0.5):
+    """Mirror HelhestSurfaceBenchmark.build_model (surface_drive_benchmark.py):
+    Helhest driving over the surface.obj triangle-mesh terrain."""
+    import openmesh
+
+    builder = AxionModelBuilder()
+    builder.rigid_gap = 0.5
+
+    create_helhest_model(
+        builder,
+        xform=wp.transform((-1.5, 0.0, 1.7), wp.quat_identity()),
+        control_mode="velocity",
+        k_p=150.0,
+        k_d=0.0,
+        friction_left_right=friction,
+        friction_rear=friction * 0.5,
+    )
+
+    assets = REPO_ROOT / "examples/assets/surface.obj"
+    sm = openmesh.read_trimesh(str(assets))
+    idx = np.array(sm.face_vertex_indices(), dtype=np.int32).flatten()
+    pts = np.array(sm.points()) * np.array([6.0, 6.0, 4.0]) + np.array([0.0, 0.0, 0.05])
+    surface_mesh = newton.Mesh(pts, idx)
+
+    globals_builder = newton.ModelBuilder()
+    globals_builder.add_shape_mesh(
+        body=-1,
+        mesh=surface_mesh,
+        cfg=newton.ModelBuilder.ShapeConfig(
+            density=0.0, has_shape_collision=True,
+            mu=0.5, ke=150.0, kd=150.0, kf=500.0,
+        ),
+    )
+
+    return builder.finalize_replicated(
+        num_worlds=1, gravity=-9.81, global_builder=globals_builder
+    )
+
+
 class SystemCapture:
     """Wraps `cr_solver.solve` to snapshot every PCR system."""
 
@@ -146,11 +185,17 @@ def main():
     ap.add_argument("--drive-velocity", type=float, default=6.0)
     ap.add_argument("--dt", type=float, default=0.03)
     ap.add_argument("--device", type=str, default="cuda:0")
-    ap.add_argument("--out", type=str, default="data/baselines/helhest_systems.npz")
+    ap.add_argument("--scene", choices=["obstacle", "surface"], default="obstacle")
+    ap.add_argument("--out", type=str, default=None,
+                    help="defaults to data/baselines/helhest_<scene>_systems.npz")
     args = ap.parse_args()
+    if args.out is None:
+        nm = "systems" if args.scene == "obstacle" else "surface_systems"
+        args.out = f"data/baselines/helhest_{nm}.npz"
 
     with wp.ScopedDevice(args.device):
-        model = build_helhest_obstacle_model()
+        model = (build_helhest_surface_model() if args.scene == "surface"
+                 else build_helhest_obstacle_model())
 
         cfg = AxionEngineConfig()
         engine = cfg.create_engine(

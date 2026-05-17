@@ -310,6 +310,36 @@ Two live options, both no-ML:
 Eisenstat–Walker (Option 5) remains an independent, complementary lever
 that stacks with either. One scene/robot/trajectory throughout.
 
+## Postscript 3 — cross-scene check REVERSES the headline (the "one scene" caveat bites)
+
+`generalization_report.py` re-ran the load-bearing measurements on a
+Helhest **surface (mesh-terrain)** dump (322 systems, active n 50–172,
+contact set churns hard step-to-step) vs the flat obstacle scene.
+
+Scene-INDEPENDENT (hold on both): κ ~99.99% removable units (Jacobi
+essential); `A|null(Jᵀ)=C` exact (algebra); a small bad band dominates
+(ideal bottom-16 ceiling flat +38%, **surface +60%**); **`null(Jᵀ)`
+analytic coarse a modest win on both (+18% / +14%)** — no ML, no
+eigensolve, no recycling: the one *practical* scene-robust lever.
+
+Scene-DEPENDENT (REVERSE between scenes):
+* **per-body-pair**: flat −33% (worse) vs **surface +23% (better)** —
+  Finding 1's "the doc premise fails" is scene-specific; on terrain it
+  holds. Which structured preconditioner wins depends on contact
+  topology.
+* **Cross-step pipeline**: flat +36% vs **surface −4%**. Terrain churns
+  the active set every step, so step N−1's subspace is useless for
+  step N. The highest-value flat survivor is **flat-ground-specific**.
+
+**Revised final recommendation:** the cross-step async pipeline is NOT
+a general win — do not pursue it as a universal lever. The only
+practical preconditioner improvement that survives a genuine scene
+change is the modest, fully-structural **`null(Jᵀ)` analytic coarse
+space (+14–18%, no ML / no eigensolve / no recycling / no cross-step
+assumption)** — and even that is gated by an in-engine cost A/B (per-NR
+`Jm`-SVD vs the 0.386 ms/NR-iter real PCR). Eisenstat–Walker (Option 5)
+remains the independent, scene-agnostic cheap lever.
+
 ## Files
 
 `test_scripts/{dump_linear_systems,precond_lab,precond_gnn,precond_train,equilibration_diag,eigenspectrum_probe,coarse_probe,ideal_target_stability,recycle_probe,recycle_validate,recycle_approx,recycle_gcrodr,dense_vs_pcr_bench,coarse_null_probe,cross_step_stability}.py`,
