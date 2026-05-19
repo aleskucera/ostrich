@@ -1,8 +1,8 @@
 defaults:
   - simulation: pendulum
-  - rendering: gl # headless
+  - rendering: headless # gl
   - logging: disabled
-  - engine: gpt 
+  - engine: gpt_profile_e2e 
   - _self_
 
 # Use the recommended hybrid approach for project names

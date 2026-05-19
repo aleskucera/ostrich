@@ -90,19 +90,20 @@ class InteractiveSimulator(BaseSimulator, ABC):
             if callable(save_logs_fn):
                 # self.solver.events.print_timings()
                 self.solver.save_logs()
-                prof = getattr(self.solver, "profiler", None)
-                if prof is not None and prof.enabled:
-                    if self.steps_per_segment != 1:
-                        # Only fires in render mode where steps_per_segment
-                        # is sized by render fps vs dt; in headless mode it
-                        # is always 1.
-                        print(
-                            f"WARNING: profiler enabled but steps_per_segment="
-                            f"{self.steps_per_segment}; only the LAST step in each "
-                            "segment is timed. For accurate stats, match render "
-                            "fps to dt or run headless."
-                        )
-                    prof.print_summary()
+
+            prof = getattr(self.solver, "profiler", None)
+            if prof is not None and prof.enabled:
+                if self.steps_per_segment != 1:
+                    # Only fires in render mode where steps_per_segment
+                    # is sized by render fps vs dt; in headless mode it
+                    # is always 1.
+                    print(
+                        f"WARNING: profiler enabled but steps_per_segment="
+                        f"{self.steps_per_segment}; only the LAST step in each "
+                        "segment is timed. For accurate stats, match render "
+                        "fps to dt or run headless."
+                    )
+                prof.print_summary()
 
             if self.rendering_config.vis_type == "usd":
                 self.viewer.close()

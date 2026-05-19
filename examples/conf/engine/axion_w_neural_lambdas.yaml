@@ -1,4 +1,5 @@
 # @package engine
 _target_: axion.AxionEngineWithNeuralLambdasConfig
-max_contacts_per_world: 4
 
+contacts:
+  max_per_world: 4

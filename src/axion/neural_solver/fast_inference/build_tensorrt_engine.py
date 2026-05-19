@@ -27,9 +27,9 @@ import torch
 import yaml
 
 # ── configure here ────────────────────────────────────────────────────────────
-ONNX_PATH         = "src/axion/neural_solver/train/trained_models/mse/05-12-2026-17-30-11/nn/best_valid_valid_model.onnx"
-MODEL_PT    = "src/axion/neural_solver/train/trained_models/mse/05-12-2026-17-30-11/nn/best_valid_valid_model.pt"
-NN_MODEL_CFG = "src/axion/neural_solver/train/trained_models/mse/05-12-2026-17-30-11/cfg.yaml"
+ONNX_PATH         = "src/axion/neural_solver/train/trained_models/mse/04-24-2026-17-02-15/nn/best_valid_valid_model.onnx"
+MODEL_PT    = "src/axion/neural_solver/train/trained_models/mse/04-24-2026-17-02-15/nn/best_valid_valid_model.pt"
+NN_MODEL_CFG = "src/axion/neural_solver/train/trained_models/mse/04-24-2026-17-02-15/cfg.yaml"
 FP16              = False       # falls back to FP32 if the GPU has no fast FP16
 WORKSPACE_GB      = 2          # tactic-search scratch memory, not runtime memory
 OUTPUT_PLAN       = None       # None → <onnx_stem>.plan beside the ONNX

@@ -119,3 +119,34 @@ def expand_pendulum_engine_lambdas_numpy(src: np.ndarray, target_last_dim: int) 
     out = np.zeros((*src.shape[:-1], PENDULUM_FULL_LAMBDA_DIM), dtype=src.dtype)
     _fill_pendulum_canonical_from_engine_numpy(out, src)
     return out
+
+
+def contract_pendulum_canonical_to_engine_lambdas_torch(
+    dest: torch.Tensor,
+    src: torch.Tensor,
+) -> None:
+    """Map canonical NN λ into engine layout in-place (inverse of expand).
+
+    Typical case: src width 24 (joint | control | contact) → dest width 22
+    (joint | contact) by dropping control slots at indices 10 and 11.
+    """
+    ld_src = int(src.shape[-1])
+    ld_dest = int(dest.shape[-1])
+    if ld_src == ld_dest:
+        dest.copy_(src)
+        return
+
+    nj, nc = PENDULUM_LAMBDA_N_J, PENDULUM_LAMBDA_N_CTRL
+    full = PENDULUM_FULL_LAMBDA_DIM
+    passive_with_contact = full - nc
+
+    if ld_src == full and ld_dest == passive_with_contact:
+        dest[..., :nj].copy_(src[..., :nj])
+        dest[..., nj:].copy_(src[..., nj + nc :])
+        return
+
+    raise ValueError(
+        f"Cannot contract Pendulum λ from width {ld_src} to {ld_dest}; "
+        f"supported pair is canonical {full} → engine {passive_with_contact} "
+        f"(or equal widths)."
+    )

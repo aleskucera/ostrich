@@ -24,7 +24,7 @@ ENABLE_STATE_LOGGING: bool = False  # set True to write pendulum-state HDF5
 if ENABLE_STATE_LOGGING:
     from axion.neural_solver.logging.state_logger_for_examples import PendulumStateLogger
 
-ENABLE_CONTROL = True  # True=controller active, False=controller off
+ENABLE_CONTROL = False # True=controller active, False=controller off
 TARGET_POS_Q0 = np.pi / 2
 TARGET_POS_Q1 = np.pi / 6
 
@@ -222,8 +222,11 @@ def basic_pendulum_example(cfg: DictConfig):
 
     # Custom initial conditions: (q0, q1, qd0, qd1)
     # Set to None to start from the default rest position.
-    INITIAL_STATE = (-0.5704, 2.8907, -3.6530, -7.6918)
+    INITIAL_STATE = (-0.5704, 2.8907, -3.6530, -7.6918)  # e.g. (0.5, -0.3, 1.0, -2.0)
+    INITIAL_STATE = (0, 0., 0, 0,)
     #INITIAL_STATE = (0.5, -0.3, 1.0, -2.0)
+    #INITIAL_STATE = (np.pi/6, 0, 1.0, 1.0)
+
 
     simulator = Simulator(
         sim_config=sim_config,

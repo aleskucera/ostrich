@@ -1,8 +1,8 @@
 defaults:
   - simulation: pendulum
-  - rendering: gl # headless
-  - logging: hdf5
-  - engine: hybrid
+  - rendering: headless # gl
+  - logging: disabled
+  - engine: hybrid_profile_e2e
   - _self_
 
 # Use the recommended hybrid approach for project names

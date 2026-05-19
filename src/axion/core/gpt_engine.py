@@ -207,16 +207,16 @@ class GPTEngine(SolverBase):
         #   1: load_data-start
         #   2: warm_start_copy-start
         #   3: nr_solve-start
-        #   4: backtracking-start (not recorded for pure NN)
+        #   4: nr_solve-end / backtracking-start (unused for pure NN)
         #   5: output_copy-start
         #   6: output_copy-end
         #
         # GPTEngine phase mapping (shared labels, NN meaning):
         #   collide / load_data — simulator collide + step entry through contact setup
         #   warm_start_copy — create_axion_contacts + process_inputs
-        #   nr_solve — nn_predictor.predict
-        #   backtracking — not recorded (boundary 4 skipped)
-        #   output_copy — joint wp.copy + eval_fk
+        #   nr_solve — nn_predictor.predict (boundaries 3→4)
+        #   backtracking — unused (4→5 is ~0; boundaries recorded for output_copy)
+        #   output_copy — joint wp.copy + eval_fk (boundaries 5→6)
         # per_component mode is N/A (no NR loop); use end_to_end only.
 
         if end_to_end:
@@ -242,9 +242,11 @@ class GPTEngine(SolverBase):
         # Predict using self.nn_predictor
         state_predicted, _ = self.nn_predictor.predict(dt=dt)
         if end_to_end:
-            prof.record_boundary(5)
+            prof.record_boundary(4)
 
         # Write the prediction back to state_out via wp.copy(...)
+        if end_to_end:
+            prof.record_boundary(5)
         wp.copy(
             dest=state_out.joint_q,
             src=wp.from_torch(state_predicted[0, :self.nn_predictor.dof_q_per_env]),

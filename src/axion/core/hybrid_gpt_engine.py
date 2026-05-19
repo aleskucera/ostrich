@@ -23,10 +23,19 @@ from axion.neural_solver.standalone.fast_neural_predictor import FastNeuralPredi
 from axion.neural_solver.standalone.neural_predictor_helpers import shift_body_qd_to_com_frame
 from axion.neural_solver.utils.legacy_newton_contacts import create_axion_contacts_for_nn
 from axion.neural_solver.utils.legacy_newton_contacts import restore_legacy_newton_contacts_if
+from axion.neural_solver.utils.pendulum_lambda_layout import (
+    PENDULUM_FULL_LAMBDA_DIM,
+    PENDULUM_LAMBDA_N_CTRL,
+    contract_pendulum_canonical_to_engine_lambdas_torch,
+)
+
+LOG_SPACE_MODEL = Path("mse")/"05-17-2026-22-58-43"
+BEST_STATE_AND_JOINT_LAMBDA_MODEL_LATER = Path("mse") / "05-12-2026-17-30-11"  # best_valid_valid_model.pt
+BEST_STATES_AND_JOINT_LAMBDA_MODEL = Path("mse") / "04-24-2026-17-02-15"  # best_valid_valid_model.pt
 
 # Shared MSE checkpoint with .plan / .engine_meta.pt already built (see
 # docs/torch_to_tensorrt_conversion.md for the rebuild recipe).
-NN_BASE_PATH = Path.cwd() /"src"/"axion"/"neural_solver"/"train"/"trained_models"/"mse"/"05-12-2026-17-30-11"
+NN_BASE_PATH = Path.cwd() /"src"/"axion"/"neural_solver"/"train"/"trained_models"/BEST_STATES_AND_JOINT_LAMBDA_MODEL
 NN_PENDULUM_PT_PATH = NN_BASE_PATH/"nn"/"best_valid_valid_model.pt"
 NN_PENDULUM_CFG_PATH = NN_BASE_PATH/"cfg.yaml"
 
@@ -129,6 +138,39 @@ class HybridGPTEngine(AxionEngineBase):
             device=self.device,
         )
 
+        self._sim_lambda_dim = int(self.dims.num_constraints)
+        self._nn_lambda_dim = int(self.nn_predictor.lambda_dim)
+        self._contract_nn_lambdas = (
+            self._nn_lambda_dim == PENDULUM_FULL_LAMBDA_DIM
+            and self._sim_lambda_dim == PENDULUM_FULL_LAMBDA_DIM - PENDULUM_LAMBDA_N_CTRL
+        )
+        if self._contract_nn_lambdas:
+            print(
+                "HybridGPTEngine: contracting NN λ "
+                f"{self._nn_lambda_dim} → solver {self._sim_lambda_dim} "
+                "(dropping canonical control slots 10–11)"
+            )
+            self._solver_lambdas = torch.zeros(
+                (1, self._sim_lambda_dim),
+                device=str(self.device),
+                dtype=torch.float32,
+            )
+        else:
+            self._solver_lambdas = None
+
+        # Joint control modes are fixed for a built model; build the mask once so
+        # cuda-graph capture never hits torch.zeros / CPU .item() in step().
+        pred = self.nn_predictor
+        self._control_active_mask = control_active_mask_from_newton_model(
+            self.model,
+            dof_q_per_env=pred.dof_q_per_env,
+            num_worlds=pred.num_worlds,
+            num_joints_per_env=pred.num_joints_per_env,
+            joint_q_start=pred.joint_q_start,
+            joint_q_end=pred.joint_q_end,
+            device=pred.device,
+        )
+
         # Exposed for external diagnostics capture (e.g., engine comparison scripts).
         # These are skipped during graph capture (see `_neural_init_state_fn`).
         self.last_predicted_next_lambdas = None
@@ -198,9 +240,8 @@ class HybridGPTEngine(AxionEngineBase):
             if next_lambdas is None:
                 self.last_predicted_next_lambdas = None
             else:
-                self.last_predicted_next_lambdas = (
-                    next_lambdas.detach().cpu().numpy().copy()
-                )
+                solver_lambdas_for_log = self._solver_lambdas_for_warm_start(next_lambdas)
+                self.last_predicted_next_lambdas = (solver_lambdas_for_log.detach().cpu().numpy().copy())
 
         # Transfer neural prediction of states into solver's working arrays:
         wp.copy(dest=self.data.body_pose, src=state_out.body_q)
@@ -208,10 +249,8 @@ class HybridGPTEngine(AxionEngineBase):
 
         # Initial guess of lambda (constraint forces).
         if next_lambdas is not None and getattr(self.config, "use_neural_lambda_init", True):
-            # Use the squeezed view directly — next_lambdas is already a
-            # preallocated buffer of shape (1, lambda_dim). wp.from_torch on
-            # a (lambda_dim,) view is zero-copy.
-            lambdas_wp = wp.from_torch(next_lambdas[0])
+            solver_lambdas = self._solver_lambdas_for_warm_start(next_lambdas)
+            lambdas_wp = wp.from_torch(solver_lambdas[0])
             wp.copy(dest=self.data._constr_force, src=lambdas_wp)
             wp.copy(dest=self.data._constr_force_prev_iter, src=lambdas_wp)
         elif getattr(self.config, "use_warm_start_forces", False):
@@ -219,6 +258,25 @@ class HybridGPTEngine(AxionEngineBase):
         else:
             self.data._constr_force.zero_()
             self.data._constr_force_prev_iter.zero_()
+
+    def _solver_lambdas_for_warm_start(self, next_lambdas: torch.Tensor) -> torch.Tensor:
+        """Return λ in solver layout (contract 24→22 when control block is absent)."""
+        if not self._contract_nn_lambdas:
+            return next_lambdas
+
+        # Torch copy_ must run on Warp's current stream during cuda-graph capture
+        # (same constraint as FastNeuralPredictor's normalize / ring-buffer ops).
+        pred = self.nn_predictor
+        if isinstance(pred, FastNeuralPredictor):
+            with torch.cuda.stream(pred._torch_stream_from_warp()):
+                contract_pendulum_canonical_to_engine_lambdas_torch(
+                    self._solver_lambdas, next_lambdas
+                )
+        else:
+            contract_pendulum_canonical_to_engine_lambdas_torch(
+                self._solver_lambdas, next_lambdas
+            )
+        return self._solver_lambdas
 
     def prewarm(
         self,
@@ -276,16 +334,6 @@ class HybridGPTEngine(AxionEngineBase):
 
         # Extract joint target positions from control (shape: dof_q -> (1, dof_q)).
         joint_target_pos = wp.to_torch(control.joint_target_pos).unsqueeze(0)
-        pred = self.nn_predictor
-        control_active = control_active_mask_from_newton_model(
-            self.model,
-            dof_q_per_env=pred.dof_q_per_env,
-            num_worlds=pred.num_worlds,
-            num_joints_per_env=pred.num_joints_per_env,
-            joint_q_start=pred.joint_q_start,
-            joint_q_end=pred.joint_q_end,
-            device=pred.device,
-        )
 
         # Perform neural network model inference to get a initial guess for the Newton method.
         self._neural_init_state_fn(
@@ -294,7 +342,7 @@ class HybridGPTEngine(AxionEngineBase):
             self.axion_contacts,
             dt,
             joint_target_pos=joint_target_pos,
-            control_active=control_active,
+            control_active=self._control_active_mask,
         )
         if end_to_end:
             prof.record_boundary(3)
