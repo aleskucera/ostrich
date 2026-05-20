@@ -1,39 +1,37 @@
-"""Event-based profiler for AxionEngine forward steps.
+"""Profiler for AxionEngine forward steps.
 
-Two modes, both intended to run with ``use_cuda_graph=True``:
+Two profiling modes:
 
-- ``"end_to_end"`` — events bracket the major coarse phases of one
-  ``engine.step`` (``load_data``, warm-start copy, NR solve, backtracking,
-  output copy). Useful for "where does one step spend its time?" at the
-  Python-callable granularity.
+- ``"end_to_end"`` — times major coarse phases of one ``engine.step``
+  (``collide``, ``load_data``, warm-start copy, NR solve, backtracking,
+  output copy).
 
-- ``"per_component"`` — replaces ``wp.capture_while`` inside ``_solve``
-  with a fixed unroll of length ``max_newton_iters``. Events sit between
-  the per-iteration phases (linear system / preconditioner / CR solve /
-  step-or-linesearch / convergence). Trades early-exit for a clean
-  per-iteration breakdown.
+- ``"per_component"`` — times each NR iter's sub-phases (linear system /
+  preconditioner / CR solve / step-or-linesearch / convergence).
 
-Usage protocol
---------------
-The captured graph must contain exactly **one** ``engine.step`` call so
-that each event-record node fires once per replay. The host then replays
-the graph R times, calling :meth:`EngineProfiler.collect` after each
-replay (which syncs and accumulates). :meth:`summary` returns
-mean/p50/p95 in milliseconds.
+Two timing backends (``end_to_end`` only for wall-clock):
 
-If the graph contains N>1 step calls, the records get overwritten N times
-within one replay and only the last copy's timestamps survive — see the
-module docstring caveat in ``base_engine.py`` for context.
+- **CUDA events** (default) — ``wp.Event`` records inside a captured
+  graph. The graph must contain exactly **one** ``engine.step`` call per
+  replay; call :meth:`collect` after each ``wp.capture_launch`` (or after
+  each eager step when ``use_cuda_graph=False``).
+
+- **Synced wall-clock** — :meth:`enable_wall_clock` switches to
+  ``wp.synchronize`` + ``torch.cuda.synchronize`` + ``perf_counter`` at
+  each boundary. Works without cuda graph; intended for eager HybridGPT
+  runs that mix PyTorch and Warp. :meth:`collect` is a no-op in this mode.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from dataclasses import field
+import time
 from typing import Literal
 from typing import Optional
 
 import numpy as np
+import torch
 import warp as wp
 
 
@@ -84,20 +82,19 @@ class _PhaseStats:
 
 
 class EngineProfiler:
-    """Pre-allocated CUDA-event pools + per-replay accumulation.
+    """Pre-allocated CUDA-event pools + per-step accumulation.
 
     Built around two patterns:
 
-    - ``end_to_end``: one event slot per phase boundary. The captured
-      graph touches each ``record_event(...)`` node once per replay.
+    - ``end_to_end``: one event slot per phase boundary.
 
     - ``per_component``: ``K_unroll + 1`` slots per phase boundary, indexed
       by the unrolled NR iteration.
 
-    The caller (the engine) is responsible for calling
-    :meth:`record_boundary` at each phase boundary inside the graph, and
-    for calling :meth:`collect` after every ``wp.capture_launch`` it wants
-    to count.
+    The caller is responsible for calling :meth:`record_boundary` at each
+    phase boundary and :meth:`collect` after each step/replay (except in
+    wall-clock mode, where samples are accumulated inside
+    :meth:`record_boundary`).
     """
 
     def __init__(self, mode: ProfilingMode, max_newton_iters: int, device):
@@ -112,6 +109,8 @@ class EngineProfiler:
         # to max_newton_iters so the unroll covers the worst case the
         # engine could ever run.
         self._n_iters = max_newton_iters
+        self._wall_clock = False
+        self._last_wall_t: Optional[float] = None
 
         if not self._enabled:
             self._events = {}
@@ -156,25 +155,58 @@ class EngineProfiler:
         """Length of the unrolled NR loop under per_component mode."""
         return self._n_iters
 
+    @property
+    def wall_clock(self) -> bool:
+        return self._wall_clock
+
+    def enable_wall_clock(self):
+        """Use synced wall-clock timing instead of CUDA events (e2e only)."""
+        if not self._enabled:
+            return
+        if self._mode != "end_to_end":
+            raise ValueError(
+                "wall-clock backend is only supported for end_to_end mode"
+            )
+        self._wall_clock = True
+
+    def _sync_gpu(self):
+        wp.synchronize()
+        if self.device.is_cuda and torch.cuda.is_available():
+            torch.cuda.synchronize()
+
     def record_boundary(self, boundary_idx: int, slot_idx: int = 0):
-        """Record a CUDA event at boundary ``boundary_idx``, slot ``slot_idx``.
+        """Record a phase boundary (CUDA event or synced wall-clock sample).
 
         For ``end_to_end`` (slots=1), pass ``slot_idx=0``. For
         ``per_component``, pass the unrolled NR iteration index.
         """
         if not self._enabled:
             return
+        if self._wall_clock:
+            if slot_idx != 0:
+                raise ValueError(
+                    "wall-clock backend does not support per_component slot_idx"
+                )
+            self._sync_gpu()
+            t = time.perf_counter()
+            if boundary_idx > 0 and self._last_wall_t is not None:
+                phase = self._phase_names[boundary_idx - 1]
+                self._stats[phase].add((t - self._last_wall_t) * 1000.0)
+            self._last_wall_t = t
+            self._boundary_recorded[boundary_idx] = True
+            return
         wp.record_event(self._events[boundary_idx][slot_idx])
         self._boundary_recorded[boundary_idx] = True
 
     def collect(self):
-        """Sync events and accumulate one replay's per-phase elapsed times.
+        """Accumulate one step/replay's per-phase elapsed times.
 
-        Call after every ``wp.capture_launch`` whose execution should be
-        counted. Synchronizes only the boundary events, so it is cheap
-        relative to ``wp.synchronize()``.
+        CUDA-event path: sync boundary events and read elapsed times.
+        Wall-clock path: no-op (samples already accumulated).
         """
         if not self._enabled:
+            return
+        if self._wall_clock:
             return
         # Sync the latest recorded event so the elapsed-time reads below
         # don't race the GPU. Walk back from the final boundary to find
@@ -203,6 +235,7 @@ class EngineProfiler:
     def reset(self):
         if not self._enabled:
             return
+        self._last_wall_t = None
         for p in self._phase_names:
             self._stats[p] = _PhaseStats()
 

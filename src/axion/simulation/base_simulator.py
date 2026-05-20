@@ -151,6 +151,10 @@ class BaseSimulator(ABC):
         # Advance the simulation clock
         self.clock.advance()
 
+        prof = getattr(self.solver, "profiler", None)
+        if prof is not None and prof.enabled and not self.use_cuda_graph:
+            prof.collect()
+
     # --- Backward Compatibility / Convenience Properties ---
 
     @property

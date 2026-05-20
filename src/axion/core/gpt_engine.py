@@ -50,7 +50,7 @@ NN_PENDULUM_CFG_PATH = NN_BASE_PATH/"cfg.yaml"
 
 # Flip to True after running export_to_onnx.py + build_tensorrt_engine.py.
 # Required for `execution: cuda_graph` — only the TRT path is capture-safe.
-USE_TENSORRT_ENGINE = True
+USE_TENSORRT_ENGINE = False
 NN_PENDULUM_PLAN_PATH = NN_PENDULUM_PT_PATH.with_suffix(".plan")
 NN_PENDULUM_META_PATH = NN_PENDULUM_PT_PATH.with_suffix(".engine_meta.pt")
 
@@ -169,6 +169,11 @@ class GPTEngine(SolverBase):
             device=pred.device,
         )
 
+        # Eager torch path mixes PyTorch + Warp; use synced wall-clock e2e
+        # profiling instead of CUDA events (see EngineProfiler.enable_wall_clock).
+        if self.profiler.enabled and isinstance(self.nn_predictor, NeuralPredictor):
+            self.profiler.enable_wall_clock()
+
     def _create_axion_contacts_for_nn(self, newton_contacts: newton.Contacts):
         return create_axion_contacts_for_nn(
             self.nn_predictor,
@@ -218,6 +223,10 @@ class GPTEngine(SolverBase):
         #   backtracking — unused (4→5 is ~0; boundaries recorded for output_copy)
         #   output_copy — joint wp.copy + eval_fk (boundaries 5→6)
         # per_component mode is N/A (no NR loop); use end_to_end only.
+        #
+        # Eager torch path (NeuralPredictor): profiler uses synced wall-clock
+        # timing (enable_wall_clock in __init__); CUDA-event path unchanged
+        # for TensorRT / cuda-graph runs.
 
         if end_to_end:
             prof.record_boundary(1)

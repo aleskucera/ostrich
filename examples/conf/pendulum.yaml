@@ -1,7 +1,7 @@
 defaults:
   - simulation: pendulum
   - rendering:  headless # gl
-  - logging: hdf5
+  - logging: disabled
   - engine: axion_profile_e2e
   - _self_
 

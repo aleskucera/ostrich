@@ -327,23 +327,27 @@ class AdjointConfig:
 class ProfilingConfig:
     """Engine performance profiling.
 
-    Two complementary mechanisms; both require use_cuda_graph=True and
-    one engine.step per captured segment for valid output.
+    Two complementary mechanisms. Event-based ``mode`` works with or without
+    ``use_cuda_graph``; when cuda graph is disabled the simulator calls
+    ``collect()`` after each physics step. HybridGPTEngine with the eager
+    torch ``NeuralPredictor`` path automatically uses synced wall-clock
+    timing for accurate PyTorch + Warp phase breakdowns.
 
     `segment_timing`: coarse host-side timer. Wraps wp.capture_launch
         with synchronize + time.perf_counter and prints ms/step. Quick
-        "is this version faster?" check during development.
+        "is this version faster?" check during development. Requires
+        use_cuda_graph=True.
 
-    `mode`: event-based GPU profiler. Three modes:
-        "off"            — no events recorded
+    `mode`: step profiler. Three modes:
+        "off"            — no timing recorded
         "end_to_end"     — times major step phases (collide, load_data,
-                           nr_solve, backtracking, output_copy)
+                           warm_start_copy, nr_solve, backtracking,
+                           output_copy)
         "per_component"  — times each NR iter's sub-phases
                            (linear_system, preconditioner, cr_solve,
                            step_or_linesearch, convergence_check).
                            Replaces wp.capture_while with a fixed unroll
-                           of length max_newton_iters; every step pays
-                           max iters (no early exit).
+                           of length max_newton_iters; requires cuda graph.
     """
 
     segment_timing: bool = False

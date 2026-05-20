@@ -35,7 +35,7 @@ BEST_STATES_AND_JOINT_LAMBDA_MODEL = Path("mse") / "04-24-2026-17-02-15"  # best
 
 # Shared MSE checkpoint with .plan / .engine_meta.pt already built (see
 # docs/torch_to_tensorrt_conversion.md for the rebuild recipe).
-NN_BASE_PATH = Path.cwd() /"src"/"axion"/"neural_solver"/"train"/"trained_models"/BEST_STATES_AND_JOINT_LAMBDA_MODEL
+NN_BASE_PATH = Path.cwd() /"src"/"axion"/"neural_solver"/"train"/"trained_models"/LOG_SPACE_MODEL
 NN_PENDULUM_PT_PATH = NN_BASE_PATH/"nn"/"best_valid_valid_model.pt"
 NN_PENDULUM_CFG_PATH = NN_BASE_PATH/"cfg.yaml"
 
@@ -176,6 +176,11 @@ class HybridGPTEngine(AxionEngineBase):
         self.last_predicted_next_lambdas = None
         self.last_predicted_next_body_pose = None
         self.last_predicted_next_body_vel = None
+
+        # Eager torch path mixes PyTorch + Warp; use synced wall-clock e2e
+        # profiling instead of CUDA events (see EngineProfiler.enable_wall_clock).
+        if self.profiler.enabled and isinstance(self.nn_predictor, NeuralPredictor):
+            self.profiler.enable_wall_clock()
 
     def _neural_init_state_fn(
         self,
@@ -322,6 +327,10 @@ class HybridGPTEngine(AxionEngineBase):
         #   warm_start_copy — _neural_init_state_fn (NN initial guess for NR)
         #   nr_solve / backtracking / output_copy — same as AxionEngine (_solve + copy)
         # per_component — NR sub-phases inside _solve() (AxionEngineBase)
+        #
+        # Eager torch path (NeuralPredictor): profiler uses synced wall-clock
+        # timing (enable_wall_clock in __init__); CUDA-event path unchanged
+        # for TensorRT / cuda-graph runs.
 
         if end_to_end:
             prof.record_boundary(1)
