@@ -208,3 +208,5 @@ src/axion/neural_solver/docs/document/
 .tmp_cache/ 
 
 data/PD_gains_search/*.txt
+src/axion/neural_solver/comparisons/time_profiles/*.txt
+data/iter_count_vs_step_per_run/*

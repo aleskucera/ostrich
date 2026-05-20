@@ -22,33 +22,46 @@ _TIME_PROFILES_DIR = pathlib.Path(__file__).resolve().parent
 
 PROFILE_PATHS = (
     _TIME_PROFILES_DIR / "axion_contact.txt",
-    _TIME_PROFILES_DIR / "gpt_contact_sweep_model.txt",
     _TIME_PROFILES_DIR / "gpt_contact_sweep_model_no_cuda.txt",
+    _TIME_PROFILES_DIR / "gpt_contact_sweep_model.txt",
 )
 
+# PROFILE_PATHS = (
+#     _TIME_PROFILES_DIR / "axion_no_contact.txt",
+#     _TIME_PROFILES_DIR / "gpt_no_contact_sweep_model_no_cuda.txt",
+#     _TIME_PROFILES_DIR / "gpt_no_contact_sweep_model.txt",
+# )
+
 BAR_LABELS = (
-    "Axion Engine",
-    "Hybrid Engine",
-    "Hybrid Engine (no CUDA graph)",
+    "Axion",
+    "Hybrid (no CUDA graph)",
+    "Hybrid",
 )
 
 # None → show interactively; set to save instead.
 FIGURE_OUTPUT_PATH: pathlib.Path | None = None
 
-# Bar colors per engine index (matplotlib default cycle C0..).
-ENGINE_BAR_FACE_COLORS = ("C0", "C1", "C2")
+# Bar colors per bar (Axion / Hybrid no-CUDA / Hybrid): blue, red, orange.
+ENGINE_BAR_FACE_COLORS = ("C0", "C3", "C1")
+BAR_EDGE_COLOR = "black"
 
-BASE_FONTSIZE = 13
+BASE_FONTSIZE = 11
 AXES_TICKS_FONTSIZE = BASE_FONTSIZE + 2
 LEGEND_FONTSIZE = BASE_FONTSIZE
-AXES_LABELS_FONTSIZE = BASE_FONTSIZE + 2
+AXES_LABELS_FONTSIZE = BASE_FONTSIZE + 1
 TITLE_FONTSIZE = BASE_FONTSIZE + 2
-GRID_ALPHA = 0.3
-Y_LIM: tuple[float, float] | None = None
+GRID_LINESTYLE = "--"
+GRID_ALPHA = 0.6
+GRID_COLOR = "gray"
+Y_LIM: tuple[float, float] | None = (0, 6)
 
-FIGURE_SIZE = (4.0, 4.8)
+# Figure geometry in inches (matplotlib `figsize`). Widen for clearer bar labels / margins.
+FIGURE_WIDTH_INCHES = 5.5
+FIGURE_HEIGHT_INCHES = 4.8
+FIGURE_SIZE: tuple[float, float] = (FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
+
 BAR_WIDTH = 0.88
-XTICK_ROTATION = 25
+XTICK_ROTATION = 0
 
 
 def _multiline_xtick_labels(labels: tuple[str, ...]) -> tuple[str, ...]:
@@ -101,13 +114,28 @@ def main() -> None:
 
     _apply_plot_style()
     plt.figure(figsize=FIGURE_SIZE)
+    ax = plt.gca()
+    ax.set_axisbelow(True)
     x_pos = np.arange(engine_count)
     bar_colors = list(ENGINE_BAR_FACE_COLORS[:engine_count])
-    bars = plt.bar(x_pos, timings_ms, width=BAR_WIDTH, color=bar_colors)
-    plt.gca().bar_label(bars, fmt="%.2f", padding=3)
-    plt.xticks(x_pos, _multiline_xtick_labels(BAR_LABELS), rotation=XTICK_ROTATION, ha="right")
-    plt.ylabel("Time per step (ms)")
-    plt.grid(True, axis="y", alpha=GRID_ALPHA)
+    bars = ax.bar(
+        x_pos,
+        timings_ms,
+        width=BAR_WIDTH,
+        color=bar_colors,
+        edgecolor=BAR_EDGE_COLOR,
+    )
+    ax.bar_label(bars, fmt="%.2f", padding=3)
+    ha = "center" if XTICK_ROTATION == 0 else "right"
+    plt.xticks(
+        x_pos,
+        _multiline_xtick_labels(BAR_LABELS),
+        rotation=XTICK_ROTATION,
+        ha=ha,
+    )
+    plt.ylabel("Mean computation time per simulation step [ms]")
+    plt.title("Contacts included in measurements")
+    ax.grid(axis="y", linestyle=GRID_LINESTYLE, alpha=GRID_ALPHA, color=GRID_COLOR)
     if Y_LIM is not None:
         plt.ylim(*Y_LIM)
     plt.xlim(-0.55, engine_count - 0.45)

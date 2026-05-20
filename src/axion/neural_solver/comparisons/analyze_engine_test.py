@@ -7,9 +7,12 @@ for selected engines and optionally plots them as a bar chart (Figure 1: first K
 Also plots a second figure with three bars: total iterations summed across all
 trajectories per engine (shown via `plt.show()`).
 
-Additionally, for each run, creates a line plot where:
-- x-axis = simulation step index
-- y-axis = iter_count
+When ``SAVE_ITER_COUNTS`` is true, saves per-run iter/step PDFs only for the first
+``FIGURE_1_NUM_RUNS_TO_PLOT`` overlapping runs (same subset as Figure 1).
+
+Additionally, for each saved run, creates a line plot where:
+- x-axis = time step index
+- y-axis = number of Newton iterations
 - one line per engine
 
 Also creates temporal plots for hardcoded slices of:
@@ -27,6 +30,7 @@ from datetime import datetime
 
 import h5py
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FuncFormatter, MaxNLocator
 import numpy as np
 
 
@@ -36,7 +40,10 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parents[4]
 # User configuration
 # ---------------------------------------------------------------------------
 
-INPUT_HDF5 = REPO_ROOT / "data" / "engine_comparison_20260519_173216.hdf5"
+CONTACT_FREE = "engine_comparison_20260427_104521.hdf5"
+CONTACTS_INCLDUED = "engine_comparison_20260519_173216.hdf5"
+
+INPUT_HDF5 = REPO_ROOT / "data" / CONTACTS_INCLDUED
 AXION_GROUP = "axion_engine"
 HYBRID_GROUP = "hybrid_gpt_engine_neural_warm_start_forces"
 REPEATED_GROUP = "repeated_axion_engine"
@@ -54,22 +61,29 @@ ENGINE_LEGEND_LABELS = (
 )
 # Bar colors per engine index (matplotlib default cycle C0..); shared by Figure 1 and 2.
 ENGINE_BAR_FACE_COLORS = ("C0", "C1", "C2")
-SAVE_ITER_COUNTS = False
+# When True, write iter_count vs time-step PDFs for the first FIGURE_1_NUM_RUNS_TO_PLOT runs only
+# (not every trajectory in the HDF5).
+SAVE_ITER_COUNTS = True
 # Figure 1: grouped bar chart of total Newton iterations per trajectory.
-# 0 = skip; N > 0 = plot only the first N runs (from overlapping run indices).
-FIGURE_1_NUM_RUNS_TO_PLOT = 5
+# Same N limits SAVE_ITER_COUNTS PDF output. 0 = skip Figure 1 and save no iter PDFs.
+# N > 0 = first N runs (from overlapping run indices).
+FIGURE_1_NUM_RUNS_TO_PLOT = 15
 LAMBDA_SLICE = (0, 0)
 STATE_SLICE = (0, 0)
 
 BASE_FONTSIZE = 13
 AXES_TICKS_FONTSIZE = BASE_FONTSIZE + 2
-LEGEND_FONTSIZE = BASE_FONTSIZE
+LEGEND_FONTSIZE = BASE_FONTSIZE + 1
 AXES_LABELS_FONTSIZE = BASE_FONTSIZE + 2
-TITLE_FONTSIZE = BASE_FONTSIZE + 2
+TITLE_FONTSIZE = BASE_FONTSIZE
 LINEWIDTH = 2.5
 GRID_ALPHA = 0.3
 LEGEND_LOC = "upper right"
-Y_LIM_ITERATION_PLOTS: tuple[float, float] | None = None
+# Figure size (in) for saved iter_count vs time-step line plots; tick/label sizes use the
+# constants above via _apply_plot_style() and explicit tick_params / legend fontsize below.
+ITER_COUNT_LINE_PLOT_FIGSIZE = (12, 4.5)
+# Optional y-axis limits for Figure 1 only (grouped bar chart). Not used for iter/step PDFs.
+Y_LIM_FIGURE_1: tuple[float, float] | None = (0, 1000)
 
 
 def _figure_2_xtick_labels() -> tuple[str, ...]:
@@ -218,7 +232,12 @@ def main() -> None:
     engine_count = len(engine_groups)
     width = 0.9 / engine_count
 
+    title_top = "Contacts included"
+    title_bottom = "Sum over 50 trajectories"
+    fig_title_two_line = f"{title_top}\n{title_bottom}"
+
     n_fig1 = max(0, int(FIGURE_1_NUM_RUNS_TO_PLOT))
+    run_indices_iter_save = run_indices[: min(n_fig1, len(run_indices))]
     if n_fig1 > 0:
         n_plot = min(n_fig1, len(run_indices))
         run_indices_fig1 = run_indices[:n_plot]
@@ -241,13 +260,9 @@ def main() -> None:
         plt.ylabel("Total number of Newton iterations")
         plt.xlabel("Trajectory number")
         traj_word_fig1 = "trajectory" if n_plot == 1 else "trajectories"
-        title_top = f"Comparison of physics engines"
-        title_bottom = (
-            "Mix of contact-free and contact-containing trajectories"
-        )
-        plt.title(f"{title_top}\n{title_bottom}")
-        if Y_LIM_ITERATION_PLOTS is not None:
-            plt.ylim(*Y_LIM_ITERATION_PLOTS)
+        plt.title(fig_title_two_line)
+        if Y_LIM_FIGURE_1 is not None:
+            plt.ylim(*Y_LIM_FIGURE_1)
         plt.grid(True, axis="y", alpha=GRID_ALPHA)
         plt.legend(loc=LEGEND_LOC)
         plt.tight_layout()
@@ -273,16 +288,16 @@ def main() -> None:
     plt.gca().bar_label(bars, fmt="%d", padding=3)
     plt.xticks(x_pos, _figure_2_xtick_labels(), rotation=25, ha="right")
     plt.ylabel("Total Number of Newton iterations")
-    #plt.title(f"Comparison of physics engines - sum over all trajectories")
+    plt.title(fig_title_two_line)
     plt.grid(True, axis="y", alpha=GRID_ALPHA)
     plt.xlim(-0.55, engine_count - 0.45)
     plt.tight_layout()
     plt.show()
 
-    # --- Per-run iter_count vs simulation-step line plots ---
+    # --- Per-run iter_count vs time-step line plots (subset: first N runs only) ---
     if SAVE_ITER_COUNTS:
         assert iter_plots_dir is not None
-        for run_idx in run_indices:
+        for run_idx in run_indices_iter_save:
             series_by_engine = {
                 engine_group_name: np.ravel(
                     all_series[engine_group_name][run_idx]
@@ -295,31 +310,39 @@ def main() -> None:
             )
             steps = np.arange(num_steps)
 
-            plt.figure(figsize=(12, 4.5))
+            fig, ax = plt.subplots(figsize=ITER_COUNT_LINE_PLOT_FIGSIZE)
             for (engine_group_name, _), legend_label in zip(
                 engine_groups, ENGINE_LEGEND_LABELS
             ):
                 arr = series_by_engine[engine_group_name]
-                plt.plot(
+                ax.plot(
                     steps,
                     arr[:num_steps],
                     label=legend_label,
                     linewidth=LINEWIDTH,
                 )
-            plt.xlabel("Simulation step")
-            plt.ylabel("iter_count")
-            plt.title(f"iter_count vs step (run_{run_idx:03d})")
-            if Y_LIM_ITERATION_PLOTS is not None:
-                plt.ylim(*Y_LIM_ITERATION_PLOTS)
-            plt.grid(True, axis="both", alpha=GRID_ALPHA)
-            plt.legend(loc=LEGEND_LOC)
+            ax.set_xlabel("Time step [-]", fontsize=AXES_LABELS_FONTSIZE)
+            ax.set_ylabel(
+                "Number of Newton iterations", fontsize=AXES_LABELS_FONTSIZE
+            )
+            ax.tick_params(axis="both", labelsize=AXES_TICKS_FONTSIZE)
+            ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+            ax.yaxis.set_major_formatter(
+                FuncFormatter(
+                    lambda x, _pos: (
+                        str(int(round(x))) if np.isfinite(x) else ""
+                    )
+                )
+            )
+            ax.grid(True, axis="both", alpha=GRID_ALPHA)
+            ax.legend(loc=LEGEND_LOC, fontsize=LEGEND_FONTSIZE)
             plt.tight_layout()
 
             out_path = (
-                iter_plots_dir / f"iter_count_vs_step_run_{run_idx:03d}.png"
+                iter_plots_dir / f"iter_count_vs_step_run_{run_idx:03d}.pdf"
             )
-            plt.savefig(out_path, dpi=150)
-            plt.close()
+            fig.savefig(out_path, format="pdf")
+            plt.close(fig)
             print(f"Saved: {out_path}")
 
     # --- Per-run temporal plots for lambda/state slices ---

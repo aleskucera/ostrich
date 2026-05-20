@@ -50,7 +50,7 @@ NN_PENDULUM_CFG_PATH = NN_BASE_PATH/"cfg.yaml"
 
 # Flip to True after running export_to_onnx.py + build_tensorrt_engine.py.
 # Required for `execution: cuda_graph` — only the TRT path is capture-safe.
-USE_TENSORRT_ENGINE = False
+USE_TENSORRT_ENGINE = True
 NN_PENDULUM_PLAN_PATH = NN_PENDULUM_PT_PATH.with_suffix(".plan")
 NN_PENDULUM_META_PATH = NN_PENDULUM_PT_PATH.with_suffix(".engine_meta.pt")
 
