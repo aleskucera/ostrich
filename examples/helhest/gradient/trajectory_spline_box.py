@@ -8,14 +8,14 @@ import numpy as np
 import warp as wp
 from axion import AxionDifferentiableSimulator
 from axion import AxionEngineConfig
-from axion import LoggingConfig
-from axion import RenderingConfig
-from axion import SimulationConfig
 from axion import ComplianceConfig
 from axion import ContactsConfig
 from axion import LinearSolverConfig
 from axion import LinesearchConfig
+from axion import LoggingConfig
 from axion import NewtonRaphsonConfig
+from axion import RenderingConfig
+from axion import SimulationConfig
 from newton import Model
 
 from examples.helhest.common import create_helhest_model
@@ -28,7 +28,7 @@ NUM_WHEEL_DOFS = 3
 
 # Static box obstacle the robot must drive over.
 BOX_CENTER = (1.5, 0.0, 0.05)
-BOX_HALF_EXTENTS = (0.3, 1.5, 0.05)  # 0.6 m long (X), 3.0 m wide (Y), 0.10 m tall
+BOX_HALF_EXTENTS = (0.37, 0.575, 0.06)  # 73 cm long (X), 115 cm wide (Y), 12 cm tall
 
 
 def make_interp_matrix(T: int, K: int) -> tuple[np.ndarray, np.ndarray]:

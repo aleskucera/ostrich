@@ -9,14 +9,14 @@ import openmesh
 import warp as wp
 from axion import AxionDifferentiableSimulator
 from axion import AxionEngineConfig
-from axion import LoggingConfig
-from axion import RenderingConfig
-from axion import SimulationConfig
 from axion import ComplianceConfig
 from axion import ContactsConfig
 from axion import LinearSolverConfig
 from axion import LinesearchConfig
+from axion import LoggingConfig
 from axion import NewtonRaphsonConfig
+from axion import RenderingConfig
+from axion import SimulationConfig
 from newton import Model
 
 from examples.helhest.common import create_helhest_model
@@ -528,14 +528,20 @@ class HelhestTrajectorySplineSurfaceOptimizer(AxionDifferentiableSimulator):
     def _print_final_recovery(self, target_spline: np.ndarray):
         """Show every knot vs target, so we don't have to trust cp[0] alone."""
         print("\n=== Final spline recovery (knot vs target) ===")
-        print(f"Target (constant):  L={TARGET_WHEEL_VEL[0]:.3f} R={TARGET_WHEEL_VEL[1]:.3f} Rear={TARGET_WHEEL_VEL[2]:.3f}")
+        print(
+            f"Target (constant):  L={TARGET_WHEEL_VEL[0]:.3f} R={TARGET_WHEEL_VEL[1]:.3f} Rear={TARGET_WHEEL_VEL[2]:.3f}"
+        )
         print("knot |   L     R    Rear |  errL   errR  errRear")
         for k in range(self.K):
             p = self.spline_params[k]
             e = p - target_spline[k]
-            print(f"  {k:2d} | {p[0]:5.3f} {p[1]:5.3f} {p[2]:5.3f} | {e[0]:+6.3f} {e[1]:+6.3f} {e[2]:+6.3f}")
+            print(
+                f"  {k:2d} | {p[0]:5.3f} {p[1]:5.3f} {p[2]:5.3f} | {e[0]:+6.3f} {e[1]:+6.3f} {e[2]:+6.3f}"
+            )
         err = np.abs(self.spline_params - target_spline)
-        print(f"|err|_max = {err.max():.4f}   |err|_mean = {err.mean():.4f}   ||err||_F = {np.linalg.norm(err):.4f}")
+        print(
+            f"|err|_max = {err.max():.4f}   |err|_mean = {err.mean():.4f}   ||err||_F = {np.linalg.norm(err):.4f}"
+        )
 
 
 def main():
