@@ -224,6 +224,8 @@ def _compute_batched_residual(
             model.body_inv_inertia,
             model.shape_body,
             model.shape_material_mu,
+            model.shape_friction_axis_local,
+            model.shape_mu_perp,
             contacts.contact_count,
             contacts.contact_shape0,
             contacts.contact_shape1,

@@ -64,6 +64,31 @@ class AxionModelBuilder(newton.ModelBuilder):
             )
         )
 
+        # Anisotropic friction: per-shape body-local axis defining the friction
+        # frame. Zero vector => isotropic (use shape_material_mu only). When set,
+        # `shape_material_mu` is the coefficient along the projected axis and
+        # `mu_perp` is the coefficient perpendicular to it in the tangent plane.
+        # `mu_perp` < 0 is a sentinel meaning "same as shape_material_mu".
+        self.add_custom_attribute(
+            newton.ModelBuilder.CustomAttribute(
+                name="friction_axis_local",
+                frequency=Model.AttributeFrequency.SHAPE,
+                dtype=wp.vec3,
+                default=wp.vec3(0.0, 0.0, 0.0),
+                assignment=Model.AttributeAssignment.MODEL,
+            )
+        )
+
+        self.add_custom_attribute(
+            newton.ModelBuilder.CustomAttribute(
+                name="mu_perp",
+                frequency=Model.AttributeFrequency.SHAPE,
+                dtype=wp.float32,
+                default=-1.0,
+                assignment=Model.AttributeAssignment.MODEL,
+            )
+        )
+
     def add_track(
         self,
         parent_body: int,

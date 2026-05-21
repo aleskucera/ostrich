@@ -136,8 +136,16 @@ def _add_wheel(
     ke: float = None,
     kd: float = None,
     kf: float = None,
+    mu_long: float = None,
 ) -> int:
-    """Adds a wheel link, shapes, and returns the link index."""
+    """Adds a wheel link, shapes, and returns the link index.
+
+    Friction model: the wheel spins about body-local Y, so the friction frame
+    is anchored to that axis. `mu` is the lateral coefficient (resists skid
+    along the spin axis); `mu_long` is the longitudinal coefficient (rolling
+    direction, perpendicular to the spin axis in the contact plane). If
+    `mu_long` is None, friction is isotropic with coefficient `mu`.
+    """
     pos_world = wp.transform_point(parent_xform, pos_local)
     rot_world = parent_xform.q
 
@@ -176,12 +184,21 @@ def _add_wheel(
     if kf is not None:
         collision_cfg_kwargs["kf"] = kf
 
+    shape_custom_attrs = {}
+    if mu_long is not None:
+        # Spin axis is body-local Y (matches the revolute joint axis below and the
+        # cylinder's WHEEL_ROT). mu (lateral) is applied along this projected axis;
+        # mu_long (longitudinal/rolling) is perpendicular to it in the tangent plane.
+        shape_custom_attrs["friction_axis_local"] = wp.vec3(0.0, 1.0, 0.0)
+        shape_custom_attrs["mu_perp"] = mu_long
+
     builder.add_shape_cylinder(
         body=wheel_link,
         xform=wp.transform(wp.vec3(0.0, 0.0, 0.0), HelhestConfig.WHEEL_ROT),
         radius=HelhestConfig.WHEEL_RADIUS,
         half_height=HelhestConfig.WHEEL_WIDTH / 2.0,
         cfg=newton.ModelBuilder.ShapeConfig(**collision_cfg_kwargs),
+        custom_attributes=shape_custom_attrs if shape_custom_attrs else None,
     )
     return wheel_link
 
@@ -195,6 +212,8 @@ def create_helhest_model(
     k_d: float = 0.1,
     friction_left_right: float = 0.7,
     friction_rear: float = 0.4,
+    friction_long_left_right: float = None,
+    friction_long_rear: float = None,
     ke: float = None,
     kd: float = None,
     kf: float = None,
@@ -210,8 +229,14 @@ def create_helhest_model(
         control_mode: Actuation mode, either "velocity" or "position".
         k_p: Proportional gain (target_ke).
         k_d: Derivative gain (target_kd).
-        friction_left_right: Friction coefficient for front wheels.
-        friction_rear: Friction coefficient for the rear wheel.
+        friction_left_right: Lateral friction (skid resistance, along the spin
+            axis) for the front wheels.
+        friction_rear: Lateral friction for the rear wheel.
+        friction_long_left_right: Optional longitudinal friction (rolling
+            direction) for the front wheels. If None, isotropic with
+            ``friction_left_right``.
+        friction_long_rear: Optional longitudinal friction for the rear wheel.
+            If None, isotropic with ``friction_rear``.
     """
 
     wheel_mesh_render = _load_wheel_mesh()
@@ -232,6 +257,7 @@ def create_helhest_model(
         ke=ke,
         kd=kd,
         kf=kf,
+        mu_long=friction_long_left_right,
     )
     right_wheel = _add_wheel(
         builder,
@@ -244,6 +270,7 @@ def create_helhest_model(
         ke=ke,
         kd=kd,
         kf=kf,
+        mu_long=friction_long_left_right,
     )
     rear_wheel = _add_wheel(
         builder,
@@ -256,6 +283,7 @@ def create_helhest_model(
         ke=ke,
         kd=kd,
         kf=kf,
+        mu_long=friction_long_rear,
     )
 
     # 3. Wheel Joints
