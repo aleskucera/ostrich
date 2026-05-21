@@ -11,17 +11,18 @@ import sys
 import newton
 import numpy as np
 import warp as wp
-from axion import InteractiveSimulator
-from axion import LoggingConfig
-from axion import RenderingConfig
-from axion import SimulationConfig
-from axion.core.engine_config import AxionEngineConfig
-from axion.core.types import JointMode
 from axion import ComplianceConfig
 from axion import ContactsConfig
+from axion import InteractiveSimulator
 from axion import LinearSolverConfig
 from axion import LinesearchConfig
+from axion import LoggingConfig
 from axion import NewtonRaphsonConfig
+from axion import RenderingConfig
+from axion import SimulationConfig
+from axion.collision import ContactReductionConfig
+from axion.core.engine_config import AxionEngineConfig
+from axion.core.types import JointMode
 
 os.environ["PYOPENGL_PLATFORM"] = "glx"
 
@@ -31,7 +32,7 @@ CHASSIS_HY = 0.4
 CHASSIS_HZ = 0.08
 CHASSIS_MASS = 80.0
 WHEEL_RADIUS = 0.22
-WHEEL_MASS = 10.0
+WHEEL_MASS = 5.0
 NUM_WHEELS = 4
 
 # Terrain parameters
@@ -45,7 +46,7 @@ def create_4wheel_robot(
     is_visible=True,
     k_p=200.0,
     k_d=0.0,
-    wheel_mu=0.3,
+    wheel_mu=0.4,
 ):
     """Simple symmetric 4-wheel robot with sphere wheels."""
     chassis = builder.add_link(xform=xform, label="chassis")
@@ -249,7 +250,7 @@ class UphillDrive(InteractiveSimulator):
             is_visible=True,
             k_p=300.0,
             k_d=0.0,
-            wheel_mu=0.7,
+            wheel_mu=0.1,
         )
 
         return self.builder.finalize_replicated(
@@ -266,7 +267,7 @@ class UphillDrive(InteractiveSimulator):
                 current_state.body_q,
                 self._step_counter,
                 self._settle_steps,
-                25.0,
+                8.0,
                 6,
                 0.0,
             ],
@@ -282,11 +283,14 @@ def main():
     )
     render_config = RenderingConfig(vis_type="gl")
     engine_config = AxionEngineConfig(
-        nr=NewtonRaphsonConfig(max_iters=16, backtrack_min_iter=12, atol=0.001),
-        linear=LinearSolverConfig(max_iters=16, tol=1e-05, atol=1e-05, regularization=1e-06),
-        compliance=ComplianceConfig(joint=5e-06, contact=1.0, friction=1e-12),
+        nr=NewtonRaphsonConfig(max_iters=24, backtrack_min_iter=12, atol=1e-5),
+        linear=LinearSolverConfig(max_iters=24, tol=1e-05, atol=1e-05, regularization=1e-06),
+        compliance=ComplianceConfig(joint=1e-8, contact=1e-10, friction=1e-8),
         linesearch=LinesearchConfig(enabled=False),
-        contacts=ContactsConfig(max_per_world=512),
+        contacts=ContactsConfig(
+            max_per_world=512,
+            reduction=ContactReductionConfig(policy="cluster", max_per_pair=12),
+        ),
     )
     logging_config = LoggingConfig()
 
