@@ -6,11 +6,11 @@ import hydra
 import newton
 import numpy as np
 import warp as wp
-from axion import InteractiveSimulator
 from axion import EngineConfig
+from axion import InteractiveSimulator
+from axion import LoggingConfig
 from axion import RenderingConfig
 from axion import SimulationConfig
-from axion import LoggingConfig
 from omegaconf import DictConfig
 
 try:
@@ -36,7 +36,7 @@ def integrate_wheel_position_kernel(
 ):
     # Drive forward command
     v = 6.0
-    
+
     # Integrate
     new_ang_fl = current_wheel_angles[0] + v * dt
     new_ang_fr = current_wheel_angles[1] + v * dt
@@ -109,10 +109,13 @@ class TarosObstacleSimulator(InteractiveSimulator):
                 dim=1,
                 inputs=[
                     self.wheel_angles,
-                    wp.zeros(1, dtype=wp.float32, device=self.model.device), # dummy
+                    wp.zeros(1, dtype=wp.float32, device=self.model.device),  # dummy
                     self.clock.dt,
                     self.joint_target,
-                    6, 7, 8, 9,
+                    6,
+                    7,
+                    8,
+                    9,
                 ],
                 device=self.model.device,
             )
@@ -153,7 +156,6 @@ class TarosObstacleSimulator(InteractiveSimulator):
             hy=1.0,
             hz=0.1,
             cfg=newton.ModelBuilder.ShapeConfig(
-                contact_margin=0.1,
                 mu=FRICTION,
                 restitution=RESTITUTION,
             ),
@@ -166,7 +168,6 @@ class TarosObstacleSimulator(InteractiveSimulator):
             hy=1.0,
             hz=0.16,
             cfg=newton.ModelBuilder.ShapeConfig(
-                contact_margin=0.1,
                 mu=FRICTION,
                 restitution=RESTITUTION,
             ),
@@ -179,7 +180,6 @@ class TarosObstacleSimulator(InteractiveSimulator):
             hy=1.0,
             hz=0.22,
             cfg=newton.ModelBuilder.ShapeConfig(
-                contact_margin=0.1,
                 mu=FRICTION,
                 restitution=RESTITUTION,
             ),
@@ -188,7 +188,6 @@ class TarosObstacleSimulator(InteractiveSimulator):
         # Ground plane
         self.builder.add_ground_plane(
             cfg=newton.ModelBuilder.ShapeConfig(
-                contact_margin=0.1,
                 ke=KE,
                 kd=KD,
                 kf=KF,

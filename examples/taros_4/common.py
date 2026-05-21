@@ -54,21 +54,27 @@ class Taros4Config:
 
 
 def _load_wheel_mesh():
-    """Loads and prepares the wheel mesh."""
-    # Using a simple cylinder or existing mesh scaled up
-    # Since the original mesh was tiny, scaling it might look weird.
-    # But for now let's reuse it with a larger scale or just rely on collision shape if visual is off.
-    # The existing mesh loading:
+    """Loads the wheel mesh and rescales it to exactly match the collision cylinder.
+
+    offroad_wheel.obj is authored X-axial (radius along Y/Z). We measure the mesh
+    bbox and pick a per-axis scale so the rendered mesh's extent matches
+    ``WHEEL_WIDTH`` along the axial axis and ``2 * WHEEL_RADIUS`` radially.
+    """
     try:
         wheel_m = openmesh.read_trimesh(str(ASSETS_DIR.joinpath("taros-4/offroad_wheel.obj")))
-
-        scale = np.array([0.9, 0.9, 0.9])
-
-        mesh_points = np.array(wheel_m.points()) * scale
+        pts = np.array(wheel_m.points())
+        size = pts.max(axis=0) - pts.min(axis=0)
+        scale = np.array(
+            [
+                Taros4Config.WHEEL_WIDTH / size[0],
+                (2.0 * Taros4Config.WHEEL_RADIUS) / size[1],
+                (2.0 * Taros4Config.WHEEL_RADIUS) / size[2],
+            ]
+        )
+        mesh_points = pts * scale
         mesh_indices = np.array(wheel_m.face_vertex_indices(), dtype=np.int32).flatten()
         return newton.Mesh(mesh_points, mesh_indices)
     except Exception:
-        # Fallback if mesh not found or error
         print("Warning: Could not load wheel mesh, using fallback.")
         return None
 

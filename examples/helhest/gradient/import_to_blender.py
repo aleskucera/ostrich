@@ -153,13 +153,27 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     p.add_argument(
-        "--labels",
-        action=argparse.BooleanOptionalAction,
-        default=False,
+        "--num-snapshots",
+        type=int,
+        default=0,
         help=(
-            "Show floating labels above the robots: 'Target Trajectory' "
-            "above the ghost, 'Iter N | Loss X' above the live robot. "
-            "Off by default; pass --labels to enable."
+            "Evenly subsample the recorded optimization snapshots down to "
+            "this many on the timeline, always keeping the first and last "
+            "(full convergence still visible, just shorter). Indexes the "
+            "logged set by position, not the real optimizer iteration "
+            "number. 0 = show every recorded snapshot."
+        ),
+    )
+    p.add_argument(
+        "--snapshots",
+        type=int,
+        nargs="+",
+        default=None,
+        metavar="I",
+        help=(
+            "Explicit logged-snapshot positions to render (0-based into "
+            "the recorded set), e.g. --snapshots 0 1 5 9. Overrides "
+            "--num-snapshots when given."
         ),
     )
     return p.parse_args(argv)
@@ -690,158 +704,6 @@ class _ConstantInterpolation:
         bpy.context.preferences.edit.keyframe_new_interpolation_type = self._prev
 
 
-def _attach_label_backing(
-    text_obj: bpy.types.Object,
-    text: str,
-    size: float,
-    collection: bpy.types.Collection,
-    color: tuple[float, float, float] = (0.04, 0.04, 0.06),
-    alpha: float = 0.6,
-    pad_x: float = 0.35,
-    pad_y: float = 0.25,
-):
-    """Translucent dark plate parented behind ``text_obj`` for legibility.
-
-    Width/height are estimated from character count × glyph metrics, then padded.
-    The plate is parented to the text so it inherits the Copy-Location and
-    Track-To constraints, and offset along local -Z so it sits just behind the
-    glyphs from the camera's perspective.
-    """
-    width = max(2, len(text)) * size * 0.55 + pad_x * size
-    height = size * 1.1 + pad_y * size
-
-    # Plate spans the text's local extents: text is align_x=CENTER, align_y=BOTTOM,
-    # so its glyphs live in x ∈ [-width/2, width/2], y ∈ [0, height].
-    verts = [
-        (-width / 2.0, -pad_y * size * 0.5, 0.0),
-        (width / 2.0, -pad_y * size * 0.5, 0.0),
-        (width / 2.0, height - pad_y * size * 0.5, 0.0),
-        (-width / 2.0, height - pad_y * size * 0.5, 0.0),
-    ]
-    faces = [(0, 1, 2, 3)]
-    mesh = bpy.data.meshes.new(name=f"{text_obj.name}_backing_mesh")
-    mesh.from_pydata(verts, [], faces)
-    mesh.update()
-
-    plate = bpy.data.objects.new(name=f"{text_obj.name}_backing", object_data=mesh)
-    plate.parent = text_obj
-    # Slightly behind the text along the camera-facing axis (text +Z faces camera).
-    plate.location = (0.0, 0.0, -0.01)
-
-    mat = make_material(f"{plate.name}_mat", color, alpha)
-    plate.data.materials.append(mat)
-    collection.objects.link(plate)
-    return plate
-
-
-def make_floating_label(
-    name: str,
-    follow_body: bpy.types.Object,
-    text: str,
-    size: float,
-    z_offset: float,
-    collection: bpy.types.Collection,
-    color: tuple[float, float, float] = (1.0, 1.0, 1.0),
-    camera: bpy.types.Object | None = None,
-    emission_strength: float = 0.0,
-    backing: bool = False,
-    roughness: float = 1.0,
-) -> bpy.types.Object:
-    """Text that follows ``follow_body``'s position with a fixed Z offset.
-
-    The text inherits the body's location via a Copy Location constraint
-    (so it doesn't spin with the chassis) and, if a camera is provided, gets
-    a Track To constraint that keeps it facing the camera at all angles. The
-    material is a flat Principled BSDF (matte, no emission) — contrast comes
-    from the chosen color rather than glow.
-    """
-    curve = bpy.data.curves.new(name=f"{name}_curve", type="FONT")
-    curve.body = text
-    curve.size = size
-    curve.align_x = "CENTER"
-    curve.align_y = "BOTTOM"
-    obj = bpy.data.objects.new(name=name, object_data=curve)
-
-    mat = make_material(
-        f"{name}_mat",
-        color,
-        1.0,
-        roughness=roughness,
-        emission_strength=emission_strength,
-    )
-    obj.data.materials.append(mat)
-
-    obj.location = (0.0, 0.0, z_offset)
-    copy_loc = obj.constraints.new("COPY_LOCATION")
-    copy_loc.target = follow_body
-    copy_loc.use_offset = True
-
-    if camera is not None:
-        track = obj.constraints.new("TRACK_TO")
-        track.target = camera
-        track.track_axis = "TRACK_Z"
-        track.up_axis = "UP_Y"
-
-    collection.objects.link(obj)
-
-    if backing:
-        _attach_label_backing(obj, text, size, collection)
-
-    return obj
-
-
-def make_floating_iteration_labels(
-    follow_body: bpy.types.Object,
-    iter_indices: np.ndarray,
-    iter_losses: np.ndarray,
-    T: int,
-    collection: bpy.types.Collection,
-    camera: bpy.types.Object | None = None,
-    size: float = 0.4,
-    z_offset: float = 0.8,
-    color: tuple[float, float, float] = (1.0, 1.0, 1.0),
-    period: int | None = None,
-):
-    """One floating label per iteration above ``follow_body``; visibility keyframed.
-
-    ``period`` is the per-iteration stride on the timeline (``T`` plus any pause
-    between iterations). Defaults to ``T`` when no pause is configured.
-    """
-    if period is None:
-        period = T
-    n_iters = len(iter_indices)
-    with _ConstantInterpolation():
-        for it_idx in range(n_iters):
-            it_label = int(iter_indices[it_idx])
-            loss = float(iter_losses[it_idx])
-            obj = make_floating_label(
-                name=f"label_iter_{it_label}",
-                follow_body=follow_body,
-                text=f"Iter {it_label}  |  Loss {loss:.4f}",
-                size=size,
-                z_offset=z_offset,
-                collection=collection,
-                color=color,
-                camera=camera,
-            )
-            start = it_idx * period
-            end = (it_idx + 1) * period
-
-            obj.hide_render = True
-            obj.hide_viewport = True
-            obj.keyframe_insert("hide_render", frame=0)
-            obj.keyframe_insert("hide_viewport", frame=0)
-            obj.hide_render = False
-            obj.hide_viewport = False
-            obj.keyframe_insert("hide_render", frame=start)
-            obj.keyframe_insert("hide_viewport", frame=start)
-            if it_idx < n_iters - 1:
-                obj.hide_render = True
-                obj.hide_viewport = True
-                obj.keyframe_insert("hide_render", frame=end)
-                obj.keyframe_insert("hide_viewport", frame=end)
-
-
 def _resample_equidistant(path: np.ndarray, spacing: float) -> tuple[np.ndarray, np.ndarray]:
     """Resample a [T, 3] polyline at points ~spacing apart along its arc length.
 
@@ -1108,6 +970,38 @@ def main():
     iter_losses = np.asarray(data["iter_losses"])
     shapes = list(data["shapes"])
 
+    # Optionally subsample the logged snapshots to shorten the timeline.
+    n_logged = body_pose_iters.shape[0]
+    if args.snapshots is not None:
+        sel = sorted({i for i in args.snapshots if 0 <= i < n_logged})
+        if not sel:
+            raise ValueError(
+                f"--snapshots {args.snapshots} selected nothing; valid "
+                f"positions are 0..{n_logged - 1}."
+            )
+    elif args.num_snapshots and 0 < args.num_snapshots < n_logged:
+        # Evenly spaced positions, first and last always included.
+        sel = sorted(
+            set(
+                np.linspace(0, n_logged - 1, args.num_snapshots)
+                .round()
+                .astype(int)
+                .tolist()
+            )
+        )
+    else:
+        sel = None
+    if sel is not None:
+        sel_idx = np.asarray(sel, dtype=int)
+        body_pose_iters = body_pose_iters[sel_idx]
+        iter_indices = iter_indices[sel_idx]
+        iter_losses = iter_losses[sel_idx]
+        print(
+            f"Subsampled {n_logged} logged snapshots → {len(sel)} "
+            f"(positions {sel}; real iters "
+            f"{[int(i) for i in iter_indices]})."
+        )
+
     n_iters = body_pose_iters.shape[0]
     T = target_body_pose.shape[0]
     pause_frames = max(0, int(round(float(args.pause_seconds) * fps)))
@@ -1145,9 +1039,8 @@ def main():
         falloff=str(args.fog_falloff),
     )
 
-    # Static 3/4 camera auto-framed to the bounding box of all chassis positions
-    # (live across iterations + target). Done before label creation so the
-    # floating labels' Track To constraint picks this camera up.
+    # Static 3/4 camera auto-framed to the bounding box of all chassis
+    # positions (sim robots across snapshots + the real reference).
     chassis_points = np.concatenate(
         [
             body_pose_iters[:, :, 0, :3].reshape(-1, 3),
@@ -1168,62 +1061,113 @@ def main():
     )
 
     static_coll = bpy.data.collections.new("static")
-    live_coll = bpy.data.collections.new("live")
-    ghost_coll = bpy.data.collections.new("ghost")
-    for c in (static_coll, live_coll, ghost_coll):
+    real_coll = bpy.data.collections.new("real")
+    sim_coll = bpy.data.collections.new("sim")
+    for c in (static_coll, real_coll, sim_coll):
         scene.collection.children.link(c)
 
-    live_materials: dict[int, bpy.types.Material] = {}
+    # --- Real robot: the physical reference trajectory we're fitting.
+    # Opaque, gunmetal-industrial so it reads as a real machine next to the
+    # bright "simulation" robot. The terrain is built on this pass.
+    REAL_CHASSIS = (0.20, 0.22, 0.26)  # brushed gunmetal
+    REAL_WHEEL = (0.05, 0.05, 0.06)  # near-black rubber
+    real_materials: dict[int, bpy.types.Material] = {}
 
-    def material_for_live(body_idx: int) -> bpy.types.Material:
-        if body_idx not in live_materials:
-            color = live_color_for_body(body_idx)
+    def material_for_real(body_idx: int) -> bpy.types.Material:
+        if body_idx not in real_materials:
             if body_idx == -1:
-                live_materials[body_idx] = make_material("live_static", color, 1.0, roughness=0.95)
+                real_materials[body_idx] = make_material(
+                    "real_static", STATIC_COLOR, 1.0, roughness=0.95
+                )
+            elif body_idx == 0:
+                real_materials[body_idx] = make_material(
+                    "real_chassis", REAL_CHASSIS, 1.0, roughness=0.35
+                )
             else:
-                live_materials[body_idx] = make_material(f"live_body_{body_idx}", color, 1.0)
-        return live_materials[body_idx]
+                real_materials[body_idx] = make_material(
+                    f"real_wheel_{body_idx}", REAL_WHEEL, 1.0, roughness=0.6
+                )
+        return real_materials[body_idx]
 
-    ghost_mat = make_material("ghost", tuple(args.ghost_color), float(args.ghost_alpha))
-
-    live_bodies = build_robot(shapes, "live", material_for_live, static_coll, live_coll)
-    ghost_bodies = build_robot(
-        shapes, "ghost", lambda _b: ghost_mat, static_coll, ghost_coll, include_static=False
+    real_bodies = build_robot(
+        shapes, "real", material_for_real, static_coll, real_coll, include_static=True
     )
-    for empty in live_bodies.values():
+    for empty in real_bodies.values():
         empty.empty_display_size = 0.0
     add_terrain_wireframe(static_coll)
 
-    if args.labels:
-        # Floating labels: "Target Trajectory" above the ghost chassis,
-        # per-iteration "Iter N | Loss X" above the live chassis.
-        label_coll = bpy.data.collections.new("floating_labels")
-        scene.collection.children.link(label_coll)
-        camera = bpy.context.scene.camera
-        if 0 in ghost_bodies:
-            make_floating_label(
-                name="target_label",
-                follow_body=ghost_bodies[0],
-                text="Target Trajectory",
-                size=0.4,
-                z_offset=1.7,
-                collection=label_coll,
-                color=tuple(args.ghost_color),
-                camera=camera,
-            )
-        if 0 in live_bodies:
-            make_floating_iteration_labels(
-                follow_body=live_bodies[0],
-                iter_indices=iter_indices,
-                iter_losses=iter_losses,
-                T=T,
-                collection=label_coll,
-                camera=camera,
-                color=LIVE_PALETTE[0],
-                period=period,
-            )
+    # --- Simulation robots: one instance per snapshot. During its own
+    # segment it is the bright "current attempt"; in every later segment it
+    # lingers as a translucent ghost whose opacity decays with age — our
+    # past attempts fading out. Visibility + fade are driven entirely by one
+    # animated Alpha fcurve per material (0 before it appears, 1 in its own
+    # segment, then a stepped exponential decay).
+    GHOST_DECAY = 0.5
+    GHOST_MIN_ALPHA = 0.12
 
-    # Breadcrumbs: chassis path per iteration, accumulating across the timeline.
+    def _force_hashed(mat: bpy.types.Material):
+        for attr, value in (("blend_method", "HASHED"), ("shadow_method", "HASHED")):
+            if hasattr(mat, attr):
+                setattr(mat, attr, value)
+        if hasattr(mat, "surface_render_method"):
+            mat.surface_render_method = "DITHERED"
+
+    def _keyframe_sim_alpha(mat: bpy.types.Material, k: int):
+        a = mat.node_tree.nodes["Principled BSDF"].inputs["Alpha"]
+
+        def key(frame: int, value: float):
+            a.default_value = float(value)
+            a.keyframe_insert("default_value", frame=int(frame))
+
+        if k > 0:
+            key(0, 0.0)
+            key(k * period - 1, 0.0)  # invisible until this snapshot appears
+        key(k * period, 1.0)  # pops in bright as the current attempt
+        key((k + 1) * period - 1, 1.0)  # held bright through its own segment
+        for j in range(k + 1, n_iters):
+            v = GHOST_MIN_ALPHA + (1.0 - GHOST_MIN_ALPHA) * (GHOST_DECAY ** (j - k))
+            key(j * period, v)  # step down to ghost when next attempt starts
+            key((j + 1) * period - 1, v)  # flat ghost across that segment
+
+    sim_chassis: list[bpy.types.Object | None] = []
+    for k in range(n_iters):
+        sim_mats: dict[int, bpy.types.Material] = {}
+
+        def material_for_sim(
+            body_idx: int, _k: int = k, _store: dict = sim_mats
+        ) -> bpy.types.Material:
+            if body_idx not in _store:
+                mat = make_material(
+                    f"sim{_k}_body_{body_idx}", live_color_for_body(body_idx), 1.0
+                )
+                _force_hashed(mat)
+                _store[body_idx] = mat
+            return _store[body_idx]
+
+        sim_bodies = build_robot(
+            shapes,
+            f"sim{k}",
+            material_for_sim,
+            static_coll,
+            sim_coll,
+            include_static=False,
+        )
+        for empty in sim_bodies.values():
+            empty.empty_display_size = 0.0
+        sim_chassis.append(sim_bodies.get(0))
+
+        # This snapshot drives its own path only during its own segment.
+        # Blender's default constant fcurve extrapolation then holds it at
+        # its final pose for the rest of the timeline, so past attempts sit
+        # frozen at where they ended (and fade out via the alpha curve)
+        # instead of all replaying at once — much less visually busy.
+        keyframe_bodies(sim_bodies, body_pose_iters[k], frame_offset=k * period)
+
+        for mat in sim_mats.values():
+            _keyframe_sim_alpha(mat, k)
+
+    # Breadcrumbs: per-snapshot chassis path, accumulating + fading across the
+    # timeline (the path-history half of "our past").
     trail_coll = bpy.data.collections.new("breadcrumbs")
     scene.collection.children.link(trail_coll)
     make_breadcrumb_trails(
@@ -1236,32 +1180,27 @@ def main():
         period=period,
     )
 
-    # Target trail: ground-truth chassis path, laid down by the ghost during iter 0
-    # and kept visible (no fade) thereafter.
-    target_trail_coll = bpy.data.collections.new("target_trail")
-    scene.collection.children.link(target_trail_coll)
+    # Real-robot path: the ground-truth reference line, laid down once and
+    # kept fully visible (it never fades — it's what we're matching).
+    real_trail_coll = bpy.data.collections.new("real_trail")
+    scene.collection.children.link(real_trail_coll)
     make_target_trail(
         target_body_pose,
         chassis_body_idx=0,
         color=tuple(args.ghost_color),
-        collection=target_trail_coll,
+        collection=real_trail_coll,
     )
 
-    # Animate: ghost follows the constant target trajectory, live cycles through iterations.
-    # Each iteration occupies `period` frames: T drive frames followed by `pause_frames`
-    # frames of held end-pose (so the eye gets a beat between iterations).
+    # Animate: the real robot drives its constant reference trajectory in
+    # every segment (the sim robots were keyframed at build time). Each
+    # segment is T drive frames + pause_frames of held end-pose.
     for it in range(n_iters):
         offset = it * period
-        keyframe_bodies(live_bodies, body_pose_iters[it], frame_offset=offset)
-        keyframe_bodies(ghost_bodies, target_body_pose, frame_offset=offset)
+        keyframe_bodies(real_bodies, target_body_pose, frame_offset=offset)
         if pause_frames > 0 and it < n_iters - 1:
-            # Hold the iteration's last pose at the final pause frame so linear
-            # interpolation between drive-end and pause-end stays constant; the
-            # next iteration's first keyframe (one frame later) then "snaps"
-            # the bodies back to the start pose.
-            hold_frame = offset + period - 1
-            keyframe_bodies(live_bodies, body_pose_iters[it, -1:], frame_offset=hold_frame)
-            keyframe_bodies(ghost_bodies, target_body_pose[-1:], frame_offset=hold_frame)
+            keyframe_bodies(
+                real_bodies, target_body_pose[-1:], frame_offset=offset + period - 1
+            )
 
     if args.output:
         bpy.ops.wm.save_as_mainfile(filepath=str(args.output.resolve()))

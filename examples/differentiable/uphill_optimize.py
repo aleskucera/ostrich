@@ -14,16 +14,17 @@ import newton
 import numpy as np
 import warp as wp
 from axion import AxionDifferentiableSimulator
-from axion import LoggingConfig
-from axion import RenderingConfig
-from axion import SimulationConfig
-from axion.core.engine_config import AxionEngineConfig
-from axion.core.types import JointMode
 from axion import ComplianceConfig
 from axion import ContactsConfig
 from axion import LinearSolverConfig
 from axion import LinesearchConfig
+from axion import LoggingConfig
 from axion import NewtonRaphsonConfig
+from axion import RenderingConfig
+from axion import SimulationConfig
+from axion.collision import ContactReductionConfig
+from axion.core.engine_config import AxionEngineConfig
+from axion.core.types import JointMode
 from newton import Model
 
 os.environ["PYOPENGL_PLATFORM"] = "glx"
@@ -211,7 +212,7 @@ class UphillOptimizer(AxionDifferentiableSimulator):
             is_visible=True,
             k_p=300.0,
             k_d=0.0,
-            wheel_mu=0.7,
+            wheel_mu=0.1,
         )
 
         return self.builder.finalize_replicated(
@@ -347,7 +348,7 @@ class UphillOptimizer(AxionDifferentiableSimulator):
         self.W, self.W_col_sums = make_interp_matrix(T, self.K)
 
         # Initial guess
-        self.spline_params = np.ones(self.K, dtype=np.float64) * 20.0
+        self.spline_params = np.ones(self.K, dtype=np.float64) * 8.0
         self.spline_adam = SplineAdam(K=self.K, lr=0.2)
         self._apply_params(self.spline_params)
 
@@ -453,7 +454,13 @@ class UphillOptimizer(AxionDifferentiableSimulator):
             _, speeds_final = spline_history[-1]
 
             ax.plot(time_axis, v_chassis, "r-", linewidth=1.5, label="Chassis forward vel")
-            ax.plot(time_axis, WHEEL_RADIUS * speeds_final, "b--", alpha=0.7, label="Wheel surface speed")
+            ax.plot(
+                time_axis,
+                WHEEL_RADIUS * speeds_final,
+                "b--",
+                alpha=0.7,
+                label="Wheel surface speed",
+            )
             ax.axhline(0, color="k", linewidth=0.5)
 
             # Mark slippery section
@@ -482,11 +489,14 @@ def main():
     )
     render_config = RenderingConfig(vis_type="gl")
     engine_config = AxionEngineConfig(
-        nr=NewtonRaphsonConfig(max_iters=16, backtrack_min_iter=12, atol=0.001),
-        linear=LinearSolverConfig(max_iters=16, tol=1e-05, atol=1e-05, regularization=1e-06),
-        compliance=ComplianceConfig(joint=5e-06, contact=1.0, friction=1e-05),
+        nr=NewtonRaphsonConfig(max_iters=24, backtrack_min_iter=12, atol=1e-3),
+        linear=LinearSolverConfig(max_iters=24, tol=1e-05, atol=1e-05, regularization=1e-06),
+        compliance=ComplianceConfig(joint=5e-10, contact=1e-10, friction=1e-8),
         linesearch=LinesearchConfig(enabled=False),
-        contacts=ContactsConfig(max_per_world=512),
+        contacts=ContactsConfig(
+            max_per_world=256,
+            reduction=ContactReductionConfig(policy="cluster", max_per_pair=8),
+        ),
     )
     logging_config = LoggingConfig()
 
