@@ -1,7 +1,60 @@
-from dataclasses import dataclass
-from typing import Any
-from typing import Callable
-from typing import Optional
+"""Engine config dataclasses.
+
+`AxionEngineConfig` is structured as a small set of sub-configs, one
+per concern:
+
+  nr            - Newton-Raphson outer loop control
+  linear        - PCR linear solver + preconditioner
+  compliance    - per-constraint-type compliance values
+  linesearch    - opt-in line search (off by default)
+  warm_start    - cross-step contact warm-start + cold-start heuristics
+  contacts      - max contacts per world + per-pair reduction policy
+  adjoint       - differentiable-simulation adjoint pass options
+  profiling     - segment timing + event-based GPU profiler
+
+Each sub-config validates itself in __post_init__; AxionEngineConfig's
+own __post_init__ coerces Hydra DictConfig overrides through each
+sub-config's `coerce()` classmethod (so partial YAML overrides like
+`engine.linesearch.enabled=true` work even when only one field is set).
+
+The non-Axion engine configs (Featherstone, MuJoCo, XPBD, SemiImplicit)
+live at the bottom of this module and remain flat — they wrap upstream
+Newton solvers which keep their own conventions.
+"""
+from dataclasses import dataclass, field, fields
+from typing import Any, Callable, Optional
+
+from axion.collision import ContactReductionConfig
+
+from axion.profiling import VALID_MODES as _VALID_PROFILING_MODES
+
+
+# -----------------------------------------------------------------------
+# Helpers
+# -----------------------------------------------------------------------
+
+
+def _coerce(cls, value):
+    """Coerce a Hydra DictConfig (or dict-like) into an instance of `cls`.
+
+    Hydra leaves nested overrides as DictConfig at instantiation time
+    rather than as a real dataclass instance. This walker re-instantiates
+    by filtering to the dataclass's known fields and constructing fresh.
+    Returns `value` unchanged if it's already an instance of `cls`.
+    """
+    if isinstance(value, cls):
+        return value
+    try:
+        items = dict(value)
+    except Exception:
+        return cls()
+    valid = {f.name for f in fields(cls)}
+    return cls(**{k: v for k, v in items.items() if k in valid})
+
+
+# -----------------------------------------------------------------------
+# Base
+# -----------------------------------------------------------------------
 
 
 @dataclass(frozen=True)
@@ -16,13 +69,16 @@ class EngineConfig:
         model: Any,
         sim_steps: Optional[int] = None,
         logging_config: Optional[Any] = None,
-        differentiable_simulation: bool = False,
+        differentiable_simulation: Optional[bool] = None,
     ) -> Any:
         """
         Factory method to create the appropriate solver instance.
 
         For standard Newton solvers (Featherstone, MuJoCo, etc.), this
         automatically passes all configuration fields as kwargs.
+
+        `differentiable_simulation`: explicit kwarg overrides the
+        config's own field (if any). Pass None to use the config field.
 
         Note: We intentionally DO NOT pass 'logging_config' to generic solvers
         because they do not support this custom Axion logging system.
@@ -37,165 +93,356 @@ class EngineConfig:
         )
 
 
+# -----------------------------------------------------------------------
+# Sub-configs for AxionEngineConfig
+# -----------------------------------------------------------------------
+
+
 @dataclass(frozen=True)
-class AxionEngineConfig(EngineConfig):
-    """
-    Configuration parameters for the AxionEngine solver.
+class NewtonRaphsonConfig:
+    """Outer Newton-Raphson loop control."""
 
-    This object centralizes all tunable parameters for the physics simulation,
-    including solver iterations, stabilization factors, and compliance values.
-    Making it a frozen dataclass ensures that configuration is immutable
-    during a simulation run.
-    """
+    max_iters: int = 16
+    backtrack_min_iter: int = 2
+    atol: float = 1e-3
 
-    # --- Physics Parameters ---
-    max_newton_iters: int = 8
-    max_linear_iters: int = 16
+    def __post_init__(self):
+        if self.max_iters < 1:
+            raise ValueError(f"nr.max_iters must be >= 1, got {self.max_iters}")
+        if self.backtrack_min_iter < 0:
+            raise ValueError(
+                f"nr.backtrack_min_iter must be >= 0, got {self.backtrack_min_iter}"
+            )
+        if self.backtrack_min_iter >= self.max_iters:
+            raise ValueError(
+                f"nr.backtrack_min_iter must be < nr.max_iters, "
+                f"got {self.backtrack_min_iter} and {self.max_iters}"
+            )
+        if self.atol < 0:
+            raise ValueError(f"nr.atol must be >= 0, got {self.atol}")
 
-    backtrack_min_iter: int = 5
+    @classmethod
+    def coerce(cls, obj):
+        return _coerce(cls, obj)
 
-    newton_mode: str = "convergence"  # "convergence" / "fixed"
-    linear_mode: str = "convergence"  # "convergence" / "fixed"
 
-    newton_atol: float = 5e-2
+@dataclass(frozen=True)
+class LinearSolverConfig:
+    """Inner PCR linear solver + preconditioner."""
 
-    linear_tol: float = 1e-5
-    linear_atol: float = 1e-5
-
-    joint_compliance: float = 1e-5
-    contact_compliance: float = 1e-6
-    friction_compliance: float = 1e-6
-
+    max_iters: int = 16
+    tol: float = 1e-5
+    atol: float = 1e-5
+    preconditioner_type: str = "jacobi"  # "jacobi" | "per_body_pair"
     regularization: float = 1e-6
 
-    contact_fb_alpha: float = 1.0
-    contact_fb_beta: float = 1.0
-    friction_fb_alpha: float = 1.0
-    friction_fb_beta: float = 1.0
+    def __post_init__(self):
+        if self.max_iters < 1:
+            raise ValueError(f"linear.max_iters must be >= 1, got {self.max_iters}")
+        if self.tol < 0:
+            raise ValueError(f"linear.tol must be >= 0, got {self.tol}")
+        if self.atol < 0:
+            raise ValueError(f"linear.atol must be >= 0, got {self.atol}")
+        if self.regularization < 0:
+            raise ValueError(
+                f"linear.regularization must be >= 0, got {self.regularization}"
+            )
+        if self.preconditioner_type not in ("jacobi", "per_body_pair"):
+            raise ValueError(
+                "linear.preconditioner_type must be 'jacobi' | 'per_body_pair', "
+                f"got {self.preconditioner_type!r}"
+            )
 
-    enable_linesearch: bool = False
+    @classmethod
+    def coerce(cls, obj):
+        return _coerce(cls, obj)
 
-    # --- 1. Conservative Cluster (Safety first) ---
-    linesearch_conservative_step_count: int = 32
-    linesearch_conservative_upper_bound: float = 0.05
-    linesearch_min_step: float = 1e-6
 
-    # --- 2. Optimistic Cluster (The "Attitude") ---
-    linesearch_optimistic_step_count: int = 32
-    linesearch_optimistic_window: float = 0.2
+@dataclass(frozen=True)
+class ComplianceConfig:
+    """Per-constraint-type compliance (regularization on the FB block)."""
 
-    max_contacts_per_world: int = 128
+    joint: float = 1e-5
+    contact: float = 1e-4
+    friction: float = 1e-6
+    # Smoothing parameter inside the contact-FB norm:
+    #   φ_ε(a, b) = α·a + β·b − √((α·a)² + (β·b)² + fb_smooth_eps_sq).
+    # Default 1e-8 reproduces pre-existing behavior. Larger values
+    # remove the corner degeneracy at (λ_n>0, signed_dist=0) — the
+    # place seeded warm-starts land — at the cost of slightly soft
+    # complementarity (λ·g ≈ fb_smooth_eps_sq at convergence).
+    contact_fb_smooth_eps_sq: float = 1e-8
 
-    joint_constraint_level: str = "pos"  # pos / vel
-    contact_constraint_level: str = "pos"  # pos / vel
+    def __post_init__(self):
+        for name in ("joint", "contact", "friction"):
+            v = getattr(self, name)
+            if v < 0:
+                raise ValueError(f"compliance.{name} must be >= 0, got {v}")
 
-    # --- Differentiable Simulation ---
-    differentiable_simulation: bool = False
+    @classmethod
+    def coerce(cls, obj):
+        return _coerce(cls, obj)
 
-    # --- Logging & Profiling (MOVED HERE from Base Class) ---
-    enable_timing: bool = False
-    enable_hdf5_logging: bool = False
-    hdf5_log_file: str = "simulation.h5"
 
-    log_dynamics_state: bool = True
-    log_linear_system_data: bool = True
-    log_constraint_data: bool = True
+@dataclass(frozen=True)
+class LinesearchConfig:
+    """Backtracking line search (off by default)."""
+
+    enabled: bool = False
+    min_step: float = 1e-6
+    conservative_step_count: int = 32
+    conservative_upper_bound: float = 0.05
+    optimistic_step_count: int = 32
+    optimistic_window: float = 0.2
 
     @property
-    def num_linesearch_steps(self):
-        num_steps = self.linesearch_conservative_step_count
-        num_steps += self.linesearch_optimistic_step_count
-        return num_steps
+    def num_steps(self) -> int:
+        """Total candidate step count = conservative + optimistic."""
+        return self.conservative_step_count + self.optimistic_step_count
+
+    def __post_init__(self):
+        if not self.enabled:
+            return  # Skip strict validation when off; defaults are inactive.
+        if self.conservative_step_count < 1:
+            raise ValueError(
+                "linesearch.conservative_step_count must be >= 1, "
+                f"got {self.conservative_step_count}"
+            )
+        if self.optimistic_step_count < 1:
+            raise ValueError(
+                "linesearch.optimistic_step_count must be >= 1, "
+                f"got {self.optimistic_step_count}"
+            )
+        if self.min_step < 0:
+            raise ValueError(f"linesearch.min_step must be >= 0, got {self.min_step}")
+        if self.conservative_upper_bound <= self.min_step:
+            raise ValueError(
+                "linesearch.conservative_upper_bound must be > min_step, "
+                f"got {self.conservative_upper_bound} and {self.min_step}"
+            )
+        if self.optimistic_window < 0:
+            raise ValueError(
+                f"linesearch.optimistic_window must be >= 0, got {self.optimistic_window}"
+            )
+
+    @classmethod
+    def coerce(cls, obj):
+        return _coerce(cls, obj)
+
+
+@dataclass(frozen=True)
+class WarmStartConfig:
+    """Cross-step contact warm-start + cold-start heuristics for unmatched contacts.
+
+    See `axion/collision/warm_start.py` for the predicted-position
+    matching algorithm and the three cold-start terms.
+    """
+
+    enabled: bool = True
+    cold_gravity: bool = True       # alpha: per-body residual-gravity split
+    cold_impact: bool = True        # beta: m_eff * (-v_n) / dt
+    cold_friction_v_threshold: float = 0.1  # gamma; auto-off when ≤ 0
+    # Matching method:
+    #   "position_match"  — original per-contact predicted-position match.
+    #                       Reliable in stationary regimes, fails for
+    #                       moving contacts (mesh-vertex jitter, terrain-
+    #                       triangle changes, rolling-wheel kinematics).
+    #   "pair_aggregate"  — sum prev-step λ_n per body pair, distribute
+    #                       uniformly over current contacts in the same
+    #                       pair. Robust to contact identity drift.
+    method: str = "position_match"
+    # If True, seed the NR initial iterate ``_constr_force`` from
+    # ``_constr_force_prev_iter`` after warm_starter.apply. Only the
+    # contact-normal slots are populated by warm_starter; joint and
+    # friction slots stay zero. Default False — pair_aggregate is the
+    # first method that produces seeds reliable enough for this to be
+    # worth wiring up.
+    seed_iterate: bool = False
+
+    def __post_init__(self):
+        if self.cold_friction_v_threshold < 0:
+            # Negative threshold is allowed as "off" — just normalize.
+            pass
+        if self.method not in ("position_match", "pair_aggregate"):
+            raise ValueError(
+                f"WarmStartConfig.method must be 'position_match' or "
+                f"'pair_aggregate', got {self.method!r}"
+            )
+
+    @classmethod
+    def coerce(cls, obj):
+        return _coerce(cls, obj)
+
+
+@dataclass(frozen=True)
+class ContactsConfig:
+    """Contact-set sizing and per-pair reduction policy."""
+
+    max_per_world: int = 128
+    reduction: ContactReductionConfig = field(
+        default_factory=ContactReductionConfig
+    )
+
+    def __post_init__(self):
+        if self.max_per_world < 1:
+            raise ValueError(
+                f"contacts.max_per_world must be >= 1, got {self.max_per_world}"
+            )
+        coerced = ContactReductionConfig.coerce(self.reduction)
+        if coerced is not self.reduction:
+            object.__setattr__(self, "reduction", coerced)
+
+    @classmethod
+    def coerce(cls, obj):
+        return _coerce(cls, obj)
+
+
+@dataclass(frozen=True)
+class AdjointConfig:
+    """Adjoint backward-pass interventions for differentiable simulation."""
+
+    soft_blending: bool = True
+    soft_blending_temperature: float = 0.05
+    regularization: float = 0.0
+    gradient_normalization: bool = False
+
+    def __post_init__(self):
+        if self.soft_blending_temperature <= 0:
+            raise ValueError(
+                "adjoint.soft_blending_temperature must be > 0, "
+                f"got {self.soft_blending_temperature}"
+            )
+        if self.regularization < 0:
+            raise ValueError(
+                "adjoint.regularization must be >= 0, "
+                f"got {self.regularization}"
+            )
+
+    @classmethod
+    def coerce(cls, obj):
+        return _coerce(cls, obj)
+
+
+@dataclass(frozen=True)
+class ProfilingConfig:
+    """Engine performance profiling.
+
+    Two complementary mechanisms; both require use_cuda_graph=True and
+    one engine.step per captured segment for valid output.
+
+    `segment_timing`: coarse host-side timer. Wraps wp.capture_launch
+        with synchronize + time.perf_counter and prints ms/step. Quick
+        "is this version faster?" check during development.
+
+    `mode`: event-based GPU profiler. Three modes:
+        "off"            — no events recorded
+        "end_to_end"     — times major step phases (collide, load_data,
+                           nr_solve, backtracking, output_copy)
+        "per_component"  — times each NR iter's sub-phases
+                           (linear_system, preconditioner, cr_solve,
+                           step_or_linesearch, convergence_check).
+                           Replaces wp.capture_while with a fixed unroll
+                           of length max_newton_iters; every step pays
+                           max iters (no early exit).
+    """
+
+    segment_timing: bool = False
+    mode: str = "off"  # "off" | "end_to_end" | "per_component"
+
+    def __post_init__(self):
+        if self.mode not in _VALID_PROFILING_MODES:
+            raise ValueError(
+                f"profiling.mode must be one of {_VALID_PROFILING_MODES}, "
+                f"got {self.mode!r}"
+            )
+
+    @classmethod
+    def coerce(cls, obj):
+        return _coerce(cls, obj)
+
+
+# -----------------------------------------------------------------------
+# AxionEngineConfig
+# -----------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class AxionEngineConfig(EngineConfig):
+    """Configuration for the AxionEngine solver, organized into sub-configs.
+
+    Top-level fields:
+        differentiable: enable adjoint backward-pass support (allocates
+            gradient buffers). Can also be set via the
+            ``differentiable_simulation`` kwarg on ``create_engine()``,
+            which overrides this field if explicitly passed.
+
+    Sub-configs:
+        nr           - NewtonRaphsonConfig — outer NR loop control
+        linear       - LinearSolverConfig  — PCR + preconditioner
+        compliance   - ComplianceConfig    — joint/contact/friction
+        linesearch   - LinesearchConfig    — backtracking line search
+        warm_start   - WarmStartConfig     — cross-step contact warm start
+        contacts     - ContactsConfig      — max + per-pair reduction
+        adjoint      - AdjointConfig       — adjoint pass options
+        profiling    - ProfilingConfig     — timing + event profiler
+    """
+
+    differentiable: bool = False
+
+    nr: NewtonRaphsonConfig = field(default_factory=NewtonRaphsonConfig)
+    linear: LinearSolverConfig = field(default_factory=LinearSolverConfig)
+    compliance: ComplianceConfig = field(default_factory=ComplianceConfig)
+    linesearch: LinesearchConfig = field(default_factory=LinesearchConfig)
+    warm_start: WarmStartConfig = field(default_factory=WarmStartConfig)
+    contacts: ContactsConfig = field(default_factory=ContactsConfig)
+    adjoint: AdjointConfig = field(default_factory=AdjointConfig)
+    profiling: ProfilingConfig = field(default_factory=ProfilingConfig)
 
     def create_engine(
         self,
         model: Any,
         sim_steps: Optional[int] = None,
         logging_config: Optional[Any] = None,
-        differentiable_simulation: bool = False,
+        differentiable_simulation: Optional[bool] = None,
     ):
         from axion.core.engine import AxionEngine
 
+        diff = (
+            self.differentiable
+            if differentiable_simulation is None
+            else differentiable_simulation
+        )
         return AxionEngine(
             model=model,
             sim_steps=sim_steps,
             config=self,
             logging_config=logging_config,
-            differentiable_simulation=differentiable_simulation,
+            differentiable_simulation=diff,
         )
 
     def __post_init__(self):
-        """Validate all configuration parameters."""
+        # Coerce sub-configs in case Hydra left them as DictConfig.
+        # Each sub-config's __post_init__ runs its own validation when
+        # constructed via coerce().
+        for name, cls in (
+            ("nr", NewtonRaphsonConfig),
+            ("linear", LinearSolverConfig),
+            ("compliance", ComplianceConfig),
+            ("linesearch", LinesearchConfig),
+            ("warm_start", WarmStartConfig),
+            ("contacts", ContactsConfig),
+            ("adjoint", AdjointConfig),
+            ("profiling", ProfilingConfig),
+        ):
+            cur = getattr(self, name)
+            coerced = cls.coerce(cur)
+            if coerced is not cur:
+                object.__setattr__(self, name, coerced)
 
-        def _validate_positive_int(value: int, name: str, min_value: int = 1) -> None:
-            if value < min_value:
-                raise ValueError(f"{name} must be >= {min_value}, got {value}")
 
-        def _validate_non_negative_float(value: float, name: str) -> None:
-            if value < 0:
-                raise ValueError(f"{name} must be >= 0, got {value}")
-
-        def _validate_unit_interval(value: float, name: str) -> None:
-            if not (0 <= value <= 1):
-                raise ValueError(f"{name} must be in [0, 1], got {value}")
-
-        # Validate iteration counts
-        _validate_positive_int(self.max_newton_iters, "max_newton_iters")
-        _validate_positive_int(self.max_linear_iters, "max_linear_iters")
-
-        if self.backtrack_min_iter >= self.max_newton_iters:
-            raise ValueError(
-                f"backtrack_min_iter mush be smaller than max_newton_iters, got {self.backtrack_min_iter} and {self.max_newton_iters}"
-            )
-
-        # Validate modes
-        if self.newton_mode not in ("convergence", "fixed"):
-            raise ValueError(
-                f"newton_mode must be 'convergence' or 'fixed', got {self.newton_mode}"
-            )
-        if self.linear_mode not in ("convergence", "fixed"):
-            raise ValueError(
-                f"linear_mode must be 'convergence' or 'fixed', got {self.linear_mode}"
-            )
-
-        # Validate tolerances
-        _validate_non_negative_float(self.newton_atol, "newton_atol")
-        _validate_non_negative_float(self.linear_tol, "linear_tol")
-        _validate_non_negative_float(self.linear_atol, "linear_atol")
-
-        # Validate physics params
-        _validate_non_negative_float(self.joint_compliance, "joint_compliance")
-        _validate_non_negative_float(self.contact_compliance, "contact_compliance")
-        _validate_non_negative_float(self.friction_compliance, "friction_compliance")
-        _validate_non_negative_float(self.regularization, "regularization")
-
-        # Validate Fisher-Burmeister parameters
-        _validate_unit_interval(self.contact_fb_alpha, "contact_fb_alpha")
-        _validate_unit_interval(self.contact_fb_beta, "contact_fb_beta")
-        _validate_unit_interval(self.friction_fb_alpha, "friction_fb_alpha")
-        _validate_unit_interval(self.friction_fb_beta, "friction_fb_beta")
-
-        if self.enable_linesearch:
-            _validate_positive_int(
-                self.linesearch_conservative_step_count, "linesearch_conservative_step_count"
-            )
-            _validate_positive_int(
-                self.linesearch_optimistic_step_count, "linesearch_optimistic_step_count"
-            )
-            _validate_non_negative_float(
-                self.linesearch_conservative_upper_bound, "linesearch_conservative_upper_bound"
-            )
-            _validate_non_negative_float(
-                self.linesearch_optimistic_window, "linesearch_optimistic_window"
-            )
-            _validate_non_negative_float(self.linesearch_min_step, "linesearch_min_step")
-
-            if self.linesearch_conservative_upper_bound <= self.linesearch_min_step:
-                raise ValueError(
-                    "linesearch_conservative_upper_bound must be > linesearch_min_step"
-                )
-
-        _validate_positive_int(self.max_contacts_per_world, "max_contacts_per_world")
+# -----------------------------------------------------------------------
+# Other engine configs (upstream Newton solver wrappers; flat by design)
+# -----------------------------------------------------------------------
 
 
 @dataclass(frozen=True)

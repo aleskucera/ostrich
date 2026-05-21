@@ -1,7 +1,5 @@
 # @package logging
 _target_: axion.LoggingConfig
-enable_timing: false
-enable_hdf5_logging: true
-enable_dataset_logging: false
-hdf5_log_file: "data/logs/${project_name}.h5"
-max_simulation_steps: 300
+hdf5:
+  enabled: true
+  file: "data/logs/${project_name}.h5"

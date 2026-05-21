@@ -8,7 +8,6 @@ import numpy as np
 import warp as wp
 from axion import AxionEngine
 from axion import EngineConfig
-from axion import ExecutionConfig
 from axion import InteractiveSimulator
 from axion import LoggingConfig
 from axion import RenderingConfig
@@ -84,7 +83,6 @@ class HelhestControlSimulator(InteractiveSimulator):
         self,
         sim_config: SimulationConfig,
         render_config: RenderingConfig,
-        exec_config: ExecutionConfig,
         engine_config: EngineConfig,
         logging_config: LoggingConfig,
         control_mode: str = "position",
@@ -101,7 +99,6 @@ class HelhestControlSimulator(InteractiveSimulator):
         super().__init__(
             sim_config,
             render_config,
-            exec_config,
             engine_config,
             logging_config,
         )
@@ -207,7 +204,7 @@ class HelhestControlSimulator(InteractiveSimulator):
         self.builder.rigid_gap = 1.0
         # --- 1. Ground ---
         ground_cfg = newton.ModelBuilder.ShapeConfig(
-            mu=1.0,
+            mu=0.3,
             ke=4e4,
             kd=4e3,
             kf=1e3,
@@ -299,7 +296,6 @@ class HelhestControlSimulator(InteractiveSimulator):
 def helhest_control_example(cfg: DictConfig):
     sim_config: SimulationConfig = hydra.utils.instantiate(cfg.simulation)
     render_config: RenderingConfig = hydra.utils.instantiate(cfg.rendering)
-    exec_config: ExecutionConfig = hydra.utils.instantiate(cfg.execution)
     engine_config: EngineConfig = hydra.utils.instantiate(cfg.engine)
     logging_config: LoggingConfig = hydra.utils.instantiate(cfg.logging)
 
@@ -309,7 +305,6 @@ def helhest_control_example(cfg: DictConfig):
     simulator = HelhestControlSimulator(
         sim_config,
         render_config,
-        exec_config,
         engine_config,
         logging_config,
         control_mode=cfg.control.mode,

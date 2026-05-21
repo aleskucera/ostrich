@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 
 import warp as wp
-from axion.math import compute_spatial_momentum
-from axion.math import compute_world_inertia
+from axion.mechanics import compute_spatial_momentum
+from axion.mechanics import compute_world_inertia
 
 
 @dataclass
@@ -147,7 +147,7 @@ class FullSystemOperator:
     this operates on the combined (N_u + N_c) vector.
     """
 
-    def __init__(self, data: FullSystemLinearData, device: wp.context.Device):
+    def __init__(self, data: FullSystemLinearData, device: wp.Device):
         self.data = data
         self.device = device
 

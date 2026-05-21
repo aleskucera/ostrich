@@ -37,24 +37,24 @@ plt.rcParams.update({
 })
 
 THRESHOLD_STYLES = {
-    "Featherstone": {"color": "#FF9800"},
-    "XPBD":         {"color": "#607D8B"},
-    "Genesis":      {"color": "#4CAF50"},
-    "MJX":          {"color": "#FF5722"},
-    "MuJoCo":       {"color": "#E91E63"},
-    "TinyDiffSim":  {"color": "#9C27B0"},
-    "Axion":        {"color": "#2196F3"},
+    "Semi-Implicit": {"color": "#607D8B"},
+    "Genesis":       {"color": "#4CAF50"},
+    "MJX":           {"color": "#FF5722"},
+    "MuJoCo":        {"color": "#E91E63"},
+    "TinyDiffSim":   {"color": "#9C27B0"},
+    "Dojo":          {"color": "#FF9800"},
+    "Axion":         {"color": "#2196F3"},
 }
 THRESHOLD_SIM_ORDER = list(THRESHOLD_STYLES.keys())
 
 THRESHOLD_LABELS = {
-    "Featherstone": "Featherstone",
-    "XPBD":         "XPBD",
-    "Genesis":      "Genesis",
-    "MJX":          "MJX",
-    "MuJoCo":       "MuJoCo",
-    "TinyDiffSim":  "TinyDiffSim",
-    "Axion":        r"\textbf{Axion}",
+    "Semi-Implicit": "Semi-Implicit",
+    "Genesis":       "Genesis",
+    "MJX":           "MJX",
+    "MuJoCo":        "MuJoCo",
+    "TinyDiffSim":   "TinyDiffSim",
+    "Dojo":          "Dojo",
+    "Axion":         r"\textbf{Axion}",
 }
 
 AXION_COLOR = "#2196F3"
@@ -65,18 +65,18 @@ _NAME_MAP = {
     "MuJoCo":         "MuJoCo",
     "MJX":            "MJX",
     "Genesis":        "Genesis",
-    "Featherstone":   "Featherstone",
-    "XPBD":           "XPBD",
+    "Semi-Implicit":  "Semi-Implicit",
     "TinyDiffSim":    "TinyDiffSim",
+    "Dojo":           "Dojo",
 }
 _FILE_MAP = {
-    "axion":        "Axion",
-    "mujoco":       "MuJoCo",
-    "mjx":          "MJX",
-    "genesis":      "Genesis",
-    "featherstone": "Featherstone",
-    "xpbd":         "XPBD",
-    "tinydiffsim":  "TinyDiffSim",
+    "axion":          "Axion",
+    "mujoco":         "MuJoCo",
+    "mjx":            "MJX",
+    "genesis":        "Genesis",
+    "semi_implicit":  "Semi-Implicit",
+    "tinydiffsim":    "TinyDiffSim",
+    "dojo":           "Dojo",
 }
 
 # ─── trajectory mode style ───────────────────────────────────────────────────

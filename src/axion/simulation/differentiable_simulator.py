@@ -9,11 +9,9 @@ import numpy as np
 import warp as wp
 from axion.core.engine_config import AxionEngineConfig
 from axion.core.engine_config import EngineConfig
-from axion.core.engine_config import SemiImplicitEngineConfig
 from axion.core.logging_config import LoggingConfig
 
 from .base_simulator import BaseSimulator
-from .sim_config import ExecutionConfig
 from .sim_config import RenderingConfig
 from .sim_config import SimulationConfig
 from .trajectory import NewtonTargetTrajectory
@@ -32,14 +30,12 @@ class DifferentiableSimulator(BaseSimulator, ABC):
         self,
         simulation_config: SimulationConfig,
         rendering_config: RenderingConfig,
-        execution_config: ExecutionConfig,
         engine_config: EngineConfig,
         logging_config: Optional[LoggingConfig] = None,
     ):
         super().__init__(
             simulation_config,
             rendering_config,
-            execution_config,
             engine_config,
             logging_config,
         )
@@ -71,6 +67,13 @@ class DifferentiableSimulator(BaseSimulator, ABC):
         self.loss = wp.zeros(1, dtype=wp.float32, requires_grad=True)
 
         self._tracked_bodies = {}
+        self._render_time_offset = 0.0
+
+    def close(self):
+        """Flush the viewer to disk. ViewerUSD only writes the file on close()."""
+        if self.viewer is not None and self.rendering_config.vis_type == "usd":
+            self.viewer.close()
+            self.viewer = None
 
     # ============== ABSTRACT METHODS ==============
     @abstractmethod
@@ -169,16 +172,17 @@ class DifferentiableSimulator(BaseSimulator, ABC):
                 step_idx = min(step_idx, len(self.states) - 1)
                 state = self.states[step_idx]
 
-                self.viewer.begin_frame(elapsed_sim_time)
+                self.viewer.begin_frame(self._render_time_offset + elapsed_sim_time)
 
                 # A. Log Physics State
                 self.viewer.log_state(state)
 
                 # B. Log Trajectories
+                iter_tag = str(iteration) if iteration >= 0 else f"n{-iteration}"
                 for body_idx, metadata in self._tracked_bodies.items():
                     pts = trajectories[body_idx]
                     if len(pts) > 1:
-                        line_name = f"/traj_{iteration}/{metadata['name']}"
+                        line_name = f"/traj_{iter_tag}/{metadata['name']}"
                         self.viewer.log_lines(
                             line_name,
                             wp.array(pts[:-1], dtype=wp.vec3),
@@ -191,6 +195,8 @@ class DifferentiableSimulator(BaseSimulator, ABC):
                     callback(self.viewer, step_idx, state)
 
                 self.viewer.end_frame()
+
+            self._render_time_offset += total_sim_time
 
 
 class AxionDifferentiableSimulator(DifferentiableSimulator, ABC):
@@ -205,7 +211,6 @@ class AxionDifferentiableSimulator(DifferentiableSimulator, ABC):
         self,
         simulation_config: SimulationConfig,
         rendering_config: RenderingConfig,
-        execution_config: ExecutionConfig,
         engine_config: AxionEngineConfig,
         logging_config: Optional[LoggingConfig] = None,
     ):
@@ -214,7 +219,6 @@ class AxionDifferentiableSimulator(DifferentiableSimulator, ABC):
         super().__init__(
             simulation_config,
             rendering_config,
-            execution_config,
             engine_config,
             logging_config,
         )
@@ -250,10 +254,17 @@ class AxionDifferentiableSimulator(DifferentiableSimulator, ABC):
         # Explicit gradients come from the TrajectoryBuffer
         self.tape.backward(self.loss)
 
+        # # DEBUG: Check initial gradients from tape
+        # print(f"DEBUG: Loss gradient norm: {np.linalg.norm(self.trajectory.body_pose.grad.numpy())}")
+        #
         for i in range(self.clock.total_sim_steps - 1, -1, -1):
             self.trajectory.load_step(i, self.solver.data, self.solver.axion_contacts)
+            self.solver.data.zero_gradients()
             self.solver.step_backward()
             self.trajectory.save_gradients(i, self.solver.data)
+            self.trajectory.save_pose_gradients(i, self.solver.data)
+            if self.solver.config.adjoint.gradient_normalization and i > 0:
+                self.trajectory.normalize_gradients(i)
 
     def run_target_episode(self):
         for i in range(self.clock.total_sim_steps):
@@ -281,14 +292,12 @@ class NewtonDifferentiableSimulator(DifferentiableSimulator, ABC):
         self,
         simulation_config: SimulationConfig,
         rendering_config: RenderingConfig,
-        execution_config: ExecutionConfig,
         engine_config: EngineConfig,
         logging_config: Optional[LoggingConfig] = None,
     ):
         super().__init__(
             simulation_config,
             rendering_config,
-            execution_config,
             engine_config,
             logging_config,
         )

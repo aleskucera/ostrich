@@ -64,6 +64,31 @@ class AxionModelBuilder(newton.ModelBuilder):
             )
         )
 
+        # Anisotropic friction: per-shape body-local axis defining the friction
+        # frame. Zero vector => isotropic (use shape_material_mu only). When set,
+        # `shape_material_mu` is the coefficient along the projected axis and
+        # `mu_perp` is the coefficient perpendicular to it in the tangent plane.
+        # `mu_perp` < 0 is a sentinel meaning "same as shape_material_mu".
+        self.add_custom_attribute(
+            newton.ModelBuilder.CustomAttribute(
+                name="friction_axis_local",
+                frequency=Model.AttributeFrequency.SHAPE,
+                dtype=wp.vec3,
+                default=wp.vec3(0.0, 0.0, 0.0),
+                assignment=Model.AttributeAssignment.MODEL,
+            )
+        )
+
+        self.add_custom_attribute(
+            newton.ModelBuilder.CustomAttribute(
+                name="mu_perp",
+                frequency=Model.AttributeFrequency.SHAPE,
+                dtype=wp.float32,
+                default=-1.0,
+                assignment=Model.AttributeAssignment.MODEL,
+            )
+        )
+
     def add_track(
         self,
         parent_body: int,
@@ -174,14 +199,55 @@ class AxionModelBuilder(newton.ModelBuilder):
         num_worlds: int,
         gravity: float = -9.81,
         requires_grad: bool = False,
+        global_builder: "newton.ModelBuilder | None" = None,
         **kwargs,
     ) -> newton.Model:
         """
         Creates a new newton.ModelBuilder, replicates the content of this builder into it
         for the specified number of worlds, and finalizes it to return the Model.
+
+        If ``global_builder`` is provided, its contents are added once with
+        ``shape_world = -1`` (Newton's "global" sentinel) before replication, so the
+        resulting Model contains a single instance of those shapes that collides
+        against shapes from every world via Newton's broadphase.
         """
         final_builder = newton.ModelBuilder(gravity=gravity)
         for k, v in kwargs.items():
             setattr(final_builder, k, v)
+        if global_builder is not None:
+            # current_world is -1 by default; add_builder copies entities with that
+            # tag so they get shape_world=-1 in the final model.
+            final_builder.add_builder(global_builder)
         final_builder.replicate(self, world_count=num_worlds)
-        return final_builder.finalize(requires_grad=requires_grad)
+        model = final_builder.finalize(requires_grad=requires_grad)
+        self._backfill_empty_custom_attributes(final_builder, model, requires_grad=requires_grad)
+        return model
+
+    @staticmethod
+    def _backfill_empty_custom_attributes(
+        builder: newton.ModelBuilder, model: Model, requires_grad: bool
+    ) -> None:
+        """Ensure every registered MODEL custom attribute exists on the model.
+
+        Why: Newton's ``ModelBuilder.finalize()`` skips custom-attribute arrays
+        whose frequency count is 0 (see ``builder.py`` — ``if count == 0: continue``).
+        Axion downstream code assumes registered attributes (e.g. ``joint_dof_mode``)
+        always exist on the model, which fails for valid models that happen to have
+        zero entities at a given frequency (e.g. a model containing only fixed
+        joints has ``joint_dof_count == 0``).
+        """
+        for custom_attr in builder.custom_attributes.values():
+            if custom_attr.assignment != Model.AttributeAssignment.MODEL:
+                continue
+
+            namespace = custom_attr.namespace
+            name = custom_attr.name
+            if namespace:
+                ns_obj = getattr(model, namespace, None)
+                if ns_obj is not None and hasattr(ns_obj, name):
+                    continue
+            elif hasattr(model, name):
+                continue
+
+            empty = custom_attr.build_array(0, device=model.device, requires_grad=requires_grad)
+            model.add_attribute(name, empty, custom_attr.frequency, custom_attr.assignment, namespace)

@@ -1,7 +1,6 @@
 defaults:
   - simulation: taros-4
   - rendering: gl
-  - execution: cuda_graph
   - logging: disabled
   - engine: axion 
   - control: taros-4/velocity
@@ -10,4 +9,8 @@ defaults:
 # Use the recommended hybrid approach for project names
 project_name: ${hydra:job.name}
 
-friction_coeff: 0.6
+friction_coeff: 1.4
+engine:
+  compliance:
+    joint: 6e-10
+    contact: 1e-10

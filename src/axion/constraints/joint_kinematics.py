@@ -1,5 +1,5 @@
 import warp as wp
-from axion.math import orthogonal_basis
+from axion.mechanics import orthogonal_basis
 
 
 @wp.func

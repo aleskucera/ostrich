@@ -1,7 +1,6 @@
 defaults:
   - simulation: featherstone
   - rendering: gl
-  - execution: cuda_graph
   - logging: disabled
   - engine: featherstone 
   - _self_

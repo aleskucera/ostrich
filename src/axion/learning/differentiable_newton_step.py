@@ -21,12 +21,12 @@ from axion.core.contacts import AxionContacts
 from axion.core.engine_config import EngineConfig
 from axion.core.engine_data import EngineData
 from axion.core.engine_dims import EngineDimensions
-from axion.core.linear_utils import (
+from axion.core.linear_system import (
     compute_linear_system,
     compute_dbody_qd_from_dbody_lambda,
 )
 from axion.core.model import AxionModel
-from axion.math import integrate_body_pose_kernel
+from axion.mechanics import integrate_body_pose_kernel
 from axion.optim import PCRSolver, SystemOperator, JacobiPreconditioner
 
 
@@ -90,9 +90,9 @@ class DifferentiableNewtonStep(torch.autograd.Function):
             b=data.rhs,
             x=data.dconstr_force.full,
             preconditioner=preconditioner,
-            iters=config.max_linear_iters,
-            tol=config.linear_tol,
-            atol=config.linear_atol,
+            iters=config.linear.max_iters,
+            tol=config.linear.tol,
+            atol=config.linear.atol,
         )
 
         dconstr_force_torch = wp.to_torch(data.dconstr_force.full).clone()
@@ -190,9 +190,9 @@ class DifferentiableNewtonStep(torch.autograd.Function):
         pcr_solver.solve(
             A=A_op, b=grad_cf_new_wp, x=grad_rhs_wp,
             preconditioner=preconditioner,
-            iters=config.max_linear_iters,
-            tol=config.linear_tol,
-            atol=config.linear_atol,
+            iters=config.linear.max_iters,
+            tol=config.linear.tol,
+            atol=config.linear.atol,
         )
 
         # Inject adjoint on rhs

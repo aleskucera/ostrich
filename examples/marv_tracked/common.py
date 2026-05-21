@@ -250,7 +250,7 @@ def _create_tracked_flipper_leg(
         label=f"{name_prefix}_visual",
     )
 
-    box_shape = newton.ModelBuilder.ShapeConfig(is_visible=True, density=1000.0, mu=0.3)
+    box_shape = newton.ModelBuilder.ShapeConfig(is_visible=True, density=100.0, mu=0.05)
 
     # We need to pass the parent_world_xform of the FLIPPER LINK, not the chassis.
     # This is used by add_track to set initial positions of track elements.

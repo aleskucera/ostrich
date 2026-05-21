@@ -1,0 +1,10 @@
+# @package engine
+# AxionEngineConfig with end-to-end forward-step profiling enabled.
+# Coarse breakdown of one engine.step:
+#   load_data | warm_start_copy | nr_solve | backtracking | output_copy
+defaults:
+  - axion
+  - _self_
+
+profiling:
+  mode: end_to_end

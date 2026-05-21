@@ -41,9 +41,9 @@ def batch_joint_qd_start_kernel(
     world_idx = joint_idx // joint_count_per_world
     slot = joint_idx % joint_count_per_world
 
-    if joint_dof_count_per_world > 1:
-        batched_joint_qd_start[world_idx, slot] = joint_qd_start[joint_idx] % (
-            joint_dof_count_per_world - 1
+    if joint_dof_count_per_world > 0:
+        batched_joint_qd_start[world_idx, slot] = (
+            joint_qd_start[joint_idx] % joint_dof_count_per_world
         )
     else:
         batched_joint_qd_start[world_idx, slot] = 0
@@ -78,29 +78,6 @@ def batch_joint_bodies_kernel(
         batched_joint_child[world_idx, slot] = child_idx % body_count_per_world
     else:
         batched_joint_child[world_idx, slot] = child_idx
-
-
-@wp.kernel
-def batch_shape_body_kernel(
-    shape_count_per_world: wp.int32,
-    body_count_per_world: wp.int32,
-    shape_body: wp.array(dtype=wp.int32),
-    # OUTPUT
-    batched_shape_body: wp.array(dtype=wp.int32, ndim=2),
-):
-    shape_idx = wp.tid()
-
-    if shape_idx >= shape_body.shape[0]:
-        return
-
-    world_idx = shape_idx // shape_count_per_world
-    slot = shape_idx % shape_count_per_world
-
-    body_idx = shape_body[shape_idx]
-    if body_idx >= 0:
-        batched_shape_body[world_idx, slot] = body_idx % body_count_per_world
-    else:
-        batched_shape_body[world_idx, slot] = body_idx
 
 
 def compute_joint_constraint_offsets(joint_types: wp.array):
@@ -199,18 +176,41 @@ class AxionModel:
 
         self.g_accel = model.gravity
 
-        self.body_count = model.body_count // model.world_count
-        self.shape_count = model.shape_count // model.world_count
-        self.joint_count = model.joint_count // model.world_count
-        self.joint_dof_count = model.joint_dof_count // model.world_count
-        self.joint_coord_count = model.joint_coord_count // model.world_count
+        # Newton's flat layout (since v1.x): [globals | world_0 | world_1 | ...].
+        # *_world_start[0] is where world 0 begins, i.e. the count of globals.
+        # *_world_start[-1] is the total entity count.
+        shape_starts_np = model.shape_world_start.numpy()
+        body_starts_np = model.body_world_start.numpy()
+        joint_starts_np = model.joint_world_start.numpy()
+
+        self.num_global_shapes = int(shape_starts_np[0])
+        self.num_global_bodies = int(body_starts_np[0])
+        self.num_global_joints = int(joint_starts_np[0])
+
+        # Globals are only wired up for shapes (e.g., a shared heightmap with no
+        # body). Bodies and joints with shape_world=-1 would need the same
+        # broadcast plumbing; not implemented yet.
+        assert self.num_global_bodies == 0, (
+            f"AxionModel does not yet support global bodies (got {self.num_global_bodies})."
+        )
+        assert self.num_global_joints == 0, (
+            f"AxionModel does not yet support global joints (got {self.num_global_joints})."
+        )
+
+        W = model.world_count
+        self.shape_count_per_world = (int(shape_starts_np[-1]) - self.num_global_shapes) // W
+        self.body_count = (int(body_starts_np[-1]) - self.num_global_bodies) // W
+        self.joint_count = (int(joint_starts_np[-1]) - self.num_global_joints) // W
+        self.shape_count = self.shape_count_per_world + self.num_global_shapes
+        self.joint_dof_count = model.joint_dof_count // W
+        self.joint_coord_count = model.joint_coord_count // W
 
         with wp.ScopedDevice(self.device):
-            self.body_com = model.body_com.reshape((model.world_count, -1))
-            self.body_inertia = model.body_inertia.reshape((model.world_count, -1))
-            self.body_inv_inertia = model.body_inv_inertia.reshape((model.world_count, -1))
-            self.body_mass = model.body_mass.reshape((model.world_count, -1))
-            self.body_inv_mass = model.body_inv_mass.reshape((model.world_count, -1))
+            self.body_com = model.body_com.reshape((W, -1))
+            self.body_inertia = model.body_inertia.reshape((W, -1))
+            self.body_inv_inertia = model.body_inv_inertia.reshape((W, -1))
+            self.body_mass = model.body_mass.reshape((W, -1))
+            self.body_inv_mass = model.body_inv_mass.reshape((W, -1))
 
             self.joint_X_c = model.joint_X_c.reshape((model.world_count, -1))
             self.joint_X_p = model.joint_X_p.reshape((model.world_count, -1))
@@ -220,6 +220,8 @@ class AxionModel:
             self.joint_enabled = model.joint_enabled.reshape((model.world_count, -1))
             self.joint_target_ke = model.joint_target_ke.reshape((model.world_count, -1))
             self.joint_target_kd = model.joint_target_kd.reshape((model.world_count, -1))
+            self.joint_target_ke.requires_grad = True
+            self.joint_target_kd.requires_grad = True
             self.joint_compliance = model.joint_compliance.reshape((model.world_count, -1))
             self.joint_type = model.joint_type.reshape((model.world_count, -1))
             self.joint_q_start = wp.zeros((model.world_count, self.joint_count), dtype=wp.int32)
@@ -246,7 +248,7 @@ class AxionModel:
             dim=self.model.joint_count,
             inputs=[
                 self.joint_count,
-                self.joint_coord_count,
+                self.joint_dof_count,
                 model.joint_qd_start,
             ],
             outputs=[
@@ -271,26 +273,17 @@ class AxionModel:
             device=self.device,
         )
 
-        with wp.ScopedDevice(self.device):
-            self.shape_body = wp.zeros((model.world_count, self.shape_count), dtype=wp.int32)
-            self.shape_material_mu = model.shape_material_mu.reshape((model.world_count, -1))
-            self.shape_material_restitution = model.shape_material_restitution.reshape(
-                (model.world_count, -1)
-            )
-
-        wp.launch(
-            kernel=batch_shape_body_kernel,
-            dim=self.model.shape_count,
-            inputs=[
-                self.shape_count,
-                self.body_count,
-                model.shape_body,
-            ],
-            outputs=[
-                self.shape_body,
-            ],
-            device=self.device,
+        # Shape arrays are (W, S+G) with the last G columns holding globals
+        # broadcast across every world's row. Per-world contact lookups in the
+        # downstream kernels then index uniformly into [0, S+G) without needing
+        # to know which slot is global.
+        self.shape_material_mu = self._broadcast_shape_array(model.shape_material_mu)
+        self.shape_material_restitution = self._broadcast_shape_array(
+            model.shape_material_restitution
         )
+        self.shape_friction_axis_local = self._broadcast_shape_array(model.friction_axis_local)
+        self.shape_mu_perp = self._broadcast_shape_array(model.mu_perp)
+        self.shape_body = self._build_shape_body_array(model.shape_body)
 
         self.joint_constraint_offsets, self.num_joint_constraints = (
             compute_joint_constraint_offsets(
@@ -305,3 +298,42 @@ class AxionModel:
                 self.joint_qd_start,
             )
         )
+
+    def _broadcast_shape_array(self, flat_arr: wp.array) -> wp.array:
+        """Reshape a flat (G + W*S,) Newton shape array into (W, S+G), with the
+        last G columns being the global section broadcast across every row."""
+        W = self.num_worlds
+        G = self.num_global_shapes
+        S = self.shape_count_per_world
+        if G == 0:
+            return flat_arr.reshape((W, S))
+        flat_np = flat_arr.numpy()
+        per_world = flat_np[G:].reshape((W, S) + flat_np.shape[1:])
+        globals_section = flat_np[:G]
+        broadcast_shape = (W,) + globals_section.shape
+        globals_broadcast = np.broadcast_to(globals_section, broadcast_shape)
+        combined = np.concatenate([per_world, globals_broadcast], axis=1)
+        return wp.array(combined, dtype=flat_arr.dtype, device=self.device)
+
+    def _build_shape_body_array(self, shape_body_flat: wp.array) -> wp.array:
+        """Build the (W, S+G) shape_body array. Per-world body indices are
+        remapped from Newton's flat indexing to world-local; global shapes
+        always have body=-1 (we assert num_global_bodies == 0 above, so a
+        global shape attached to a body is rejected upstream)."""
+        W = self.num_worlds
+        G = self.num_global_shapes
+        S = self.shape_count_per_world
+        Bp = self.body_count
+
+        sb_np = shape_body_flat.numpy()
+        out = np.empty((W, S + G), dtype=np.int32)
+        per_world = sb_np[G:].reshape(W, S)
+        # Newton uses global body indices; remap into world-local [0, Bp).
+        out[:, :S] = np.where(per_world >= 0, (per_world - self.num_global_bodies) % Bp, per_world)
+        if G > 0:
+            globals_ = sb_np[:G]
+            assert np.all(globals_ < 0), (
+                "Global shape attached to a body is not supported; expected shape_body=-1."
+            )
+            out[:, S:] = globals_  # all -1
+        return wp.array(out, dtype=wp.int32, device=self.device)

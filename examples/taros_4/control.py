@@ -7,7 +7,6 @@ import newton
 import numpy as np
 import warp as wp
 from axion import EngineConfig
-from axion import ExecutionConfig
 from axion import InteractiveSimulator
 from axion import LoggingConfig
 from axion import RenderingConfig
@@ -64,22 +63,24 @@ class Taros4ControlSimulator(InteractiveSimulator):
         self,
         sim_config: SimulationConfig,
         render_config: RenderingConfig,
-        exec_config: ExecutionConfig,
         engine_config: EngineConfig,
         logging_config: LoggingConfig,
         control_mode: str = "velocity",
         k_p: float = 1000.0,
         k_d: float = 0.0,
         friction: float = 0.5,
+        max_accel: float = 8.0,
     ):
         self.control_mode = control_mode
         self.k_p = k_p
         self.k_d = k_d
         self.friction = friction
+        self.max_accel = max_accel
+        self._cmd_left_v = 0.0
+        self._cmd_right_v = 0.0
         super().__init__(
             sim_config,
             render_config,
-            exec_config,
             engine_config,
             logging_config,
         )
@@ -125,6 +126,14 @@ class Taros4ControlSimulator(InteractiveSimulator):
             if self.viewer.is_key_down("l"):  # Right
                 left_v += turn_speed
                 right_v -= turn_speed
+
+        # Slew-rate limit toward the desired command (acceleration ramp).
+        segment_dt = self.clock.steps_per_segment * self.clock.dt
+        dv_max = self.max_accel * segment_dt
+        self._cmd_left_v += float(np.clip(left_v - self._cmd_left_v, -dv_max, dv_max))
+        self._cmd_right_v += float(np.clip(right_v - self._cmd_right_v, -dv_max, dv_max))
+        left_v = self._cmd_left_v
+        right_v = self._cmd_right_v
 
         # Update targets
         if self.control_mode == "velocity":
@@ -176,9 +185,9 @@ class Taros4ControlSimulator(InteractiveSimulator):
             wp.copy(self.control.joint_target_pos, self.joint_target)
 
     def build_model(self) -> newton.Model:
-        self.builder.rigid_gap = 0.5
+        self.builder.rigid_gap = 0.8
         # --- 1. Ground ---
-        ground_cfg = newton.ModelBuilder.ShapeConfig(mu=1.0)
+        ground_cfg = newton.ModelBuilder.ShapeConfig(mu=0.3)
         self.builder.add_ground_plane(cfg=ground_cfg)
 
         # Obstacle 1: Stairs (Stepped boxes)
@@ -265,20 +274,19 @@ class Taros4ControlSimulator(InteractiveSimulator):
 def taros4_control_example(cfg: DictConfig):
     sim_config: SimulationConfig = hydra.utils.instantiate(cfg.simulation)
     render_config: RenderingConfig = hydra.utils.instantiate(cfg.rendering)
-    exec_config: ExecutionConfig = hydra.utils.instantiate(cfg.execution)
     engine_config: EngineConfig = hydra.utils.instantiate(cfg.engine)
     logging_config: LoggingConfig = hydra.utils.instantiate(cfg.logging)
 
     simulator = Taros4ControlSimulator(
         sim_config=sim_config,
         render_config=render_config,
-        exec_config=exec_config,
         engine_config=engine_config,
         logging_config=logging_config,
         control_mode=cfg.control.mode,
         k_p=cfg.control.k_p,
         k_d=cfg.control.k_d,
         friction=cfg.friction_coeff,
+        max_accel=cfg.control.get("max_accel", 2.0),
     )
 
     simulator.run()

@@ -1,0 +1,209 @@
+{
+  "top_10_coarse": [
+    {
+      "error": 2.956811277880698,
+      "params": {
+        "friction_front": 0.1,
+        "dt": 0.02,
+        "friction_rear": 0.1,
+        "kv": 500.0
+      }
+    },
+    {
+      "error": 2.9580736386663986,
+      "params": {
+        "friction_front": 0.1,
+        "dt": 0.02,
+        "friction_rear": 0.1,
+        "kv": 1000.0
+      }
+    },
+    {
+      "error": 2.960251920038591,
+      "params": {
+        "friction_front": 0.1,
+        "dt": 0.02,
+        "friction_rear": 0.1,
+        "kv": 2000.0
+      }
+    },
+    {
+      "error": 2.9605488549477177,
+      "params": {
+        "friction_front": 0.1,
+        "dt": 0.02,
+        "friction_rear": 0.1,
+        "kv": 4000.0
+      }
+    },
+    {
+      "error": 3.0368537071608754,
+      "params": {
+        "friction_front": 0.1,
+        "dt": 0.01,
+        "friction_rear": 0.1,
+        "kv": 1000.0
+      }
+    },
+    {
+      "error": 3.0419031412711055,
+      "params": {
+        "friction_front": 0.1,
+        "dt": 0.01,
+        "friction_rear": 0.1,
+        "kv": 2000.0
+      }
+    },
+    {
+      "error": 3.0432841447023926,
+      "params": {
+        "friction_front": 0.1,
+        "dt": 0.01,
+        "friction_rear": 0.1,
+        "kv": 4000.0
+      }
+    },
+    {
+      "error": 3.045976624792002,
+      "params": {
+        "friction_front": 0.1,
+        "dt": 0.01,
+        "friction_rear": 0.1,
+        "kv": 500.0
+      }
+    },
+    {
+      "error": 3.11571524108318,
+      "params": {
+        "friction_front": 0.5,
+        "dt": 0.05,
+        "friction_rear": 0.5,
+        "kv": 2000.0
+      }
+    },
+    {
+      "error": 3.1891317803000874,
+      "params": {
+        "friction_front": 0.1,
+        "dt": 0.05,
+        "friction_rear": 0.1,
+        "kv": 4000.0
+      }
+    }
+  ],
+  "ground_truth": [
+    "/home/kuceral4/projects/axion/experiments/1_sim_to_real/../data/right_turn_b.json",
+    "/home/kuceral4/projects/axion/experiments/1_sim_to_real/../data/acceleration.json"
+  ],
+  "best_per_trajectory": {
+    "helhest_2026_04_10-14_46_18": {
+      "error": 1.5389564521926007
+    },
+    "helhest_2026_04_13-09_56_50": {
+      "error": 3.396891415671823
+    }
+  },
+  "best_params": {
+    "friction_front": 0.08000000000000002,
+    "dt": 0.04,
+    "friction_rear": 0.08000000000000002,
+    "kv": 600.0
+  },
+  "coarse_sweep_size": 60,
+  "best_error": 2.467923933932212,
+  "fine_sweep_size": 81,
+  "simulator": "Dojo",
+  "top_10_fine": [
+    {
+      "error": 2.467923933932212,
+      "params": {
+        "friction_front": 0.08000000000000002,
+        "dt": 0.04,
+        "friction_rear": 0.08000000000000002,
+        "kv": 600.0
+      }
+    },
+    {
+      "error": 2.470250284855811,
+      "params": {
+        "friction_front": 0.08000000000000002,
+        "dt": 0.04,
+        "friction_rear": 0.08000000000000002,
+        "kv": 400.0
+      }
+    },
+    {
+      "error": 2.471050068858298,
+      "params": {
+        "friction_front": 0.08000000000000002,
+        "dt": 0.04,
+        "friction_rear": 0.08000000000000002,
+        "kv": 500.0
+      }
+    },
+    {
+      "error": 2.547784379779922,
+      "params": {
+        "friction_front": 0.08000000000000002,
+        "dt": 0.02,
+        "friction_rear": 0.08000000000000002,
+        "kv": 600.0
+      }
+    },
+    {
+      "error": 2.548510929327732,
+      "params": {
+        "friction_front": 0.08000000000000002,
+        "dt": 0.02,
+        "friction_rear": 0.08000000000000002,
+        "kv": 500.0
+      }
+    },
+    {
+      "error": 2.550697272827548,
+      "params": {
+        "friction_front": 0.08000000000000002,
+        "dt": 0.02,
+        "friction_rear": 0.08000000000000002,
+        "kv": 400.0
+      }
+    },
+    {
+      "error": 2.6052895235210944,
+      "params": {
+        "friction_front": 0.085,
+        "dt": 0.04,
+        "friction_rear": 0.085,
+        "kv": 400.0
+      }
+    },
+    {
+      "error": 2.62477234440165,
+      "params": {
+        "friction_front": 0.085,
+        "dt": 0.04,
+        "friction_rear": 0.085,
+        "kv": 500.0
+      }
+    },
+    {
+      "error": 2.625054998345827,
+      "params": {
+        "friction_front": 0.085,
+        "dt": 0.04,
+        "friction_rear": 0.085,
+        "kv": 600.0
+      }
+    },
+    {
+      "error": 2.6496156485514026,
+      "params": {
+        "friction_front": 0.085,
+        "dt": 0.02,
+        "friction_rear": 0.085,
+        "kv": 600.0
+      }
+    }
+  ],
+  "ground_truth_source": "real_robot"
+}

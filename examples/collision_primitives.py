@@ -5,7 +5,6 @@ import hydra
 import newton
 import warp as wp
 from axion import EngineConfig
-from axion import ExecutionConfig
 from axion import InteractiveSimulator
 from axion import LoggingConfig
 from axion import RenderingConfig
@@ -22,14 +21,12 @@ class Simulator(InteractiveSimulator):
         self,
         sim_config: SimulationConfig,
         render_config: RenderingConfig,
-        exec_config: ExecutionConfig,
         engine_config: EngineConfig,
         logging_config: LoggingConfig,
     ):
         super().__init__(
             sim_config,
             render_config,
-            exec_config,
             engine_config,
             logging_config,
         )
@@ -55,8 +52,6 @@ class Simulator(InteractiveSimulator):
                 kf=KF,
                 mu=FRICTION,
                 restitution=RESTITUTION,
-                thickness=0.0,
-                contact_margin=0.3,
             ),
         )
 
@@ -74,7 +69,6 @@ class Simulator(InteractiveSimulator):
                 kf=KF,
                 mu=FRICTION,
                 restitution=RESTITUTION,
-                thickness=0.0,
             ),
         )
 
@@ -92,8 +86,6 @@ class Simulator(InteractiveSimulator):
                 kf=KF,
                 mu=FRICTION,
                 restitution=RESTITUTION,
-                thickness=0.0,
-                contact_margin=0.3,
             ),
         )
 
@@ -111,8 +103,6 @@ class Simulator(InteractiveSimulator):
                 kf=KF,
                 mu=FRICTION,
                 restitution=RESTITUTION,
-                thickness=0.0,
-                contact_margin=0.3,
             ),
         )
 
@@ -132,8 +122,6 @@ class Simulator(InteractiveSimulator):
                 kf=KF,
                 mu=FRICTION,
                 restitution=RESTITUTION,
-                thickness=0.0,
-                contact_margin=0.3,
             ),
         )
 
@@ -144,7 +132,6 @@ class Simulator(InteractiveSimulator):
                 kf=0.0,
                 mu=FRICTION,
                 restitution=RESTITUTION,
-                contact_margin=0.3,
             )
         )
 
@@ -155,14 +142,12 @@ class Simulator(InteractiveSimulator):
 def collision_primitives_example(cfg: DictConfig):
     sim_config: SimulationConfig = hydra.utils.instantiate(cfg.simulation)
     render_config: RenderingConfig = hydra.utils.instantiate(cfg.rendering)
-    exec_config: ExecutionConfig = hydra.utils.instantiate(cfg.execution)
     engine_config: EngineConfig = hydra.utils.instantiate(cfg.engine)
     logging_config: LoggingConfig = hydra.utils.instantiate(cfg.logging)
 
     simulator = Simulator(
         sim_config=sim_config,
         render_config=render_config,
-        exec_config=exec_config,
         engine_config=engine_config,
         logging_config=logging_config,
     )

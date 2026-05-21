@@ -7,7 +7,6 @@ import newton
 import numpy as np
 import warp as wp
 from axion import EngineConfig
-from axion import ExecutionConfig
 from axion import InteractiveSimulator
 from axion import LoggingConfig
 from axion import RenderingConfig
@@ -213,14 +212,12 @@ class TrackControlSimulator(InteractiveSimulator):
         self,
         sim_config: SimulationConfig,
         render_config: RenderingConfig,
-        exec_config: ExecutionConfig,
         engine_config: EngineConfig,
         logging_config: LoggingConfig,
     ):
         super().__init__(
             sim_config,
             render_config,
-            exec_config,
             engine_config,
             logging_config,
         )
@@ -328,14 +325,12 @@ class TrackControlSimulator(InteractiveSimulator):
 def track_chain_example(cfg: DictConfig):
     sim_config: SimulationConfig = hydra.utils.instantiate(cfg.simulation)
     render_config: RenderingConfig = hydra.utils.instantiate(cfg.rendering)
-    exec_config: ExecutionConfig = hydra.utils.instantiate(cfg.execution)
     engine_config: EngineConfig = hydra.utils.instantiate(cfg.engine)
     logging_config: LoggingConfig = hydra.utils.instantiate(cfg.logging)
 
     simulator = TrackControlSimulator(
         sim_config,
         render_config,
-        exec_config,
         engine_config,
         logging_config,
     )

@@ -18,7 +18,6 @@ import numpy as np
 import warp as wp
 from axion import AxionDifferentiableSimulator
 from axion import AxionEngineConfig
-from axion import ExecutionConfig
 from axion import LoggingConfig
 from axion import RenderingConfig
 from axion import SimulationConfig
@@ -107,7 +106,6 @@ class HelhestBatchOptimizer(AxionDifferentiableSimulator):
         self,
         sim_config,
         render_config,
-        exec_config,
         engine_config,
         logging_config,
         num_control_points=K,
@@ -116,7 +114,7 @@ class HelhestBatchOptimizer(AxionDifferentiableSimulator):
         self.save_path = save_path
         self.K = num_control_points
         self.num_worlds = sim_config.num_worlds
-        super().__init__(sim_config, render_config, exec_config, engine_config, logging_config)
+        super().__init__(sim_config, render_config, engine_config, logging_config)
         self.loss = wp.zeros(1, dtype=float, requires_grad=True)
         self.trajectory_weight = 10.0
         self.regularization_weight = 1e-7
@@ -286,10 +284,6 @@ def main():
         world_offset_y=5.0,
         start_paused=False,
     )
-    exec_config = ExecutionConfig(
-        use_cuda_graph=True,
-        headless_steps_per_segment=10,
-    )
     engine_config = AxionEngineConfig(
         max_newton_iters=12,
         max_linear_iters=12,
@@ -302,18 +296,13 @@ def main():
         contact_compliance=1e-6,
         friction_compliance=1e-6,
         regularization=1e-6,
-        contact_fb_alpha=0.5,
-        contact_fb_beta=1.0,
-        friction_fb_alpha=1.0,
-        friction_fb_beta=1.0,
         max_contacts_per_world=8,
     )
-    logging_config = LoggingConfig(enable_timing=False, enable_hdf5_logging=False)
+    logging_config = LoggingConfig()
 
     sim = HelhestBatchOptimizer(
         sim_config,
         render_config,
-        exec_config,
         engine_config,
         logging_config,
         num_control_points=K,

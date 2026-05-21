@@ -1,4 +1,3 @@
 # @package logging
+# All sub-configs default to enabled=False; nothing logged.
 _target_: axion.LoggingConfig
-enable_timing: false
-enable_hdf5_logging: false

@@ -1,0 +1,14 @@
+defaults:
+  - simulation: helhest
+  - rendering: headless
+  - logging: disabled
+  - engine: axion_profile_per_iter
+  - control: helhest/velocity
+  - _self_
+
+project_name: ${hydra:job.name}
+
+friction_coeff: 0.5
+
+drive_velocity: 5.0
+

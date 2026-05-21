@@ -3,18 +3,16 @@ import numpy as np
 import warp as wp
 from axion import JointMode
 from axion.core.engine import AxionEngine
-from axion.core.engine_config import AxionEngineConfig
+from axion.core.engine_config import AxionEngineConfig, ComplianceConfig, LinearSolverConfig, NewtonRaphsonConfig
 from axion.core.model_builder import AxionModelBuilder
 
 wp.init()
 
 def setup_test_engine():
     config = AxionEngineConfig(
-        joint_constraint_level="pos",
-        contact_constraint_level="pos",
-        joint_compliance=0.0,
-        max_newton_iters=20,
-        max_linear_iters=50,
+        nr=NewtonRaphsonConfig(max_iters=20),
+        linear=LinearSolverConfig(max_iters=50),
+        compliance=ComplianceConfig(joint=0.0),
     )
     return config
 
@@ -40,7 +38,7 @@ def create_prismatic_model():
         child_xform=child_local_xform,
     )
 
-    builder.add_articulation([j0], key="slider")
+    builder.add_articulation([j0])
 
     model = builder.finalize_replicated(num_worlds=1, gravity=0.0)
     return model, j0
@@ -75,11 +73,7 @@ def test_prismatic_position_control():
         wp.array(np.array([50.0], dtype=np.float32), dtype=wp.float32, device=model.device),
     )
 
-    def init_state_fn(state_in, state_out, contacts, dt):
-        wp.copy(state_out.body_q, state_in.body_q)
-        wp.copy(state_out.body_qd, state_in.body_qd)
-
-    engine = AxionEngine(model=model, init_state_fn=init_state_fn, config=config)
+    engine = AxionEngine(model=model, sim_steps=100, config=config)
     newton.eval_fk(model, model.joint_q, model.joint_qd, state_in)
 
     target_pos = 1.0 # 1 meter
@@ -134,11 +128,7 @@ def test_prismatic_velocity_control():
         wp.array(np.array([100.0], dtype=np.float32), dtype=wp.float32, device=model.device),
     )
 
-    def init_state_fn(state_in, state_out, contacts, dt):
-        wp.copy(state_out.body_q, state_in.body_q)
-        wp.copy(state_out.body_qd, state_in.body_qd)
-
-    engine = AxionEngine(model=model, init_state_fn=init_state_fn, config=config)
+    engine = AxionEngine(model=model, sim_steps=100, config=config)
     newton.eval_fk(model, model.joint_q, model.joint_qd, state_in)
 
     target_vel = 0.5 # 0.5 m/s

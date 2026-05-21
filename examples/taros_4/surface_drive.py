@@ -8,7 +8,6 @@ import numpy as np
 import openmesh
 import warp as wp
 from axion import EngineConfig
-from axion import ExecutionConfig
 from axion import InteractiveSimulator
 from axion import LoggingConfig
 from axion import RenderingConfig
@@ -65,22 +64,24 @@ class TarosSurfaceSimulator(InteractiveSimulator):
         self,
         sim_config: SimulationConfig,
         render_config: RenderingConfig,
-        exec_config: ExecutionConfig,
         engine_config: EngineConfig,
         logging_config: LoggingConfig,
         control_mode: str = "velocity",
         k_p: float = 1000.0,
         k_d: float = 0.0,
         friction: float = 0.5,
+        max_accel: float = 8.0,
     ):
         self.control_mode = control_mode
         self.k_p = k_p
         self.k_d = k_d
         self.friction = friction
+        self.max_accel = max_accel
+        self._cmd_left_v = 0.0
+        self._cmd_right_v = 0.0
         super().__init__(
             sim_config,
             render_config,
-            exec_config,
             engine_config,
             logging_config,
         )
@@ -124,6 +125,14 @@ class TarosSurfaceSimulator(InteractiveSimulator):
             if self.viewer.is_key_down("l"):  # Right
                 left_v += turn_speed
                 right_v -= turn_speed
+
+        # Slew-rate limit toward the desired command (acceleration ramp).
+        segment_dt = self.clock.steps_per_segment * self.clock.dt
+        dv_max = self.max_accel * segment_dt
+        self._cmd_left_v += float(np.clip(left_v - self._cmd_left_v, -dv_max, dv_max))
+        self._cmd_right_v += float(np.clip(right_v - self._cmd_right_v, -dv_max, dv_max))
+        left_v = self._cmd_left_v
+        right_v = self._cmd_right_v
 
         # Update targets
         if self.control_mode == "velocity":
@@ -197,7 +206,7 @@ class TarosSurfaceSimulator(InteractiveSimulator):
         surface_m = openmesh.read_trimesh(str(ASSETS_DIR.joinpath("surface.obj")))
         mesh_indices = np.array(surface_m.face_vertex_indices(), dtype=np.int32).flatten()
 
-        scale = np.array([6.0, 6.0, 4.0])
+        scale = np.array([6.0, 6.0, 3.0])
         mesh_points = np.array(surface_m.points()) * scale + np.array([0.0, 0.0, -0.1])
 
         surface_mesh = newton.Mesh(mesh_points, mesh_indices)
@@ -205,7 +214,7 @@ class TarosSurfaceSimulator(InteractiveSimulator):
         self.builder.add_shape_mesh(
             body=-1,
             mesh=surface_mesh,
-            cfg=newton.ModelBuilder.ShapeConfig(density=0.0, has_shape_collision=True, mu=1.0),
+            cfg=newton.ModelBuilder.ShapeConfig(density=0.0, has_shape_collision=True, mu=0.3),
         )
 
         return self.builder.finalize_replicated(num_worlds=self.simulation_config.num_worlds)
@@ -215,20 +224,19 @@ class TarosSurfaceSimulator(InteractiveSimulator):
 def taros4_surface_drive_example(cfg: DictConfig):
     sim_config: SimulationConfig = hydra.utils.instantiate(cfg.simulation)
     render_config: RenderingConfig = hydra.utils.instantiate(cfg.rendering)
-    exec_config: ExecutionConfig = hydra.utils.instantiate(cfg.execution)
     engine_config: EngineConfig = hydra.utils.instantiate(cfg.engine)
     logging_config: LoggingConfig = hydra.utils.instantiate(cfg.logging)
 
     simulator = TarosSurfaceSimulator(
         sim_config,
         render_config,
-        exec_config,
         engine_config,
         logging_config,
         control_mode=cfg.control.mode,
         k_p=cfg.control.k_p,
         k_d=cfg.control.k_d,
         friction=cfg.friction_coeff,
+        max_accel=cfg.control.get("max_accel", 2.0),
     )
     simulator.run()
 

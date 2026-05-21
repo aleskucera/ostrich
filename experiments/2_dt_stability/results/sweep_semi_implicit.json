@@ -1,0 +1,1157 @@
+{
+  "simulator": "Semi-Implicit",
+  "experiment": "obstacle_dt_sweep",
+  "nominal": {
+    "obstacle_x": 2.0,
+    "obstacle_height": 0.08,
+    "wheel_vel": 4.0
+  },
+  "perturbation_ranges": {
+    "obstacle_height": [
+      0.07,
+      0.09
+    ],
+    "obstacle_x": [
+      1.5,
+      2.5
+    ],
+    "wheel_vel": [
+      3.5,
+      4.5
+    ],
+    "initial_yaw": [
+      -0.1,
+      0.1
+    ]
+  },
+  "num_trials": 10,
+  "seed": 0,
+  "calibrated_params": {
+    "k_p": 0.0,
+    "k_d": 400.0,
+    "mu": 0.02,
+    "ke": 8000.0,
+    "kd_contact": 2000.0,
+    "kf": 1500.0
+  },
+  "ramp_time": 1.0,
+  "duration": 8.0,
+  "max_stable_dt": null,
+  "max_stable_dt_median": 0.0006562499999999999,
+  "max_stable_dt_iqr": [
+    0.0006562499999999999,
+    0.0006875
+  ],
+  "trials": [
+    {
+      "config": {
+        "obstacle_height": 0.08273923374642908,
+        "obstacle_x": 1.7697867137638703,
+        "wheel_vel": 3.5409735239361946,
+        "initial_yaw": -0.09669447289429418
+      },
+      "max_stable_dt": 0.0006562499999999999,
+      "total_time_s": 81.97,
+      "search": [
+        {
+          "stable": false,
+          "has_nan": true,
+          "z_min": 0.4151,
+          "z_max": 4.9372,
+          "x_final": -18.9192,
+          "y_max_abs": 5.4913,
+          "num_steps": 8,
+          "dt": 0.01,
+          "time_s": 1.46
+        },
+        {
+          "stable": false,
+          "has_nan": true,
+          "z_min": -0.0055,
+          "z_max": 0.5811,
+          "x_final": -1.1686,
+          "y_max_abs": 0.1598,
+          "num_steps": 9,
+          "dt": 0.005,
+          "time_s": 1.17
+        },
+        {
+          "stable": false,
+          "has_nan": true,
+          "z_min": 0.4091,
+          "z_max": 0.9067,
+          "x_final": -0.4814,
+          "y_max_abs": 1.3771,
+          "num_steps": 16,
+          "dt": 0.002,
+          "time_s": 1.36
+        },
+        {
+          "stable": false,
+          "has_nan": true,
+          "z_min": -0.1325,
+          "z_max": 0.5804,
+          "x_final": 0.539,
+          "y_max_abs": 10.0728,
+          "num_steps": 45,
+          "dt": 0.001,
+          "time_s": 1.18
+        },
+        {
+          "stable": true,
+          "has_nan": false,
+          "z_min": 0.2046,
+          "z_max": 0.5038,
+          "x_final": 8.7049,
+          "y_max_abs": 0.1491,
+          "num_steps": 16001,
+          "dt": 0.0005,
+          "time_s": 19.01
+        },
+        {
+          "stable": false,
+          "has_nan": false,
+          "z_min": 0.1979,
+          "z_max": 0.5,
+          "x_final": 0.9805,
+          "y_max_abs": 0.1421,
+          "num_steps": 10668,
+          "dt": 0.00075,
+          "time_s": 13.18
+        },
+        {
+          "stable": true,
+          "has_nan": false,
+          "z_min": 0.2042,
+          "z_max": 0.5,
+          "x_final": 7.242,
+          "y_max_abs": 1.9885,
+          "num_steps": 12801,
+          "dt": 0.000625,
+          "time_s": 15.97
+        },
+        {
+          "stable": false,
+          "has_nan": false,
+          "z_min": 0.204,
+          "z_max": 0.5,
+          "x_final": 1.9737,
+          "y_max_abs": 3.0365,
+          "num_steps": 11638,
+          "dt": 0.0006875,
+          "time_s": 14.42
+        },
+        {
+          "stable": true,
+          "has_nan": false,
+          "z_min": 0.204,
+          "z_max": 0.5,
+          "x_final": 4.8336,
+          "y_max_abs": 3.2556,
+          "num_steps": 12192,
+          "dt": 0.0006562499999999999,
+          "time_s": 14.22
+        }
+      ]
+    },
+    {
+      "config": {
+        "obstacle_height": 0.08626540478400545,
+        "obstacle_x": 2.412755577277722,
+        "wheel_vel": 4.10663577576718,
+        "initial_yaw": 0.045899312196799685
+      },
+      "max_stable_dt": 0.0006562499999999999,
+      "total_time_s": 73.16,
+      "search": [
+        {
+          "stable": false,
+          "has_nan": true,
+          "z_min": 0.4114,
+          "z_max": 27.2053,
+          "x_final": -66.0158,
+          "y_max_abs": 13.8529,
+          "num_steps": 8,
+          "dt": 0.01,
+          "time_s": 1.07
+        },
+        {
+          "stable": false,
+          "has_nan": true,
+          "z_min": -0.1314,
+          "z_max": 0.5789,
+          "x_final": -1.3333,
+          "y_max_abs": 0.0183,
+          "num_steps": 9,
+          "dt": 0.005,
+          "time_s": 1.05
+        },
+        {
+          "stable": false,
+          "has_nan": true,
+          "z_min": 0.4086,
+          "z_max": 1.3898,
+          "x_final": 0.5816,
+          "y_max_abs": 2.1898,
+          "num_steps": 16,
+          "dt": 0.002,
+          "time_s": 1.46
+        },
+        {
+          "stable": false,
+          "has_nan": true,
+          "z_min": -44.5004,
+          "z_max": 0.6447,
+          "x_final": 611.9812,
+          "y_max_abs": 133.1569,
+          "num_steps": 45,
+          "dt": 0.001,
+          "time_s": 1.08
+        },
+        {
+          "stable": true,
+          "has_nan": false,
+          "z_min": 0.206,
+          "z_max": 0.5401,
+          "x_final": 10.043,
+          "y_max_abs": 0.0929,
+          "num_steps": 16001,
+          "dt": 0.0005,
+          "time_s": 17.22
+        },
+        {
+          "stable": false,
+          "has_nan": false,
+          "z_min": 0.2005,
+          "z_max": 0.5,
+          "x_final": 1.5628,
+          "y_max_abs": 0.0966,
+          "num_steps": 10668,
+          "dt": 0.00075,
+          "time_s": 11.69
+        },
+        {
+          "stable": true,
+          "has_nan": false,
+          "z_min": 0.2058,
+          "z_max": 0.5059,
+          "x_final": 8.6353,
+          "y_max_abs": 0.7258,
+          "num_steps": 12801,
+          "dt": 0.000625,
+          "time_s": 13.84
+        },
+        {
+          "stable": false,
+          "has_nan": false,
+          "z_min": 0.2052,
+          "z_max": 0.5,
+          "x_final": 3.2029,
+          "y_max_abs": 4.2071,
+          "num_steps": 11638,
+          "dt": 0.0006875,
+          "time_s": 12.63
+        },
+        {
+          "stable": true,
+          "has_nan": false,
+          "z_min": 0.2054,
+          "z_max": 0.5,
+          "x_final": 7.0627,
+          "y_max_abs": 3.2969,
+          "num_steps": 12192,
+          "dt": 0.0006562499999999999,
+          "time_s": 13.11
+        }
+      ]
+    },
+    {
+      "config": {
+        "obstacle_height": 0.08087249982930846,
+        "obstacle_x": 2.4350724237877683,
+        "wheel_vel": 4.315853554121532,
+        "initial_yaw": -0.09945229996597038
+      },
+      "max_stable_dt": 0.0006875,
+      "total_time_s": 72.42,
+      "search": [
+        {
+          "stable": false,
+          "has_nan": true,
+          "z_min": 0.4103,
+          "z_max": 37.8203,
+          "x_final": -16.7633,
+          "y_max_abs": 9.9734,
+          "num_steps": 8,
+          "dt": 0.01,
+          "time_s": 1.67
+        },
+        {
+          "stable": false,
+          "has_nan": true,
+          "z_min": -0.1758,
+          "z_max": 0.5782,
+          "x_final": -1.3795,
+          "y_max_abs": 0.1775,
+          "num_steps": 9,
+          "dt": 0.005,
+          "time_s": 1.06
+        },
+        {
+          "stable": false,
+          "has_nan": true,
+          "z_min": 0.4085,
+          "z_max": 1.6505,
+          "x_final": 0.7232,
+          "y_max_abs": 2.6142,
+          "num_steps": 16,
+          "dt": 0.002,
+          "time_s": 1.05
+        },
+        {
+          "stable": false,
+          "has_nan": true,
+          "z_min": 0.4048,
+          "z_max": 18.7398,
+          "x_final": 2255.1113,
+          "y_max_abs": 201.7055,
+          "num_steps": 45,
+          "dt": 0.001,
+          "time_s": 1.07
+        },
+        {
+          "stable": true,
+          "has_nan": false,
+          "z_min": 0.2065,
+          "z_max": 0.5,
+          "x_final": 10.8747,
+          "y_max_abs": 0.6791,
+          "num_steps": 16001,
+          "dt": 0.0005,
+          "time_s": 16.9
+        },
+        {
+          "stable": false,
+          "has_nan": false,
+          "z_min": 0.2015,
+          "z_max": 0.5,
+          "x_final": 1.6466,
+          "y_max_abs": 0.2974,
+          "num_steps": 10668,
+          "dt": 0.00075,
+          "time_s": 11.58
+        },
+        {
+          "stable": true,
+          "has_nan": false,
+          "z_min": 0.2063,
+          "z_max": 0.5074,
+          "x_final": 9.4524,
+          "y_max_abs": 0.2212,
+          "num_steps": 12801,
+          "dt": 0.000625,
+          "time_s": 13.76
+        },
+        {
+          "stable": true,
+          "has_nan": false,
+          "z_min": 0.2058,
+          "z_max": 0.5,
+          "x_final": 6.4439,
+          "y_max_abs": 3.9682,
+          "num_steps": 11638,
+          "dt": 0.0006875,
+          "time_s": 12.52
+        },
+        {
+          "stable": false,
+          "has_nan": false,
+          "z_min": 0.2053,
+          "z_max": 0.5,
+          "x_final": 2.8315,
+          "y_max_abs": 3.1282,
+          "num_steps": 11132,
+          "dt": 0.00071875,
+          "time_s": 12.81
+        }
+      ]
+    },
+    {
+      "config": {
+        "obstacle_height": 0.08714808553175138,
+        "obstacle_x": 1.5335855753054644,
+        "wheel_vel": 4.229655446429944,
+        "initial_yaw": -0.0648688758794882
+      },
+      "max_stable_dt": 0.0006562499999999999,
+      "total_time_s": 71.67,
+      "search": [
+        {
+          "stable": false,
+          "has_nan": true,
+          "z_min": 0.4107,
+          "z_max": 26.4324,
+          "x_final": -70.0726,
+          "y_max_abs": 6.9327,
+          "num_steps": 8,
+          "dt": 0.01,
+          "time_s": 1.02
+        },
+        {
+          "stable": false,
+          "has_nan": true,
+          "z_min": -0.1576,
+          "z_max": 0.5785,
+          "x_final": -1.361,
+          "y_max_abs": 0.1296,
+          "num_steps": 9,
+          "dt": 0.005,
+          "time_s": 1.04
+        },
+        {
+          "stable": false,
+          "has_nan": true,
+          "z_min": 0.4085,
+          "z_max": 1.5423,
+          "x_final": 0.6299,
+          "y_max_abs": 2.4456,
+          "num_steps": 16,
+          "dt": 0.002,
+          "time_s": 1.03
+        },
+        {
+          "stable": false,
+          "has_nan": true,
+          "z_min": -35.0264,
+          "z_max": 0.8566,
+          "x_final": 1365.0735,
+          "y_max_abs": 131.9814,
+          "num_steps": 45,
+          "dt": 0.001,
+          "time_s": 1.05
+        },
+        {
+          "stable": true,
+          "has_nan": false,
+          "z_min": 0.2063,
+          "z_max": 0.5106,
+          "x_final": 10.4827,
+          "y_max_abs": 0.0884,
+          "num_steps": 16001,
+          "dt": 0.0005,
+          "time_s": 16.71
+        },
+        {
+          "stable": false,
+          "has_nan": false,
+          "z_min": 0.2011,
+          "z_max": 0.5,
+          "x_final": 0.7032,
+          "y_max_abs": 0.1271,
+          "num_steps": 10668,
+          "dt": 0.00075,
+          "time_s": 11.64
+        },
+        {
+          "stable": true,
+          "has_nan": false,
+          "z_min": 0.2061,
+          "z_max": 0.5103,
+          "x_final": 5.5556,
+          "y_max_abs": 7.7251,
+          "num_steps": 12801,
+          "dt": 0.000625,
+          "time_s": 13.59
+        },
+        {
+          "stable": false,
+          "has_nan": false,
+          "z_min": 0.2056,
+          "z_max": 0.5,
+          "x_final": 2.4485,
+          "y_max_abs": 4.3926,
+          "num_steps": 11638,
+          "dt": 0.0006875,
+          "time_s": 12.59
+        },
+        {
+          "stable": true,
+          "has_nan": false,
+          "z_min": 0.2056,
+          "z_max": 0.5338,
+          "x_final": 7.7245,
+          "y_max_abs": 0.4048,
+          "num_steps": 12192,
+          "dt": 0.0006562499999999999,
+          "time_s": 12.99
+        }
+      ]
+    },
+    {
+      "config": {
+        "obstacle_height": 0.08726357844699772,
+        "obstacle_x": 2.041461220249092,
+        "wheel_vel": 3.7997118905373846,
+        "initial_yaw": -0.015462555760468316
+      },
+      "max_stable_dt": 0.000625,
+      "total_time_s": 72.73,
+      "search": [
+        {
+          "stable": false,
+          "has_nan": true,
+          "z_min": 0.4133,
+          "z_max": 28.5295,
+          "x_final": -60.6254,
+          "y_max_abs": 8.337,
+          "num_steps": 8,
+          "dt": 0.01,
+          "time_s": 2.02
+        },
+        {
+          "stable": false,
+          "has_nan": true,
+          "z_min": -0.0642,
+          "z_max": 0.58,
+          "x_final": -1.248,
+          "y_max_abs": 0.065,
+          "num_steps": 9,
+          "dt": 0.005,
+          "time_s": 1.03
+        },
+        {
+          "stable": false,
+          "has_nan": true,
+          "z_min": 0.4088,
+          "z_max": 1.0935,
+          "x_final": -0.0761,
+          "y_max_abs": 1.7637,
+          "num_steps": 16,
+          "dt": 0.002,
+          "time_s": 1.04
+        },
+        {
+          "stable": false,
+          "has_nan": true,
+          "z_min": -14.9918,
+          "z_max": 0.5802,
+          "x_final": 51.8127,
+          "y_max_abs": 43.9633,
+          "num_steps": 45,
+          "dt": 0.001,
+          "time_s": 1.07
+        },
+        {
+          "stable": true,
+          "has_nan": false,
+          "z_min": 0.2053,
+          "z_max": 0.533,
+          "x_final": 9.3855,
+          "y_max_abs": 0.3826,
+          "num_steps": 16001,
+          "dt": 0.0005,
+          "time_s": 17.01
+        },
+        {
+          "stable": false,
+          "has_nan": false,
+          "z_min": 0.1997,
+          "z_max": 0.5,
+          "x_final": 1.2402,
+          "y_max_abs": 0.0595,
+          "num_steps": 10668,
+          "dt": 0.00075,
+          "time_s": 11.54
+        },
+        {
+          "stable": true,
+          "has_nan": false,
+          "z_min": 0.2048,
+          "z_max": 0.5,
+          "x_final": 7.4881,
+          "y_max_abs": 1.2357,
+          "num_steps": 12801,
+          "dt": 0.000625,
+          "time_s": 13.69
+        },
+        {
+          "stable": false,
+          "has_nan": false,
+          "z_min": 0.2047,
+          "z_max": 0.5,
+          "x_final": 2.0298,
+          "y_max_abs": 1.7391,
+          "num_steps": 11638,
+          "dt": 0.0006875,
+          "time_s": 12.36
+        },
+        {
+          "stable": false,
+          "has_nan": false,
+          "z_min": 0.2048,
+          "z_max": 0.5,
+          "x_final": 2.3891,
+          "y_max_abs": 0.3892,
+          "num_steps": 12192,
+          "dt": 0.0006562499999999999,
+          "time_s": 12.97
+        }
+      ]
+    },
+    {
+      "config": {
+        "obstacle_height": 0.07056639342290927,
+        "obstacle_x": 1.6242832764995638,
+        "wheel_vel": 4.170624414693631,
+        "initial_yaw": 0.029437902314850023
+      },
+      "max_stable_dt": 0.0006875,
+      "total_time_s": 72.47,
+      "search": [
+        {
+          "stable": false,
+          "has_nan": true,
+          "z_min": 0.411,
+          "z_max": 26.7831,
+          "x_final": -67.8866,
+          "y_max_abs": 13.1502,
+          "num_steps": 8,
+          "dt": 0.01,
+          "time_s": 1.02
+        },
+        {
+          "stable": false,
+          "has_nan": true,
+          "z_min": -0.1451,
+          "z_max": 0.5787,
+          "x_final": -1.351,
+          "y_max_abs": 0.0084,
+          "num_steps": 9,
+          "dt": 0.005,
+          "time_s": 1.02
+        },
+        {
+          "stable": false,
+          "has_nan": true,
+          "z_min": 0.4086,
+          "z_max": 1.469,
+          "x_final": 0.7131,
+          "y_max_abs": 2.2905,
+          "num_steps": 16,
+          "dt": 0.002,
+          "time_s": 1.03
+        },
+        {
+          "stable": false,
+          "has_nan": true,
+          "z_min": -45.0915,
+          "z_max": 0.7462,
+          "x_final": 934.6921,
+          "y_max_abs": 175.3411,
+          "num_steps": 45,
+          "dt": 0.001,
+          "time_s": 1.15
+        },
+        {
+          "stable": true,
+          "has_nan": false,
+          "z_min": 0.2062,
+          "z_max": 0.5,
+          "x_final": 10.2516,
+          "y_max_abs": 2.5055,
+          "num_steps": 16001,
+          "dt": 0.0005,
+          "time_s": 18.3
+        },
+        {
+          "stable": false,
+          "has_nan": false,
+          "z_min": 0.2016,
+          "z_max": 0.5,
+          "x_final": 0.8455,
+          "y_max_abs": 0.0412,
+          "num_steps": 10668,
+          "dt": 0.00075,
+          "time_s": 11.67
+        },
+        {
+          "stable": true,
+          "has_nan": false,
+          "z_min": 0.2059,
+          "z_max": 0.5,
+          "x_final": 8.6741,
+          "y_max_abs": 0.0389,
+          "num_steps": 12801,
+          "dt": 0.000625,
+          "time_s": 13.7
+        },
+        {
+          "stable": true,
+          "has_nan": false,
+          "z_min": 0.2054,
+          "z_max": 0.5,
+          "x_final": 2.8957,
+          "y_max_abs": 5.4861,
+          "num_steps": 11638,
+          "dt": 0.0006875,
+          "time_s": 12.55
+        },
+        {
+          "stable": false,
+          "has_nan": false,
+          "z_min": 0.2039,
+          "z_max": 0.5,
+          "x_final": 0.8312,
+          "y_max_abs": 0.1123,
+          "num_steps": 11132,
+          "dt": 0.00071875,
+          "time_s": 12.05
+        }
+      ]
+    },
+    {
+      "config": {
+        "obstacle_height": 0.08230770222962508,
+        "obstacle_x": 1.8836775542618835,
+        "wheel_vel": 4.497209935789211,
+        "initial_yaw": 0.09616706775524603
+      },
+      "max_stable_dt": 0.0006875,
+      "total_time_s": 70.58,
+      "search": [
+        {
+          "stable": false,
+          "has_nan": true,
+          "z_min": 0.4093,
+          "z_max": 24.6357,
+          "x_final": -73.4396,
+          "y_max_abs": 20.0842,
+          "num_steps": 8,
+          "dt": 0.01,
+          "time_s": 1.02
+        },
+        {
+          "stable": false,
+          "has_nan": true,
+          "z_min": -0.2133,
+          "z_max": 0.5776,
+          "x_final": -1.4372,
+          "y_max_abs": 0.1024,
+          "num_steps": 9,
+          "dt": 0.005,
+          "time_s": 1.03
+        },
+        {
+          "stable": false,
+          "has_nan": true,
+          "z_min": 0.4085,
+          "z_max": 2.9,
+          "x_final": 2.4921,
+          "y_max_abs": 2.7826,
+          "num_steps": 16,
+          "dt": 0.002,
+          "time_s": 1.02
+        },
+        {
+          "stable": false,
+          "has_nan": true,
+          "z_min": 0.4047,
+          "z_max": 1.5375,
+          "x_final": 0.5203,
+          "y_max_abs": 0.5024,
+          "num_steps": 44,
+          "dt": 0.001,
+          "time_s": 1.05
+        },
+        {
+          "stable": true,
+          "has_nan": false,
+          "z_min": 0.2069,
+          "z_max": 0.5166,
+          "x_final": 11.2495,
+          "y_max_abs": 0.4649,
+          "num_steps": 16001,
+          "dt": 0.0005,
+          "time_s": 16.73
+        },
+        {
+          "stable": false,
+          "has_nan": false,
+          "z_min": 0.202,
+          "z_max": 0.5,
+          "x_final": 1.1365,
+          "y_max_abs": 0.1374,
+          "num_steps": 10668,
+          "dt": 0.00075,
+          "time_s": 11.63
+        },
+        {
+          "stable": true,
+          "has_nan": false,
+          "z_min": 0.2067,
+          "z_max": 0.5,
+          "x_final": 9.7428,
+          "y_max_abs": 0.1726,
+          "num_steps": 12801,
+          "dt": 0.000625,
+          "time_s": 13.59
+        },
+        {
+          "stable": true,
+          "has_nan": false,
+          "z_min": 0.2064,
+          "z_max": 0.5,
+          "x_final": 4.4061,
+          "y_max_abs": 6.0041,
+          "num_steps": 11638,
+          "dt": 0.0006875,
+          "time_s": 12.53
+        },
+        {
+          "stable": false,
+          "has_nan": false,
+          "z_min": 0.2058,
+          "z_max": 0.5,
+          "x_final": 2.455,
+          "y_max_abs": 2.1854,
+          "num_steps": 11132,
+          "dt": 0.00071875,
+          "time_s": 11.98
+        }
+      ]
+    },
+    {
+      "config": {
+        "obstacle_height": 0.08371083968961389,
+        "obstacle_x": 2.1504592762678163,
+        "wheel_vel": 4.18844673057094,
+        "initial_yaw": -0.02221571520417924
+      },
+      "max_stable_dt": 0.0006562499999999999,
+      "total_time_s": 72.93,
+      "search": [
+        {
+          "stable": false,
+          "has_nan": true,
+          "z_min": 0.4109,
+          "z_max": 26.6774,
+          "x_final": -68.8467,
+          "y_max_abs": 9.7137,
+          "num_steps": 8,
+          "dt": 0.01,
+          "time_s": 1.05
+        },
+        {
+          "stable": false,
+          "has_nan": true,
+          "z_min": -0.1489,
+          "z_max": 0.5786,
+          "x_final": -1.354,
+          "y_max_abs": 0.0718,
+          "num_steps": 9,
+          "dt": 0.005,
+          "time_s": 1.06
+        },
+        {
+          "stable": false,
+          "has_nan": true,
+          "z_min": 0.4086,
+          "z_max": 1.4855,
+          "x_final": 0.6087,
+          "y_max_abs": 2.3517,
+          "num_steps": 16,
+          "dt": 0.002,
+          "time_s": 2.62
+        },
+        {
+          "stable": false,
+          "has_nan": true,
+          "z_min": -43.4839,
+          "z_max": 0.7777,
+          "x_final": 1054.1986,
+          "y_max_abs": 142.0338,
+          "num_steps": 45,
+          "dt": 0.001,
+          "time_s": 1.07
+        },
+        {
+          "stable": true,
+          "has_nan": false,
+          "z_min": 0.2062,
+          "z_max": 0.5376,
+          "x_final": 10.1604,
+          "y_max_abs": 0.0409,
+          "num_steps": 16001,
+          "dt": 0.0005,
+          "time_s": 16.72
+        },
+        {
+          "stable": false,
+          "has_nan": false,
+          "z_min": 0.2008,
+          "z_max": 0.5,
+          "x_final": 1.3436,
+          "y_max_abs": 0.0509,
+          "num_steps": 10668,
+          "dt": 0.00075,
+          "time_s": 11.5
+        },
+        {
+          "stable": true,
+          "has_nan": false,
+          "z_min": 0.206,
+          "z_max": 0.5,
+          "x_final": 8.1054,
+          "y_max_abs": 0.8174,
+          "num_steps": 12801,
+          "dt": 0.000625,
+          "time_s": 13.56
+        },
+        {
+          "stable": false,
+          "has_nan": false,
+          "z_min": 0.2054,
+          "z_max": 0.5,
+          "x_final": 1.9363,
+          "y_max_abs": 0.0464,
+          "num_steps": 11638,
+          "dt": 0.0006875,
+          "time_s": 12.38
+        },
+        {
+          "stable": true,
+          "has_nan": false,
+          "z_min": 0.2057,
+          "z_max": 0.5,
+          "x_final": 6.4873,
+          "y_max_abs": 2.8019,
+          "num_steps": 12192,
+          "dt": 0.0006562499999999999,
+          "time_s": 12.98
+        }
+      ]
+    },
+    {
+      "config": {
+        "obstacle_height": 0.07270193010044823,
+        "obstacle_x": 2.2214883401940817,
+        "wheel_vel": 4.025354322475726,
+        "initial_yaw": -0.03795162488820887
+      },
+      "max_stable_dt": 0.0006562499999999999,
+      "total_time_s": 71.47,
+      "search": [
+        {
+          "stable": false,
+          "has_nan": true,
+          "z_min": 0.4119,
+          "z_max": 27.5623,
+          "x_final": -65.5528,
+          "y_max_abs": 7.9105,
+          "num_steps": 8,
+          "dt": 0.01,
+          "time_s": 1.03
+        },
+        {
+          "stable": false,
+          "has_nan": true,
+          "z_min": -0.1138,
+          "z_max": 0.5792,
+          "x_final": -1.3079,
+          "y_max_abs": 0.0936,
+          "num_steps": 9,
+          "dt": 0.005,
+          "time_s": 1.03
+        },
+        {
+          "stable": false,
+          "has_nan": true,
+          "z_min": 0.4087,
+          "z_max": 1.3022,
+          "x_final": 0.2392,
+          "y_max_abs": 2.1032,
+          "num_steps": 16,
+          "dt": 0.002,
+          "time_s": 1.06
+        },
+        {
+          "stable": false,
+          "has_nan": true,
+          "z_min": -36.977,
+          "z_max": 0.5798,
+          "x_final": 352.5726,
+          "y_max_abs": 65.6252,
+          "num_steps": 45,
+          "dt": 0.001,
+          "time_s": 1.07
+        },
+        {
+          "stable": true,
+          "has_nan": false,
+          "z_min": 0.2058,
+          "z_max": 0.5,
+          "x_final": 9.937,
+          "y_max_abs": 0.0717,
+          "num_steps": 16001,
+          "dt": 0.0005,
+          "time_s": 16.67
+        },
+        {
+          "stable": false,
+          "has_nan": false,
+          "z_min": 0.2004,
+          "z_max": 0.5,
+          "x_final": 1.4452,
+          "y_max_abs": 0.0671,
+          "num_steps": 10668,
+          "dt": 0.00075,
+          "time_s": 11.45
+        },
+        {
+          "stable": true,
+          "has_nan": false,
+          "z_min": 0.2056,
+          "z_max": 0.5,
+          "x_final": 7.3036,
+          "y_max_abs": 4.253,
+          "num_steps": 12801,
+          "dt": 0.000625,
+          "time_s": 13.72
+        },
+        {
+          "stable": false,
+          "has_nan": false,
+          "z_min": 0.205,
+          "z_max": 0.5171,
+          "x_final": 2.2411,
+          "y_max_abs": 0.2443,
+          "num_steps": 11638,
+          "dt": 0.0006875,
+          "time_s": 12.38
+        },
+        {
+          "stable": true,
+          "has_nan": false,
+          "z_min": 0.2052,
+          "z_max": 0.5,
+          "x_final": 6.9808,
+          "y_max_abs": 4.2083,
+          "num_steps": 12192,
+          "dt": 0.0006562499999999999,
+          "time_s": 13.06
+        }
+      ]
+    },
+    {
+      "config": {
+        "obstacle_height": 0.07971670717663579,
+        "obstacle_x": 2.3894878343490005,
+        "wheel_vel": 4.434043515956249,
+        "initial_yaw": -0.02844096065818595
+      },
+      "max_stable_dt": 0.0006875,
+      "total_time_s": 72.45,
+      "search": [
+        {
+          "stable": false,
+          "has_nan": true,
+          "z_min": 0.4096,
+          "z_max": 25.091,
+          "x_final": -74.0488,
+          "y_max_abs": 10.4809,
+          "num_steps": 8,
+          "dt": 0.01,
+          "time_s": 1.08
+        },
+        {
+          "stable": false,
+          "has_nan": true,
+          "z_min": -0.2003,
+          "z_max": 0.5778,
+          "x_final": -1.4213,
+          "y_max_abs": 0.0778,
+          "num_steps": 9,
+          "dt": 0.005,
+          "time_s": 1.04
+        },
+        {
+          "stable": false,
+          "has_nan": true,
+          "z_min": 0.4085,
+          "z_max": 1.8223,
+          "x_final": 1.2421,
+          "y_max_abs": 2.741,
+          "num_steps": 16,
+          "dt": 0.002,
+          "time_s": 1.02
+        },
+        {
+          "stable": false,
+          "has_nan": true,
+          "z_min": 0.4047,
+          "z_max": 1.3567,
+          "x_final": 0.5632,
+          "y_max_abs": 0.4404,
+          "num_steps": 44,
+          "dt": 0.001,
+          "time_s": 1.07
+        },
+        {
+          "stable": true,
+          "has_nan": false,
+          "z_min": 0.2068,
+          "z_max": 0.5188,
+          "x_final": 11.1878,
+          "y_max_abs": 0.0766,
+          "num_steps": 16001,
+          "dt": 0.0005,
+          "time_s": 18.85
+        },
+        {
+          "stable": false,
+          "has_nan": false,
+          "z_min": 0.2017,
+          "z_max": 0.5,
+          "x_final": 1.6457,
+          "y_max_abs": 1.0773,
+          "num_steps": 10668,
+          "dt": 0.00075,
+          "time_s": 11.59
+        },
+        {
+          "stable": true,
+          "has_nan": false,
+          "z_min": 0.2066,
+          "z_max": 0.5131,
+          "x_final": 9.2282,
+          "y_max_abs": 0.0616,
+          "num_steps": 12801,
+          "dt": 0.000625,
+          "time_s": 13.57
+        },
+        {
+          "stable": true,
+          "has_nan": false,
+          "z_min": 0.206,
+          "z_max": 0.5,
+          "x_final": 6.3261,
+          "y_max_abs": 0.0773,
+          "num_steps": 11638,
+          "dt": 0.0006875,
+          "time_s": 12.35
+        },
+        {
+          "stable": false,
+          "has_nan": false,
+          "z_min": 0.2056,
+          "z_max": 0.5284,
+          "x_final": 2.2934,
+          "y_max_abs": 0.2676,
+          "num_steps": 11132,
+          "dt": 0.00071875,
+          "time_s": 11.88
+        }
+      ]
+    }
+  ]
+}

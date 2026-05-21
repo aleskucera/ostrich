@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 import warp as wp
-from axion.math import compute_spatial_momentum
+from axion.mechanics import compute_spatial_momentum
 from warp.optim.linear import LinearOperator
 
 
@@ -128,7 +128,7 @@ class SystemOperator(LinearOperator):
     def __init__(
         self,
         data: SystemLinearData,
-        device: wp.context.Device,
+        device: wp.Device,
         regularization: float = 1e-6,
     ):
         super().__init__(

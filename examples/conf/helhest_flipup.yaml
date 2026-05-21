@@ -1,0 +1,8 @@
+defaults:
+  - simulation: helhest_flipup
+  - rendering: gl
+  - logging: disabled
+  - engine: axion
+  - _self_
+
+project_name: ${hydra:job.name}

@@ -8,7 +8,6 @@ import warp as wp
 import warp.optim
 from axion import AxionDifferentiableSimulator
 from axion import EngineConfig
-from axion import ExecutionConfig
 from axion import LoggingConfig
 from axion import RenderingConfig
 from axion import SimulationConfig
@@ -86,14 +85,12 @@ class BallThrowOptimizerImplicit(AxionDifferentiableSimulator):
         self,
         sim_config: SimulationConfig,
         render_config: RenderingConfig,
-        exec_config: ExecutionConfig,
         engine_config: EngineConfig,
         logging_config: LoggingConfig,
     ):
         super().__init__(
             sim_config,
             render_config,
-            exec_config,
             engine_config,
             logging_config,
         )
@@ -101,7 +98,7 @@ class BallThrowOptimizerImplicit(AxionDifferentiableSimulator):
         # 2. Optimization Setup
         self.target_pos = wp.vec3(0.0, 5.0, 1.0)
         self.loss = wp.zeros(1, dtype=float, requires_grad=True)
-        self.learning_rate = 1.0
+        self.learning_rate = 1e-1
 
         self.frame = 0
 
@@ -216,14 +213,12 @@ class BallThrowOptimizerImplicit(AxionDifferentiableSimulator):
 def main(cfg: DictConfig):
     sim_config: SimulationConfig = hydra.utils.instantiate(cfg.simulation)
     render_config: RenderingConfig = hydra.utils.instantiate(cfg.rendering)
-    exec_config: ExecutionConfig = hydra.utils.instantiate(cfg.execution)
     engine_config: EngineConfig = hydra.utils.instantiate(cfg.engine)
     logging_config: LoggingConfig = hydra.utils.instantiate(cfg.logging)
 
     sim = BallThrowOptimizerImplicit(
         sim_config,
         render_config,
-        exec_config,
         engine_config,
         logging_config,
     )

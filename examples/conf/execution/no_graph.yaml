@@ -1,4 +1,0 @@
-# @package execution
-_target_: axion.ExecutionConfig
-use_cuda_graph: False
-headless_steps_per_segment: 10

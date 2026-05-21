@@ -6,10 +6,10 @@ from axion.core.engine_config import EngineConfig
 from axion.core.engine_data import EngineData
 from axion.core.engine_dims import EngineDimensions
 from axion.core.model import AxionModel
-from axion.math import integrate_body_pose_kernel
+from axion.mechanics import integrate_body_pose_kernel
 
 from axion.core.contacts import AxionContacts
-from axion.core.residual_utils import compute_residual
+from axion.core.residual import compute_residual
 
 
 class AxionResidualAD(torch.autograd.Function):

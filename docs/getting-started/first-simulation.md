@@ -34,8 +34,6 @@ Let's begin by creating a simple simulation of a single rod falling under gravit
 import warp as wp
 from axion import InteractiveSimulator
 from axion import EngineConfig
-from axion import ExecutionConfig
-from axion import ProfilingConfig
 from axion import RenderingConfig
 from axion import SimulationConfig
 
@@ -45,11 +43,9 @@ class Simulator(InteractiveSimulator):
         self,
         sim_config: SimulationConfig,
         render_config: RenderingConfig,
-        exec_config: ExecutionConfig,
-        profile_config: ProfilingConfig,
         engine_config: EngineConfig,
     ):
-        super().__init__(sim_config, render_config, exec_config, profile_config, engine_config)
+        super().__init__(sim_config, render_config, engine_config)
 
     def build_model(self) -> wp.sim.Model:
         # Create model builder with Z-axis up (gravity points down in -Z)
@@ -89,8 +85,6 @@ if __name__ == "__main__":
     sim = Simulator(
         sim_config=SimulationConfig(duration_seconds=5.0),  # Run for 5 seconds
         render_config=RenderingConfig(),                    # Default rendering settings
-        exec_config=ExecutionConfig(),                      # Default execution (GPU if available)
-        profile_config=ProfilingConfig(),                   # No profiling by default
         engine_config=EngineConfig(),                       # Default physics settings
     )
     sim.run()  # Execute the simulation and generate USD file
@@ -271,10 +265,14 @@ The `__main__` block in the script passes several configuration objects to the s
     ```python
     @dataclass
     class SimulationConfig:
-        """Parameters defining the simulation's timeline."""
+        """Parameters defining the simulation's timeline and execution
+        strategy."""
 
         duration_seconds: float = 3.0
         target_timestep_seconds: float = 1e-3
+        num_worlds: int = 1
+        sync_mode: SyncMode = SyncMode.ALIGN_FPS_TO_DT
+        use_cuda_graph: bool = True
     ```
 
 === "EngineConfig"
@@ -320,28 +318,25 @@ The `__main__` block in the script passes several configuration objects to the s
         usd_file: str = "sim.usd"
     ```
 
-=== "ExecutionConfig"
+=== "LoggingConfig"
     ```python
+    # Three independent sub-configs, one per logging subsystem.
+    # Each sub-config has its own ``enabled`` flag and ``file`` path.
     @dataclass
-    class ExecutionConfig:
-        """Parameters controlling the performance and execution strategy."""
-
-        use_cuda_graph: bool = True
-        headless_steps_per_segment: int = 10
+    class LoggingConfig:
+        hdf5: HDF5LoggingConfig = field(default_factory=HDF5LoggingConfig)
+        dataset: DatasetLoggingConfig = field(default_factory=DatasetLoggingConfig)
+        adjoint: AdjointLoggingConfig = field(default_factory=AdjointLoggingConfig)
     ```
 
 === "ProfilingConfig"
     ```python
+    # Lives on AxionEngineConfig as ``profiling``. Drives the CUDA-event
+    # profiler (``axion.profiling.EngineProfiler``).
     @dataclass
     class ProfilingConfig:
-        """Parameters for debugging, timing, and logging."""
-
-        enable_timing: bool = False
-
-        # Enables HDF5 logging (disables CUDA graph optimization).
-        enable_hdf5_logging: bool = False
-        hdf5_log_file: str = "simulation.log"
-
+        mode: Literal["off", "end_to_end", "per_component"] = "off"
+        segment_timing: bool = False
     ```
 
 ## Next Steps

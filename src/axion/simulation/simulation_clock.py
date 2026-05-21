@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Tuple
 
-from .sim_config import ExecutionConfig
 from .sim_config import RenderingConfig
 from .sim_config import SimulationConfig
 from .sim_config import SyncMode
@@ -19,11 +18,9 @@ class SimulationClock:
         self,
         simulation_config: SimulationConfig,
         rendering_config: RenderingConfig,
-        execution_config: ExecutionConfig,
     ):
         self.sim_config = simulation_config
         self.render_config = rendering_config
-        self.exec_config = execution_config
 
         # --- State Tracking ---
         self._current_step: int = 0
@@ -86,7 +83,13 @@ class SimulationClock:
                 self.render_config.target_fps = new_fps
         else:
             self.dt = target_dt
-            self.steps_per_segment = self.exec_config.headless_steps_per_segment
+            # Headless: one physics step per segment. There used to be an
+            # ``exec_config.headless_steps_per_segment`` knob here that
+            # unrolled multiple steps inside the captured CUDA graph;
+            # measurement showed no speed-up (graph-launch overhead is
+            # noise relative to per-step compute at this codebase's
+            # scale), so the knob was dropped.
+            self.steps_per_segment = 1
 
         # 2. Determine Total Duration
         self.sim_duration, self.num_segments = self._align_duration_to_segment(

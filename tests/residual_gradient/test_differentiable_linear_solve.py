@@ -9,7 +9,7 @@ import numpy as np
 import torch
 import warp as wp
 from axion.core.engine import AxionEngine
-from axion.core.engine_config import AxionEngineConfig
+from axion.core.engine_config import AxionEngineConfig, LinearSolverConfig, NewtonRaphsonConfig
 from axion.core.logging_config import LoggingConfig
 from axion.core.model_builder import AxionModelBuilder
 from axion.learning.differentiable_linear_solve import DifferentiableLinearSolve
@@ -39,7 +39,10 @@ def build_scene(num_worlds: int = 1) -> newton.Model:
 def setup_engine_at_timestep(model, config=None):
     """Create engine, step once to populate contacts, return engine ready for linear solve."""
     if config is None:
-        config = AxionEngineConfig(max_newton_iters=10, max_linear_iters=200)
+        config = AxionEngineConfig(
+            nr=NewtonRaphsonConfig(max_iters=10),
+            linear=LinearSolverConfig(max_iters=200),
+        )
 
     engine = config.create_engine(model=model, sim_steps=5, logging_config=LoggingConfig())
 
@@ -64,7 +67,7 @@ def setup_engine_at_timestep(model, config=None):
     engine.data._constr_force_prev_iter.zero_()
 
     # Integrate poses
-    from axion.math import integrate_body_pose_kernel
+    from axion.mechanics import integrate_body_pose_kernel
     wp.launch(
         kernel=integrate_body_pose_kernel,
         dim=(engine.dims.num_worlds, engine.dims.body_count),
@@ -74,7 +77,7 @@ def setup_engine_at_timestep(model, config=None):
     )
 
     # Compute linear system (populates J, C, rhs)
-    from axion.core.linear_utils import compute_linear_system
+    from axion.core.linear_system import compute_linear_system
     compute_linear_system(
         engine.axion_model, engine.axion_contacts, engine.data, engine.config, engine.dims
     )
@@ -99,9 +102,9 @@ def test_forward_solves_correctly():
     x_diff = DifferentiableLinearSolve.apply(
         engine.cr_solver, engine.A_op, engine.preconditioner,
         rhs_torch,
-        engine.config.max_linear_iters,
-        engine.config.linear_tol,
-        engine.config.linear_atol,
+        engine.config.linear.max_iters,
+        engine.config.linear.tol,
+        engine.config.linear.atol,
     )
 
     # Solve via direct PCR
@@ -111,9 +114,9 @@ def test_forward_solves_correctly():
         b=wp.from_torch(rhs_torch),
         x=x_direct,
         preconditioner=engine.preconditioner,
-        iters=engine.config.max_linear_iters,
-        tol=engine.config.linear_tol,
-        atol=engine.config.linear_atol,
+        iters=engine.config.linear.max_iters,
+        tol=engine.config.linear.tol,
+        atol=engine.config.linear.atol,
     )
     x_direct_torch = wp.to_torch(x_direct).clone()
 

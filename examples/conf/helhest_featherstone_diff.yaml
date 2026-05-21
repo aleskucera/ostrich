@@ -1,7 +1,6 @@
 defaults:
   - simulation: helhest_featherstone_diff
   - rendering: gl
-  - execution: cuda_graph
   - logging: disabled
   - engine: featherstone
   - control: helhest/velocity_featherstone

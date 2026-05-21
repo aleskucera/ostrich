@@ -4,6 +4,105 @@ from axion.core.engine_data import EngineData
 from axion.core.engine_dims import EngineDimensions
 
 
+@wp.kernel
+def vel_grad_norm_sq_kernel(
+    vel_grad: wp.array(dtype=wp.spatial_vector, ndim=2),
+    norm_sq: wp.array(dtype=wp.float32),
+):
+    """Accumulate squared norm of velocity gradient into a scalar."""
+    world_idx, body_idx = wp.tid()
+    v = vel_grad[world_idx, body_idx]
+    s = wp.dot(wp.spatial_top(v), wp.spatial_top(v)) + wp.dot(
+        wp.spatial_bottom(v), wp.spatial_bottom(v)
+    )
+    wp.atomic_add(norm_sq, 0, s)
+
+
+@wp.kernel
+def pose_grad_norm_sq_kernel(
+    pose_grad: wp.array(dtype=wp.transform, ndim=2),
+    norm_sq: wp.array(dtype=wp.float32),
+):
+    """Accumulate squared norm of pose gradient into a scalar."""
+    world_idx, body_idx = wp.tid()
+    g = pose_grad[world_idx, body_idx]
+    p = wp.transform_get_translation(g)
+    r = wp.transform_get_rotation(g)
+    s = wp.dot(p, p) + r[0] * r[0] + r[1] * r[1] + r[2] * r[2] + r[3] * r[3]
+    wp.atomic_add(norm_sq, 0, s)
+
+
+@wp.kernel
+def compute_grad_scale_kernel(
+    norm_sq: wp.array(dtype=wp.float32),
+    target_norm: wp.float32,
+    scale: wp.array(dtype=wp.float32),
+):
+    """Compute scale = target_norm / sqrt(norm_sq), or 1.0 if norm is tiny."""
+    n = wp.sqrt(norm_sq[0])
+    if n < 1.0e-15:
+        scale[0] = 1.0
+    else:
+        scale[0] = target_norm / n
+
+
+@wp.kernel
+def scale_vel_grad_kernel(
+    vel_grad: wp.array(dtype=wp.spatial_vector, ndim=2),
+    scale: wp.array(dtype=wp.float32),
+):
+    """Scale velocity gradient in-place."""
+    world_idx, body_idx = wp.tid()
+    s = scale[0]
+    v = vel_grad[world_idx, body_idx]
+    vel_grad[world_idx, body_idx] = wp.spatial_vector(
+        wp.spatial_top(v) * s, wp.spatial_bottom(v) * s
+    )
+
+
+@wp.kernel
+def scale_pose_grad_kernel(
+    pose_grad: wp.array(dtype=wp.transform, ndim=2),
+    scale: wp.array(dtype=wp.float32),
+):
+    """Scale pose gradient in-place."""
+    world_idx, body_idx = wp.tid()
+    s = scale[0]
+    g = pose_grad[world_idx, body_idx]
+    p = wp.transform_get_translation(g)
+    r = wp.transform_get_rotation(g)
+    pose_grad[world_idx, body_idx] = wp.transform(
+        p * s, wp.quat(r[0] * s, r[1] * s, r[2] * s, r[3] * s)
+    )
+
+
+@wp.kernel
+def accumulate_pose_grad_kernel(
+    src: wp.array(dtype=wp.transform, ndim=2),
+    dest: wp.array(dtype=wp.transform, ndim=2),
+):
+    world_idx, body_idx = wp.tid()
+    val = src[world_idx, body_idx]
+    
+    # Explicitly add components since atomic_add on structs might be limited
+    p_src = wp.transform_get_translation(val)
+    r_src = wp.transform_get_rotation(val)
+    
+    # We can't easily atomic_add to a transform's components directly if it's an array of transforms.
+    # But we can read, add, and write. Since this is a single-threaded write per body_idx, 
+    # it doesn't need to be atomic if we ensure no other thread writes to the same (world, body).
+    # In TrajectoryBuffer, each (world, body) is indeed handled by one thread in this kernel.
+    
+    curr = dest[world_idx, body_idx]
+    p_curr = wp.transform_get_translation(curr)
+    r_curr = wp.transform_get_rotation(curr)
+    
+    dest[world_idx, body_idx] = wp.transform(
+        p_curr + p_src,
+        wp.quat(r_curr[0] + r_src[0], r_curr[1] + r_src[1], r_curr[2] + r_src[2], r_curr[3] + r_src[3])
+    )
+
+
 class TrajectoryBuffer:
     def __init__(
         self,
@@ -72,6 +171,12 @@ class TrajectoryBuffer:
         self.contact_shape1 = _alloc_buffer(contacts.contact_shape1)
         self.contact_thickness0 = _alloc_buffer(contacts.contact_thickness0)
         self.contact_thickness1 = _alloc_buffer(contacts.contact_thickness1)
+
+        # =========================================================================
+        # 5. Scratch buffers for gradient normalization
+        # =========================================================================
+        self._grad_norm_sq = wp.zeros(1, dtype=wp.float32, device=device)
+        self._grad_scale = wp.zeros(1, dtype=wp.float32, device=device)
 
     def zero_grad(self):
         if self.body_pose.requires_grad:
@@ -166,11 +271,14 @@ class TrajectoryBuffer:
     def save_gradients(self, step_idx: int, data: EngineData):
         """
         Saves gradients computed during a backward pass from EngineData into the buffer.
+
+        Note: body_pose.grad is NOT overwritten here. The implicit backward pass
+        absorbs pose gradients into the velocity adjoint (via dt * G^T * grad_q in
+        compute_body_adjoint_init_kernel), so body_pose_prev.grad is not computed.
+        The tape.backward values in body_pose.grad (direct loss sensitivities) must
+        be preserved for earlier backward steps to use.
         """
-        # --- Body State ---
-        # Note: We save the gradients w.r.t the INITIAL state of this step (q_prev)
-        # into the buffer at step_idx (which corresponds to q at time T)
-        wp.copy(self.body_pose.grad[step_idx], data.body_pose_prev.grad)
+        # --- Body Velocity ---
         wp.copy(self.body_vel.grad[step_idx], data.body_vel_prev.grad)
 
         # Forces and inputs are interval-based (index T)
@@ -179,3 +287,65 @@ class TrajectoryBuffer:
         # --- Inputs ---
         wp.copy(self.joint_target_pos.grad[step_idx], data.joint_target_pos.grad)
         wp.copy(self.joint_target_vel.grad[step_idx], data.joint_target_vel.grad)
+
+    def save_pose_gradients(self, step_idx: int, data: EngineData):
+        """
+        Accumulates the propagated pose gradient from EngineData into the buffer.
+        """
+        wp.launch(
+            kernel=accumulate_pose_grad_kernel,
+            dim=(self.dims.num_worlds, self.dims.body_count),
+            inputs=[data.body_pose_prev.grad],
+            outputs=[self.body_pose.grad[step_idx]],
+            device=self.device,
+        )
+
+    def normalize_gradients(self, step_idx: int, target_norm: float = 1.0):
+        """Normalize velocity+pose gradients at step_idx to target_norm.
+
+        Preserves gradient direction but prevents exponential magnitude decay.
+        Fully GPU-resident (CUDA graph safe).
+        """
+        dim = (self.dims.num_worlds, self.dims.body_count)
+
+        # 1. Compute ||grad||^2
+        self._grad_norm_sq.zero_()
+        wp.launch(
+            kernel=vel_grad_norm_sq_kernel,
+            dim=dim,
+            inputs=[self.body_vel.grad[step_idx]],
+            outputs=[self._grad_norm_sq],
+            device=self.device,
+        )
+        wp.launch(
+            kernel=pose_grad_norm_sq_kernel,
+            dim=dim,
+            inputs=[self.body_pose.grad[step_idx]],
+            outputs=[self._grad_norm_sq],
+            device=self.device,
+        )
+
+        # 2. Compute scale = target_norm / ||grad||
+        wp.launch(
+            kernel=compute_grad_scale_kernel,
+            dim=(1,),
+            inputs=[self._grad_norm_sq, target_norm],
+            outputs=[self._grad_scale],
+            device=self.device,
+        )
+
+        # 3. Scale both arrays in-place
+        wp.launch(
+            kernel=scale_vel_grad_kernel,
+            dim=dim,
+            inputs=[self.body_vel.grad[step_idx], self._grad_scale],
+            outputs=[],
+            device=self.device,
+        )
+        wp.launch(
+            kernel=scale_pose_grad_kernel,
+            dim=dim,
+            inputs=[self.body_pose.grad[step_idx], self._grad_scale],
+            outputs=[],
+            device=self.device,
+        )

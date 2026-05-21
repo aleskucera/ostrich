@@ -30,11 +30,11 @@ using JSON
 # ======================== Constants ========================
 
 const DURATION       = 3.0
-const DENSITY        = 1500.0   # kg/m³
+const DENSITY        = 500.0    # kg/m³ — must match config.py
 
-const HX1 = 0.2
-const HX2 = 0.8
-const HX3 = 1.6
+const HX1 = 0.3
+const HX2 = 0.6
+const HX3 = 1.2
 
 const Z1 = HX1
 const Z2 = 2*HX1 + HX2

@@ -1,0 +1,12 @@
+# @package engine
+# AxionEngineConfig with per-iteration NR profiling enabled.
+# Replaces wp.capture_while inside _solve with a fixed-K Python `for`,
+# which means NO early exit (every step pays max_newton_iters iterations).
+# Phases timed per NR iteration:
+#   linear_system | preconditioner | cr_solve | step_or_linesearch | convergence_check
+defaults:
+  - axion
+  - _self_
+
+profiling:
+  mode: per_component

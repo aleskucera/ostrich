@@ -1,0 +1,22 @@
+defaults:
+  - simulation: helhest
+  - rendering: headless
+  - logging: hdf5
+  - engine: axion
+  - control: helhest/velocity
+  - _self_
+
+project_name: ${hydra:job.name}
+
+friction_coeff: 0.5
+
+drive_velocity: 5.0
+
+# Disable HDF5 file write (we read in-memory buffers and dump NPZ ourselves).
+logging:
+  hdf5:
+    enabled: true
+    file: "/tmp/helhest_diagnose_unused.h5"
+
+# NPZ output for the convergence trace
+npz_output: "data/baselines/helhest_pcr_trace.npz"

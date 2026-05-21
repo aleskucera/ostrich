@@ -12,12 +12,22 @@ class SyncMode(Enum):
 
 @dataclass
 class SimulationConfig:
-    """Parameters defining the simulation's timeline."""
+    """Parameters defining the simulation's timeline and execution
+    strategy.
+
+    ``use_cuda_graph`` controls whether the inner physics step is
+    captured into a CUDA graph at run time. It used to live on a
+    separate ``ExecutionConfig`` alongside a ``headless_steps_per_segment``
+    knob; both were collapsed here once measurement showed the
+    per-segment unroll knob bought no measurable speed-up at this
+    codebase's scale.
+    """
 
     duration_seconds: float = 3.0
     target_timestep_seconds: float = 1e-3
     num_worlds: int = 1
     sync_mode: SyncMode = SyncMode.ALIGN_FPS_TO_DT
+    use_cuda_graph: bool = True
 
 
 @dataclass
@@ -51,9 +61,3 @@ class RenderingConfig:
             raise ValueError(f"Unsupported rendering type: {self.vis_type}")
 
 
-@dataclass
-class ExecutionConfig:
-    """Parameters controlling the performance and execution strategy."""
-
-    use_cuda_graph: bool = True
-    headless_steps_per_segment: int = 10

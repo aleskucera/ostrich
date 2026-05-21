@@ -8,7 +8,6 @@ import numpy as np
 import openmesh
 import warp as wp
 from axion import EngineConfig
-from axion import ExecutionConfig
 from axion import InteractiveSimulator
 from axion import LoggingConfig
 from axion import RenderingConfig
@@ -216,7 +215,6 @@ class TankSurfaceSimulator(InteractiveSimulator):
         self,
         sim_config: SimulationConfig,
         render_config: RenderingConfig,
-        exec_config: ExecutionConfig,
         engine_config: EngineConfig,
         logging_config: LoggingConfig,
     ):
@@ -225,7 +223,6 @@ class TankSurfaceSimulator(InteractiveSimulator):
         super().__init__(
             sim_config,
             render_config,
-            exec_config,
             engine_config,
             logging_config,
         )
@@ -502,13 +499,11 @@ def tank_example(cfg: DictConfig):
     engine_config: EngineConfig = hydra.utils.instantiate(cfg.engine)
     sim_config: SimulationConfig = hydra.utils.instantiate(cfg.simulation)
     render_config: RenderingConfig = hydra.utils.instantiate(cfg.rendering)
-    exec_config: ExecutionConfig = hydra.utils.instantiate(cfg.execution)
     logging_config: LoggingConfig = hydra.utils.instantiate(cfg.logging)
 
     simulator = TankSurfaceSimulator(
         sim_config,
         render_config,
-        exec_config,
         engine_config,
         logging_config,
     )

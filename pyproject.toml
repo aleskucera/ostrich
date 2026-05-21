@@ -20,12 +20,12 @@ sim = [
   "pytest==8.4.0",
   "scipy==1.16.1",
   "taichi==1.7.3",
-  "torch==2.9.1+cu128",
+  "torch>=2.9.1",
   "tqdm==4.67.1",
   "trimesh==4.6.12",
   "usd-core==25.5.1",
-  "mujoco-warp==3.5.0.1",
-  "warp-lang==1.11.0",
+  "mujoco-warp>=3.8.0.1",
+  "warp-lang>=1.13.0",
 ]
 brax = [
   "brax",
@@ -59,9 +59,16 @@ packages = ["src/axion", "examples"]
 [tool.uv.workspace]
 members = ["third_party/newton"]
 
+[tool.uv]
+conflicts = [
+    [
+        { package = "newton", extra = "torch-cu12" },
+        { package = "newton", extra = "torch-cu13" },
+    ],
+]
+
 [tool.uv.sources]
 newton = { workspace = true }
-torch = [{ index = "pytorch-cu128", extra = "sim" }]
 warp-lang = { index = "nvidia" }
 
 [[tool.uv.index]]

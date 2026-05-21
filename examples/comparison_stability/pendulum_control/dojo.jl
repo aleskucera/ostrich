@@ -82,10 +82,9 @@ function build_pendulum(; timestep=0.01, gravity=-9.81)
     # parent_vertex: pivot position in world (Origin) frame
     # child_vertex: pivot position in link's body frame (top end of rod)
     j = JointConstraint(
-        Revolute(origin, link;
+        Revolute(origin, link, Y_AXIS;
             parent_vertex = [0.0, 0.0, 2.0],
             child_vertex  = [0.0, 0.0, LINK_LENGTH / 2],
-            axis          = [0.0, 1.0, 0.0],
             spring        = 0.0,
             damper        = 0.0,
         ),

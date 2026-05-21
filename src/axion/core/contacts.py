@@ -1,5 +1,4 @@
 import warp as wp
-from axion.math import orthogonal_basis
 from newton import Contacts
 from newton import Model
 
@@ -8,9 +7,25 @@ from .engine_dims import EngineDimensions
 from .model import AxionModel
 
 
+@wp.func
+def _shape_to_local_idx(
+    shape_idx: wp.int32,
+    num_globals: wp.int32,
+    num_shapes_per_world: wp.int32,
+) -> wp.int32:
+    """Map Newton's flat shape index to the column of AxionModel's (W, S+G)
+    per-world layout. Per-world shapes go to columns [0, S); globals to
+    columns [S, S+G)."""
+    if shape_idx < num_globals:
+        # Global shape: column num_shapes_per_world + global_idx
+        return num_shapes_per_world + shape_idx
+    return (shape_idx - num_globals) % num_shapes_per_world
+
+
 @wp.kernel
 def batch_contact_data_kernel(
     shape_world: wp.array(dtype=wp.int32),
+    num_globals: wp.int32,
     num_shapes_per_world: wp.int32,
     # Contact info
     contact_count: wp.array(dtype=wp.int32),
@@ -39,13 +54,20 @@ def batch_contact_data_kernel(
     if contact_idx >= contact_count[0] or shape_0 == shape_1:
         return
 
-    world_idx = -1
+    # Pick world_idx from the per-world side (globals have shape_world == -1).
+    # If both sides are global the contact has no world to live in; drop it.
+    w0 = wp.int32(-1)
+    w1 = wp.int32(-1)
     if shape_0 >= 0:
-        world_idx = shape_world[shape_0]
+        w0 = shape_world[shape_0]
     if shape_1 >= 0:
-        world_idx = shape_world[shape_1]
-
-    if world_idx < 0:
+        w1 = shape_world[shape_1]
+    world_idx = wp.int32(-1)
+    if w0 >= 0:
+        world_idx = w0
+    elif w1 >= 0:
+        world_idx = w1
+    else:
         return
 
     slot = wp.atomic_add(batched_contact_count, world_idx, 1)
@@ -55,158 +77,44 @@ def batch_contact_data_kernel(
 
     batched_contact_point0[world_idx, slot] = contact_point0[contact_idx]
     batched_contact_point1[world_idx, slot] = contact_point1[contact_idx]
-    batched_contact_normal[world_idx, slot] = contact_normal[contact_idx]
+    # Newton (since PR #2069) emits rigid_contact_normal pointing from shape0
+    # toward shape1 (A-to-B). Axion's contact/friction kernels were written for
+    # the older B-to-A convention, so we flip here at the boundary.
+    batched_contact_normal[world_idx, slot] = -contact_normal[contact_idx]
     batched_contact_thickness0[world_idx, slot] = contact_thickness0[contact_idx]
     batched_contact_thickness1[world_idx, slot] = contact_thickness1[contact_idx]
 
     if shape_0 >= 0:
-        batched_contact_shape0[world_idx, slot] = shape_0 % num_shapes_per_world
+        batched_contact_shape0[world_idx, slot] = _shape_to_local_idx(
+            shape_0, num_globals, num_shapes_per_world
+        )
     else:
         batched_contact_shape0[world_idx, slot] = shape_0
 
     if shape_1 >= 0:
-        batched_contact_shape1[world_idx, slot] = shape_1 % num_shapes_per_world
+        batched_contact_shape1[world_idx, slot] = _shape_to_local_idx(
+            shape_1, num_globals, num_shapes_per_world
+        )
     else:
         batched_contact_shape1[world_idx, slot] = shape_1
 
 
-@wp.kernel
-def contact_interaction_kernel(
-    # --- Inputs ---
-    body_q: wp.array(dtype=wp.transform, ndim=2),
-    body_com: wp.array(dtype=wp.vec3, ndim=2),
-    shape_body: wp.array(dtype=wp.int32, ndim=2),
-    shape_thickness: wp.array(dtype=wp.float32, ndim=2),
-    shape_material_mu: wp.array(dtype=wp.float32, ndim=2),
-    shape_material_restitution: wp.array(dtype=wp.float32, ndim=2),
-    contact_count: wp.array(dtype=wp.int32, ndim=1),
-    contact_point0: wp.array(dtype=wp.vec3, ndim=2),
-    contact_point1: wp.array(dtype=wp.vec3, ndim=2),
-    contact_normal: wp.array(dtype=wp.vec3, ndim=2),
-    contact_shape0: wp.array(dtype=wp.int32, ndim=2),
-    contact_shape1: wp.array(dtype=wp.int32, ndim=2),
-    contact_thickness0: wp.array(dtype=wp.float32, ndim=2),
-    contact_thickness1: wp.array(dtype=wp.float32, ndim=2),
-    # --- Outputs ---
-    contact_body_a: wp.array(dtype=wp.int32, ndim=2),
-    contact_body_b: wp.array(dtype=wp.int32, ndim=2),
-    contact_point_a: wp.array(dtype=wp.vec3, ndim=2),
-    contact_point_b: wp.array(dtype=wp.vec3, ndim=2),
-    contact_thickness_a: wp.array(dtype=wp.float32, ndim=2),
-    contact_thickness_b: wp.array(dtype=wp.float32, ndim=2),
-    contact_dist: wp.array(dtype=wp.float32, ndim=2),
-    contact_friction_coeff: wp.array(dtype=wp.float32, ndim=2),
-    contact_restitution_coeff: wp.array(dtype=wp.float32, ndim=2),
-    contact_basis_n_a: wp.array(dtype=wp.spatial_vector, ndim=2),
-    contact_basis_t1_a: wp.array(dtype=wp.spatial_vector, ndim=2),
-    contact_basis_t2_a: wp.array(dtype=wp.spatial_vector, ndim=2),
-    contact_basis_n_b: wp.array(dtype=wp.spatial_vector, ndim=2),
-    contact_basis_t1_b: wp.array(dtype=wp.spatial_vector, ndim=2),
-    contact_basis_t2_b: wp.array(dtype=wp.spatial_vector, ndim=2),
-    contact_active_mask: wp.array(dtype=wp.float32, ndim=2),
-):
-    world_idx, contact_idx = wp.tid()
-
-    shape_a = contact_shape0[world_idx, contact_idx]
-    shape_b = contact_shape1[world_idx, contact_idx]
-
-    if contact_idx >= contact_count[world_idx] or shape_a == shape_b:
-        contact_active_mask[world_idx, contact_idx] = 0.0
-        return
-
-    contact_active_mask[world_idx, contact_idx] = 1.0
-
-    # Contact body indices (default to -1)
-    body_a = -1
-    body_b = -1
-
-    # Get body indices
-    if shape_a >= 0:
-        body_a = shape_body[world_idx, shape_a]
-    if shape_b >= 0:
-        body_b = shape_body[world_idx, shape_b]
-
-    # Contact normal in world space
-    n = contact_normal[world_idx, contact_idx]
-
-    # Contact points from Newton are in Body-Local space
-    p_a_local = contact_point0[world_idx, contact_idx]
-    p_b_local = contact_point1[world_idx, contact_idx]
-
-    # Transforms
-    X_a = wp.transform_identity()
-    if body_a >= 0:
-        X_a = body_q[world_idx, body_a]
-
-    X_b = wp.transform_identity()
-    if body_b >= 0:
-        X_b = body_q[world_idx, body_b]
-
-    # World points
-    p_a_world = wp.transform_point(X_a, p_a_local)
-    p_b_world = wp.transform_point(X_b, p_b_local)
-
-    # Thickness adjustment in world space
-    offset_a = -contact_thickness0[world_idx, contact_idx] * n
-    offset_b = contact_thickness1[world_idx, contact_idx] * n
-
-    p_a_world_adj = p_a_world + offset_a
-    p_b_world_adj = p_b_world + offset_b
-
-    # Contact residuals (lever arms) in World space
-    r_a = wp.vec3()
-    if body_a >= 0:
-        com_a_world = wp.transform_point(X_a, body_com[world_idx, body_a])
-        r_a = p_a_world_adj - com_a_world
-
-    r_b = wp.vec3()
-    if body_b >= 0:
-        com_b_world = wp.transform_point(X_b, body_com[world_idx, body_b])
-        r_b = p_b_world_adj - com_b_world
-
-    # Compute contact Jacobians
-    t1, t2 = orthogonal_basis(n)
-
-    # Fill the output arrays
-    contact_body_a[world_idx, contact_idx] = body_a
-    contact_body_b[world_idx, contact_idx] = body_b
-
-    contact_point_a[world_idx, contact_idx] = p_a_local
-    contact_point_b[world_idx, contact_idx] = p_b_local
-
-    contact_thickness_a[world_idx, contact_idx] = contact_thickness0[world_idx, contact_idx]
-    contact_thickness_b[world_idx, contact_idx] = contact_thickness1[world_idx, contact_idx]
-
-    # Penetration depth (positive for penetration)
-    contact_dist[world_idx, contact_idx] = wp.dot(n, p_b_world_adj - p_a_world_adj)
-
-    contact_basis_n_a[world_idx, contact_idx] = wp.spatial_vector(n, wp.cross(r_a, n))
-    contact_basis_t1_a[world_idx, contact_idx] = wp.spatial_vector(t1, wp.cross(r_a, t1))
-    contact_basis_t2_a[world_idx, contact_idx] = wp.spatial_vector(t2, wp.cross(r_a, t2))
-
-    contact_basis_n_b[world_idx, contact_idx] = wp.spatial_vector(-n, -wp.cross(r_b, n))
-    contact_basis_t1_b[world_idx, contact_idx] = wp.spatial_vector(-t1, -wp.cross(r_b, t1))
-    contact_basis_t2_b[world_idx, contact_idx] = wp.spatial_vector(-t2, -wp.cross(r_b, t2))
-
-    mu_a = shape_material_mu[world_idx, shape_a]
-    mu_b = shape_material_mu[world_idx, shape_b]
-    contact_friction_coeff[world_idx, contact_idx] = (mu_a + mu_b) * 0.5
-
-    e_a = shape_material_restitution[world_idx, shape_a]
-    e_b = shape_material_restitution[world_idx, shape_b]
-    contact_restitution_coeff[world_idx, contact_idx] = (e_a + e_b) * 0.5
-
-
 class AxionContacts:
     def __init__(self, model: Model, max_contacts_per_world: int) -> None:
-        assert (
-            model.shape_count % model.world_count == 0
-        ), "Worlds have not identical number of shapes."
+        # Newton's flat layout: [globals | world_0 | world_1 | ...].
+        # shape_world_start[0] is the count of globals (where world 0 starts).
+        shape_starts_np = model.shape_world_start.numpy()
+        self.num_global_shapes = int(shape_starts_np[0])
+        per_world_total = int(shape_starts_np[-1]) - self.num_global_shapes
+        assert per_world_total % model.world_count == 0, (
+            f"Per-world shape count {per_world_total} not divisible by "
+            f"world_count {model.world_count}; worlds must be uniform."
+        )
 
         self.model = model
         self.device = model.device
         self.num_worlds = model.world_count
-        self.num_shapes_per_world = model.shape_count // model.world_count
+        self.num_shapes_per_world = per_world_total // model.world_count
         self.max_contacts = max_contacts_per_world
 
         with wp.ScopedDevice(self.device):
@@ -240,9 +148,10 @@ class AxionContacts:
 
         wp.launch(
             kernel=batch_contact_data_kernel,
-            dim=self.model.rigid_contact_max,
+            dim=contacts.rigid_contact_max,
             inputs=[
                 self.model.shape_world,
+                self.num_global_shapes,
                 self.num_shapes_per_world,
                 contacts.rigid_contact_count,
                 contacts.rigid_contact_point0,

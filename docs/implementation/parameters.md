@@ -133,42 +133,57 @@ class RenderingConfig:
 
 ---
 
-## `ExecutionConfig`: Execution Settings
-The `ExecutionConfig` dataclass holds parameters for controlling the performance and execution strategy of the simulation.
+## Execution settings: `SimulationConfig.use_cuda_graph`
 
-```python
-from axion import ExecutionConfig
-
-@dataclass
-class ExecutionConfig:
-    use_cuda_graph: bool = True
-    headless_steps_per_segment: int = 10
-```
-
-| Parameter | Default | Description |
-| :--- | :--- | :--- |
-| `use_cuda_graph` | `True` | If `True`, enables CUDA Graphs to minimize kernel launch overhead and improve performance. |
-| `headless_steps_per_segment` | 10 | Number of simulation steps to run in each headless segment when rendering is disabled. |
+CUDA-graph capture used to live on a separate ``ExecutionConfig`` along
+with a ``headless_steps_per_segment`` knob; both were collapsed once
+measurement showed the per-segment unroll bought no measurable speed-up
+at this codebase's scale. ``use_cuda_graph`` is now a field on
+``SimulationConfig`` (see above); ``headless_steps_per_segment`` was
+deleted (the headless segment always contains exactly one physics
+step).
 
 ---
 
-## `ProfilingConfig`: Profiling and Logging Settings
-The `ProfilingConfig` dataclass holds parameters for controlling the profiling, timing and logging of the simulation. The logging is done using an [HDF5](https://www.hdfgroup.org/solutions/hdf5/)-based logger, which records detailed simulation data for later analysis, for example using [myHDF5](https://myhdf5.hdfgroup.org/).
+## `LoggingConfig`: Persistent-state logging
+Three independent HDF5 logging subsystems, each toggled by its own sub-config:
+
+```python
+from axion import LoggingConfig, HDF5LoggingConfig, DatasetLoggingConfig, AdjointLoggingConfig
+
+@dataclass
+class LoggingConfig:
+    hdf5: HDF5LoggingConfig = field(default_factory=HDF5LoggingConfig)
+    dataset: DatasetLoggingConfig = field(default_factory=DatasetLoggingConfig)
+    adjoint: AdjointLoggingConfig = field(default_factory=AdjointLoggingConfig)
+```
+
+Each sub-config has an ``enabled: bool`` flag and a ``file: str`` path.
+Buffer sizes are auto-derived from ``simulation.duration_seconds`` —
+there is no separate ``max_steps`` knob.
+
+| Sub-config | Captures |
+| :--- | :--- |
+| ``hdf5`` | Full per-step state, linear system, constraints — for offline diagnostics and the convergence dashboard. |
+| ``dataset`` | State-only log for ML training pipelines. |
+| ``adjoint`` | Backward-pass adjoint trace (requires ``differentiable_simulation=True``). |
+
+---
+
+## `ProfilingConfig`: CUDA-event profiling
+Lives on ``AxionEngineConfig.profiling`` (not on ``LoggingConfig``).
+Drives the CUDA-event profiler in ``axion.profiling.EngineProfiler``.
 
 ```python
 from axion import ProfilingConfig
 
 @dataclass
 class ProfilingConfig:
-    enable_timing: bool = False
-
-    # HDF5 Logging
-    enable_hdf5_logging: bool = False
-    hdf5_log_file: str = "simulation.h5"
+    mode: Literal["off", "end_to_end", "per_component"] = "off"
+    segment_timing: bool = False
 ```
 
 | Parameter | Default | Description |
 | :--- | :--- | :--- |
-| `enable_timing` | `False` | If `True`, enables detailed printing of timing of simulation stages. |
-| `enable_hdf5_logging` | `False` | If `True`, enables logging of detailed simulation data to an HDF5 file for later analysis. |
-| `hdf5_log_file` | "simulation.h5" | The filename where the HDF5 log is saved, relative to the working directory
+| ``mode`` | ``"off"`` | ``"end_to_end"`` records one event-pair per ``engine.step``; ``"per_component"`` adds events around each constraint block. |
+| ``segment_timing`` | ``False`` | Coarse host-side wall-clock timer around each segment replay. Independent of GPU-event mode.

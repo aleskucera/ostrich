@@ -1,3 +1,4 @@
+import time
 from abc import ABC
 from typing import Optional
 
@@ -9,7 +10,6 @@ from axion.core.logging_config import LoggingConfig
 from tqdm import tqdm
 
 from .base_simulator import BaseSimulator
-from .base_simulator import ExecutionConfig
 from .base_simulator import RenderingConfig
 from .base_simulator import SimulationConfig
 
@@ -24,14 +24,12 @@ class InteractiveSimulator(BaseSimulator, ABC):
         self,
         simulation_config: SimulationConfig,
         rendering_config: RenderingConfig,
-        execution_config: ExecutionConfig,
         engine_config: EngineConfig,
         logging_config: LoggingConfig,
     ):
         super().__init__(
             simulation_config,
             rendering_config,
-            execution_config,
             engine_config,
             logging_config,
         )
@@ -74,6 +72,18 @@ class InteractiveSimulator(BaseSimulator, ABC):
             if isinstance(self.solver, AxionEngine):
                 # self.solver.events.print_timings()
                 self.solver.save_logs()
+                if self.solver.profiler.enabled:
+                    if self.steps_per_segment != 1:
+                        # Only fires in render mode where steps_per_segment
+                        # is sized by render fps vs dt; in headless mode it
+                        # is always 1.
+                        print(
+                            f"WARNING: profiler enabled but steps_per_segment="
+                            f"{self.steps_per_segment}; only the LAST step in each "
+                            "segment is timed. For accurate stats, match render "
+                            "fps to dt or run headless."
+                        )
+                    self.solver.profiler.print_summary()
 
             if self.rendering_config.vis_type == "usd":
                 self.viewer.close()
@@ -121,10 +131,30 @@ class InteractiveSimulator(BaseSimulator, ABC):
         if self.cuda_graph is None:
             self._capture_cuda_graphs()
 
-        wp.capture_launch(self.cuda_graph)
+        # Coarse segment timer lives on engine.profiling.segment_timing
+        # for AxionEngine; for non-Axion solvers there's no profiling
+        # config, so the timer is just disabled.
+        segment_timing = bool(
+            getattr(getattr(self.solver, "config", None), "profiling", None)
+            and self.solver.config.profiling.segment_timing
+        )
+        if segment_timing:
+            wp.synchronize()
+            t0 = time.perf_counter()
+            wp.capture_launch(self.cuda_graph)
+            wp.synchronize()
+            t1 = time.perf_counter()
+            ms_per_step = (t1 - t0) * 1000 / self.steps_per_segment
+            print(f"segment: {(t1 - t0) * 1000:.2f} ms total, ~{ms_per_step:.2f} ms/step")
+        else:
+            wp.capture_launch(self.cuda_graph)
 
-        # if isinstance(self.solver, AxionEngine):
-        #     self.solver.events.record_timings()
+        # Profiler hook: read back per-replay event timings. Only valid
+        # when the captured graph contains exactly one engine.step (i.e.
+        # steps_per_segment == 1); otherwise events get overwritten by
+        # the unrolled copies and only the last copy's times survive.
+        if isinstance(self.solver, AxionEngine) and self.solver.profiler.enabled:
+            self.solver.profiler.collect()
 
     def _capture_cuda_graphs(self):
         n_steps = self.steps_per_segment

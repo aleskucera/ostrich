@@ -34,24 +34,24 @@ plt.rcParams.update({
 })
 
 STYLES = {
-    "Featherstone": {"color": "#FF9800"},
-    "XPBD":         {"color": "#607D8B"},
-    "Genesis":      {"color": "#4CAF50"},
-    "MuJoCo":       {"color": "#E91E63"},
-    "MJX":          {"color": "#FF5722"},
-    "TinyDiffSim":  {"color": "#9C27B0"},
-    "Axion":        {"color": "#2196F3"},
+    "Semi-Implicit": {"color": "#607D8B"},
+    "Genesis":       {"color": "#4CAF50"},
+    "MuJoCo":        {"color": "#E91E63"},
+    "MJX":           {"color": "#FF5722"},
+    "TinyDiffSim":   {"color": "#9C27B0"},
+    "Dojo":          {"color": "#FF9800"},
+    "Axion":         {"color": "#2196F3"},
 }
 SIM_ORDER = list(STYLES.keys())
 
 LABELS = {
-    "Featherstone": "Featherstone",
-    "XPBD":         "XPBD",
-    "Genesis":      "Genesis",
-    "MuJoCo":       "MuJoCo",
-    "MJX":          "MJX",
-    "TinyDiffSim":  "TinyDiffSim",
-    "Axion":        r"\textbf{Axion}",
+    "Semi-Implicit": "Semi-Implicit",
+    "Genesis":       "Genesis",
+    "MuJoCo":        "MuJoCo",
+    "MJX":           "MJX",
+    "TinyDiffSim":   "TinyDiffSim",
+    "Dojo":          "Dojo",
+    "Axion":         r"\textbf{Axion}",
 }
 
 AXION_COLOR = "#2196F3"
@@ -97,10 +97,12 @@ def main():
 
     # Separate simulators that are never stable (max_stable_dt == 0)
     never_stable = {s for s in sims if thresholds[s]["max_stable_dt"] == 0}
-    sims = [s for s in sims if s not in never_stable]
+    stable_sims = [s for s in sims if s not in never_stable]
 
     # Sort ascending so the strongest simulator (Axion) is at the top
-    sims = sorted(sims, key=lambda s: thresholds[s]["max_stable_dt"])
+    # Never-stable simulators go at the bottom
+    never_stable_sorted = sorted(never_stable)
+    sims = never_stable_sorted + sorted(stable_sims, key=lambda s: thresholds[s]["max_stable_dt"])
 
     axion_dt = thresholds["Axion"]["max_stable_dt"]
     colors   = [STYLES.get(s, {"color": "gray"})["color"] for s in sims]
@@ -111,7 +113,9 @@ def main():
     fig, ax = plt.subplots(figsize=(3.5, 2.8))
 
     y = np.arange(len(sims))
-    bars = ax.barh(y, values, color=colors, height=0.5, zorder=3)
+    # Plot bars only for stable simulators (value > 0)
+    bar_values = [v if v > 0 else 0 for v in values]
+    bars = ax.barh(y, bar_values, color=colors, height=0.5, zorder=3)
 
     ax.set_xscale("log")
     ax.set_yticks(y)
@@ -121,37 +125,41 @@ def main():
     ax.xaxis.set_minor_formatter(ticker.NullFormatter())
     ax.set_ylim(-0.6, len(sims) - 0.4)
 
-    xmax = max(values)
-    # Leave enough room for value labels to the right of the longest bar
+    xmax = max(v for v in values if v > 0)
     ax.set_xlim(right=xmax * 4)
 
-    # Blended transform: x in axes coordinates, y in data coordinates.
-    # This pins the ×N column to a fixed horizontal position outside the axes
-    # regardless of data values, eliminating overlap with value labels.
     right_xfm = blended_transform_factory(ax.transAxes, ax.transData)
 
-    for bar, sim, val, hm in zip(bars, sims, values, hit_max):
-        cy = bar.get_y() + bar.get_height() / 2
+    for i, (sim, val, hm) in enumerate(zip(sims, values, hit_max)):
+        cy = y[i]
 
-        # Value label to the right of the bar
-        val_label = f"${_fmt(val)}$" + (r"$^+$" if hm else "")
-        ax.text(val * 1.5, cy, val_label, va="center", ha="left", fontsize=7)
-
-        # ×N label pinned to axes right edge via blended transform
-        if sim != "Axion":
-            ratio = axion_dt / val
-            ratio_str = (
-                f"$\\times{ratio:.0f}$" if ratio >= 10 else f"$\\times{ratio:.1f}$"
-            )
+        if val == 0:
+            # Never-stable: show "N/A" label and ×∞
+            ax.text(ax.get_xlim()[0] * 1.5, cy, r"\textit{never stable}",
+                    va="center", ha="left", fontsize=7, color="0.45")
             ax.text(
-                1.04, cy, ratio_str,
+                1.04, cy, r"$\times\infty$",
                 va="center", ha="left", fontsize=7,
                 color=AXION_COLOR, fontweight="bold",
                 transform=right_xfm, clip_on=False,
             )
-        # Axion is the reference — no ×N label
+        else:
+            # Value label to the right of the bar
+            val_label = f"${_fmt(val)}$" + (r"$^+$" if hm else "")
+            ax.text(val * 1.5, cy, val_label, va="center", ha="left", fontsize=7)
 
-    # Column header in axes coordinates so it never overlaps the top bar
+            if sim != "Axion":
+                ratio = axion_dt / val
+                ratio_str = (
+                    f"$\\times{ratio:.0f}$" if ratio >= 10 else f"$\\times{ratio:.1f}$"
+                )
+                ax.text(
+                    1.04, cy, ratio_str,
+                    va="center", ha="left", fontsize=7,
+                    color=AXION_COLOR, fontweight="bold",
+                    transform=right_xfm, clip_on=False,
+                )
+
     ax.text(
         1.04, 1.01, r"vs \textbf{Axion}",
         va="bottom", ha="left", fontsize=6,
@@ -164,15 +172,6 @@ def main():
             r"${}^+$ search limit; true threshold may be higher",
             transform=ax.transAxes,
             fontsize=6, ha="right", va="bottom", color="gray",
-        )
-
-    if never_stable:
-        names = ", ".join(LABELS.get(s, s).replace(r"\textbf{", "").replace("}", "") for s in sorted(never_stable))
-        ax.text(
-            0.02, 0.98,
-            rf"$\dagger$ {names}: never stable (solver limitation)",
-            transform=ax.transAxes,
-            fontsize=6, ha="left", va="top", color="gray",
         )
 
     # Reserve right margin in the figure for the ×N column

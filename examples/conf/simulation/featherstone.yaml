@@ -3,3 +3,4 @@ _target_: axion.SimulationConfig
 duration_seconds: 10.0
 target_timestep_seconds: 5e-4
 num_worlds: 1
+use_cuda_graph: true

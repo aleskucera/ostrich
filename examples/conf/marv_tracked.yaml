@@ -1,0 +1,16 @@
+defaults:
+  - simulation: marv_tracked
+  - rendering: gl
+  - logging: disabled
+  - engine: axion 
+  - control: helhest/velocity
+  - _self_
+
+# Use the recommended hybrid approach for project names
+project_name: ${hydra:job.name}
+
+engine:
+  compliance:
+    contact: 1e-9
+  contacts:
+    max_per_world: 1024

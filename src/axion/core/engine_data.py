@@ -16,16 +16,16 @@ def _compute_linesearch_step_size_array(config: EngineConfig) -> wp.array:
     # --- 1. Conservative Steps (Logarithmic) ---
     # "I don't trust the solver, let's try tiny steps."
     steps_conservative = np.logspace(
-        np.log10(config.linesearch_min_step),
-        np.log10(config.linesearch_conservative_upper_bound),
-        config.linesearch_conservative_step_count,
+        np.log10(config.linesearch.min_step),
+        np.log10(config.linesearch.conservative_upper_bound),
+        config.linesearch.conservative_step_count,
     )
 
     # --- 2. Optimistic Steps (Linear) ---
     # "I trust the Newton direction, let's check around 1.0."
-    half_window = config.linesearch_optimistic_window / 2.0
+    half_window = config.linesearch.optimistic_window / 2.0
     steps_optimistic = np.linspace(
-        1.0 - half_window, 1.0 + half_window, config.linesearch_optimistic_step_count
+        1.0 - half_window, 1.0 + half_window, config.linesearch.optimistic_step_count
     )
 
     # --- 3. Combine & Sort ---
@@ -158,9 +158,9 @@ class EngineData:
         # =========================================================================
         # Linesearch Arrays
         # =========================================================================
-        if config.enable_linesearch:
-            step_count = config.linesearch_conservative_step_count
-            step_count += config.linesearch_optimistic_step_count
+        if config.linesearch.enabled:
+            step_count = config.linesearch.conservative_step_count
+            step_count += config.linesearch.optimistic_step_count
 
             self.linesearch_step_size = _compute_linesearch_step_size_array(config)
 
@@ -189,7 +189,7 @@ class EngineData:
             )
 
         self.candidates = HistoryGroup(
-            capacity=config.max_newton_iters,
+            capacity=config.nr.max_iters,
             index_array=self.iter_count,
             device=device,
         )
@@ -210,7 +210,7 @@ class EngineData:
         # We use a single HistoryGroup to capture all data at the end of each Newton iteration.
         if alloc_history_arrays:
             self.history = HistoryGroup(
-                capacity=config.max_newton_iters, index_array=self.iter_count, device=device
+                capacity=config.nr.max_iters, index_array=self.iter_count, device=device
             )
 
             # 2. PCR History (Snapshots of the inner solver state)
@@ -218,7 +218,7 @@ class EngineData:
                 self.pcr_iter_count = wp.zeros((1,), wp.int32)  # Placeholder source
                 self.pcr_final_res_norm_sq = wp.zeros((dims.num_worlds,), wp.float32)
                 self.pcr_res_norm_sq_history = wp.zeros(
-                    (config.max_linear_iters + 1, dims.num_worlds), wp.float32
+                    (config.linear.max_iters + 1, dims.num_worlds), wp.float32
                 )
 
             self.pcr_history_iter_count = self.history.register(
@@ -232,7 +232,7 @@ class EngineData:
             )
 
             # 3. Linesearch (LS) History
-            if config.enable_linesearch:
+            if config.linesearch.enabled:
                 self.ls_history_step_size = self.history.register(
                     "ls_step_size", self.linesearch_step_size
                 )
@@ -279,12 +279,12 @@ class EngineData:
         )
 
     def zero_gradients(self):
-        self.ext_force.grad.zero_()
-        self.body_pose_prev.grad.zero_()
-        self.body_vel_prev.grad.zero_()
-
-        self._res.grad.zero_()
-        self._res_spatial.grad.zero_()
+        # self.ext_force.grad.zero_()
+        # self.body_pose_prev.grad.zero_()
+        # self.body_vel_prev.grad.zero_()
+        #
+        # self._res.grad.zero_()
+        # self._res_spatial.grad.zero_()
 
         self.joint_target_pos.grad.zero_()
         self.joint_target_vel.grad.zero_()

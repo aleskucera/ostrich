@@ -196,3 +196,9 @@ wandb/
 examples/comparison_stability/*/results/
 examples/comparison_gradient/*/results/
 examples/comparison_scalability/*/results/
+# pixi environments
+.pixi/*
+!.pixi/config.toml
+
+*.npz
+*.blend

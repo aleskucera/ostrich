@@ -1,24 +1,36 @@
 # @package engine
 _target_: axion.AxionEngineConfig
-max_newton_iters: 16
-max_linear_iters: 16
-backtrack_min_iter: 12
-newton_atol: 1e-1
-linear_atol: 1e-3
-linear_tol: 1e-3
-enable_linesearch: false 
-linesearch_conservative_step_count: 16
-linesearch_conservative_upper_bound: 5e-2
-linesearch_min_step: 1e-6
-linesearch_optimistic_step_count: 48
-linesearch_optimistic_window: 0.4
-joint_compliance: 6e-8
-contact_compliance: 1e-6
-friction_compliance: 1e-6
-regularization: 1e-6
-contact_fb_alpha: 0.5
-contact_fb_beta: 1.0
-friction_fb_alpha: 1.0
-friction_fb_beta: 1.0
-max_contacts_per_world: 256
-differentiable_simulation: false
+
+nr:
+  max_iters: 16
+  backtrack_min_iter: 2
+  atol: 1e-3
+
+linear:
+  max_iters: 26
+  tol: 1e-3
+  atol: 1e-3
+  regularization: 1e-6
+
+compliance:
+  joint: 6e-10
+  contact: 1e-10
+  friction: 1e-6
+
+contacts:
+  max_per_world: 256
+  reduction:
+    policy: cluster
+    max_per_pair: 8
+
+warm_start:
+  enabled: true
+
+# --- Linesearch: typically off ---
+linesearch:
+  enabled: false
+  conservative_step_count: 16
+  conservative_upper_bound: 0.8
+  min_step: 1e-6
+  optimistic_step_count: 48
+  optimistic_window: 0.4

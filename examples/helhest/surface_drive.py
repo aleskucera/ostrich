@@ -8,7 +8,6 @@ import numpy as np
 import openmesh
 import warp as wp
 from axion import EngineConfig
-from axion import ExecutionConfig
 from axion import InteractiveSimulator
 from axion import LoggingConfig
 from axion import RenderingConfig
@@ -62,7 +61,6 @@ class HelhestSurfaceSimulator(InteractiveSimulator):
         self,
         sim_config: SimulationConfig,
         render_config: RenderingConfig,
-        exec_config: ExecutionConfig,
         engine_config: EngineConfig,
         logging_config: LoggingConfig,
         control_mode: str = "position",
@@ -77,7 +75,6 @@ class HelhestSurfaceSimulator(InteractiveSimulator):
         super().__init__(
             sim_config,
             render_config,
-            exec_config,
             engine_config,
             logging_config,
         )
@@ -175,7 +172,7 @@ class HelhestSurfaceSimulator(InteractiveSimulator):
         Builds the unified Helhest model on a surface.
         """
 
-        self.builder.rigid_gap = 1.0
+        self.builder.rigid_gap = 0.5
 
         # Robot position
         robot_x = -1.5
@@ -201,34 +198,39 @@ class HelhestSurfaceSimulator(InteractiveSimulator):
 
         surface_mesh = newton.Mesh(mesh_points, mesh_indices)
 
-        self.builder.add_shape_mesh(
+        # Add the surface mesh to a separate builder so it gets shape_world=-1
+        # (Newton's "global" sentinel). The mesh is then stored once and the
+        # broadphase tests it against shapes from every world without duplication.
+        globals_builder = newton.ModelBuilder()
+        globals_builder.add_shape_mesh(
             body=-1,
             mesh=surface_mesh,
             cfg=newton.ModelBuilder.ShapeConfig(
                 density=0.0,
                 has_shape_collision=True,
-                mu=1.0,
+                mu=0.5,
                 ke=150.0,
                 kd=150.0,
                 kf=500.0,
             ),
         )
 
-        return self.builder.finalize_replicated(num_worlds=self.simulation_config.num_worlds)
+        return self.builder.finalize_replicated(
+            num_worlds=self.simulation_config.num_worlds,
+            global_builder=globals_builder,
+        )
 
 
 @hydra.main(config_path=str(CONFIG_PATH), config_name="helhest", version_base=None)
 def helhest_surface_drive_example(cfg: DictConfig):
     sim_config: SimulationConfig = hydra.utils.instantiate(cfg.simulation)
     render_config: RenderingConfig = hydra.utils.instantiate(cfg.rendering)
-    exec_config: ExecutionConfig = hydra.utils.instantiate(cfg.execution)
     engine_config: EngineConfig = hydra.utils.instantiate(cfg.engine)
     logging_config: LoggingConfig = hydra.utils.instantiate(cfg.logging)
 
     simulator = HelhestSurfaceSimulator(
         sim_config,
         render_config,
-        exec_config,
         engine_config,
         logging_config,
         control_mode=cfg.control.mode,

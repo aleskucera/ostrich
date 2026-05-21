@@ -6,11 +6,10 @@ import newton
 import warp as wp
 from axion import InteractiveSimulator
 from axion import EngineConfig
-from axion import ExecutionConfig
 from axion import RenderingConfig
 from axion import SimulationConfig
 from axion import LoggingConfig
-from axion.generation import SceneGenerator
+from axion.generation import PlacementSceneGenerator
 from omegaconf import DictConfig
 
 os.environ["PYOPENGL_PLATFORM"] = "glx"
@@ -23,14 +22,12 @@ class JointsSimulator(InteractiveSimulator):
         self,
         sim_config: SimulationConfig,
         render_config: RenderingConfig,
-        exec_config: ExecutionConfig,
         engine_config: EngineConfig,
         logging_config: LoggingConfig,
     ):
         super().__init__(
             sim_config,
             render_config,
-            exec_config,
             engine_config,
             logging_config,
         )
@@ -40,7 +37,7 @@ class JointsSimulator(InteractiveSimulator):
         self.builder.add_ground_plane()
 
         # Initialize SceneGenerator
-        gen = SceneGenerator(self.builder, seed=123)
+        gen = PlacementSceneGenerator(self.builder, seed=123)
 
         # 1. Revolute Chain (Snake-like)
         gen.generate_chain(length=2, start_pos=(-3, -3, 1), shape_type="box", joint_type="revolute")
@@ -60,14 +57,12 @@ class JointsSimulator(InteractiveSimulator):
 def joints_example(cfg: DictConfig):
     sim_config: SimulationConfig = hydra.utils.instantiate(cfg.simulation)
     render_config: RenderingConfig = hydra.utils.instantiate(cfg.rendering)
-    exec_config: ExecutionConfig = hydra.utils.instantiate(cfg.execution)
     engine_config: EngineConfig = hydra.utils.instantiate(cfg.engine)
     logging_config: LoggingConfig = hydra.utils.instantiate(cfg.logging)
 
     simulator = JointsSimulator(
         sim_config=sim_config,
         render_config=render_config,
-        exec_config=exec_config,
         engine_config=engine_config,
         logging_config=logging_config,
     )

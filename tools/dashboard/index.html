@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>axion convergence</title>
+<style>
+:root {
+  --bg: #fafafa;
+  --panel: #ffffff;
+  --fg: #1f1f1f;
+  --muted: #6c6c6c;
+  --line: #e5e5e5;
+  --accent: #5b6cff;
+  --warn: #e35a4a;
+  --ok: #22a06b;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  font-size: 13px;
+  line-height: 1.4;
+}
+header {
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: var(--panel);
+}
+header h1 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+header .controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+header label { color: var(--muted); }
+select, input[type=number] {
+  font: inherit;
+  padding: 3px 6px;
+  border: 1px solid var(--line);
+  background: white;
+  border-radius: 3px;
+}
+input[type=number] { width: 70px; }
+main { padding: 16px 20px; display: grid; gap: 16px; }
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 14px 16px;
+}
+.panel h2 {
+  margin: 0 0 10px 0;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+.kv {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 14px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; }
+.note { color: var(--muted); font-size: 12px; margin: 0 0 8px 0; }
+.charts { display: grid; gap: 16px; }
+.chart-host { min-height: 1px; }
+figure { margin: 0; }
+.empty {
+  color: var(--muted);
+  font-style: italic;
+  padding: 20px 0;
+  text-align: center;
+}
+.step-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  font-family: ui-monospace, monospace;
+}
+.step-picker button {
+  font: inherit;
+  padding: 2px 8px;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  cursor: pointer;
+}
+.step-picker button:hover { background: #f3f3f8; }
+.step-picker button:disabled { color: #bbb; cursor: not-allowed; }
+.step-picker input { width: 70px; }
+table.bad {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+}
+table.bad th {
+  text-align: left;
+  font-weight: 500;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+  padding: 4px 8px;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+table.bad td {
+  padding: 3px 8px;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+}
+table.bad tr:hover td { background: #f5f7ff; }
+table.bad tr.selected td { background: #e3e9ff; }
+table.bad td.warn { color: var(--warn); }
+table.bad td.muted { color: var(--muted); }
+.bad-empty { color: var(--muted); font-style: italic; padding: 8px 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>axion convergence</h1>
+  <div class="controls">
+    <label>run <select id="run"></select></label>
+    <label>world <input id="world" type="number" value="0" min="0"></label>
+    <span id="run-size" class="note"></span>
+  </div>
+</header>
+
+<main>
+  <div class="panel">
+    <h2>metadata</h2>
+    <dl class="kv" id="meta"><dd class="empty">no run loaded</dd></dl>
+  </div>
+
+  <div class="panel">
+    <h2>NR residual heatmap</h2>
+    <p class="note">log<sub>10</sub> ‖r‖² for each (step, NR iter) that ran. red = bad, blue = good. click a cell to inspect that step below.</p>
+    <div class="chart-host" id="heatmap"><div class="empty">…</div></div>
+  </div>
+
+  <div class="panel">
+    <h2>convergence overview</h2>
+    <p class="note">final NR ‖r‖² per simulation step (log y). hover for tooltip, click a point to inspect that step below.</p>
+    <div class="chart-host" id="overview"><div class="empty">…</div></div>
+  </div>
+
+  <div class="panel">
+    <h2>residual decomposition (per step, final NR iter)</h2>
+    <p class="note">stacked ‖r‖² split into solver blocks. tells you which physics is failing on bad steps.</p>
+    <div class="chart-host" id="decomp"></div>
+  </div>
+
+  <div class="panel">
+    <h2>bad steps</h2>
+    <p class="note">steps with NR final ‖r‖² above tolerance, sorted by severity. click a row to inspect.</p>
+    <div id="bad-steps-list"></div>
+  </div>
+
+  <div class="panel">
+    <h2>step detail
+      <span class="step-picker">
+        <button id="step-prev" type="button" title="previous step">◀</button>
+        <input id="step-input" type="number" min="0" value="0">
+        <button id="step-next" type="button" title="next step">▶</button>
+      </span>
+      <span id="step-info" class="note"></span>
+    </h2>
+    <div class="charts">
+      <div class="chart-host" id="nr-chart"></div>
+      <div class="chart-host" id="decomp-step-chart"></div>
+      <div class="chart-host" id="pcr-chart"></div>
+      <div class="chart-host" id="alpha-chart"></div>
+    </div>
+  </div>
+</main>
+
+<script type="module">
+import * as Plot from "https://cdn.jsdelivr.net/npm/@observablehq/plot@0.6/+esm";
+
+const $ = (id) => document.getElementById(id);
+const runSel = $("run");
+const worldEl = $("world");
+const runSize = $("run-size");
+const stepInput = $("step-input");
+const stepPrev = $("step-prev");
+const stepNext = $("step-next");
+
+const ACCENT = "#5b6cff";
+const WARN = "#e35a4a";
+const OK = "#22a06b";
+const MUTED = "#888888";
+const SELECTION = "#222";
+
+const ATOL_SQ = 1e-6;  // newton_atol² used for "bad step" classification
+const BAD_STEPS_LIMIT = 100;
+
+let currentRun = null;
+let currentMeta = null;
+let currentStep = null;
+
+// Cached fetched data — refilled on run/world change.
+let cachedHeatmap = null;
+let cachedConvergence = null;
+let cachedDecomp = null;
+
+// ---- data plumbing ----------------------------------------------------------
+
+async function fetchJson(url) {
+  const r = await fetch(url);
+  if (!r.ok) {
+    const t = await r.text();
+    throw new Error(`${r.status} ${t}`);
+  }
+  return r.json();
+}
+
+async function loadRunList() {
+  const runs = await fetchJson("/api/runs");
+  if (!runs.length) {
+    runSel.innerHTML = `<option value="">(no .h5 in data/logs)</option>`;
+    return;
+  }
+  runSel.innerHTML = runs
+    .map((r) => `<option value="${r.name}" data-size="${r.size_mb}">${r.name}</option>`)
+    .join("");
+
+  // Honor URL hash on first load.
+  const h = readHash();
+  if (h.run && Array.from(runSel.options).some((o) => o.value === h.run)) {
+    runSel.value = h.run;
+  }
+  if (h.world != null) worldEl.value = String(h.world);
+
+  await loadRun(h.step != null ? parseInt(h.step, 10) : null);
+}
+
+async function loadRun(initialStep = null) {
+  currentRun = runSel.value;
+  if (!currentRun) return;
+  const opt = runSel.options[runSel.selectedIndex];
+  runSize.textContent = opt.dataset.size ? `(${opt.dataset.size} MB)` : "";
+
+  try {
+    currentMeta = await fetchJson(`/api/run/${currentRun}/meta`);
+    renderMeta(currentMeta);
+  } catch (e) {
+    $("meta").innerHTML = `<dd class="empty">error: ${e.message}</dd>`;
+    return;
+  }
+
+  worldEl.max = (currentMeta.num_worlds ?? 1) - 1;
+  if (parseInt(worldEl.value, 10) > worldEl.max) worldEl.value = 0;
+
+  await fetchOverviewData();
+  renderHeatmap();
+  renderOverview();
+  renderDecomposition();
+  renderBadSteps();
+
+  const numSteps = currentMeta.num_steps ?? 0;
+  stepInput.max = Math.max(0, numSteps - 1);
+
+  // Pick a starting step: URL hash override, else first bad step, else 0.
+  let target = null;
+  if (initialStep != null && initialStep >= 0 && initialStep < numSteps) {
+    target = initialStep;
+  } else if (cachedConvergence) {
+    const bad = collectBadSteps();
+    target = bad.length ? bad[0].step : 0;
+  } else {
+    target = 0;
+  }
+  await selectStep(target);
+}
+
+async function fetchOverviewData() {
+  const world = parseInt(worldEl.value, 10) || 0;
+  const [hm, conv, decomp] = await Promise.all([
+    fetchJson(`/api/run/${currentRun}/heatmap?world=${world}`),
+    fetchJson(`/api/run/${currentRun}/convergence?world=${world}`),
+    fetchJson(`/api/run/${currentRun}/decomposition?world=${world}`),
+  ]);
+  cachedHeatmap = hm;
+  cachedConvergence = conv;
+  cachedDecomp = decomp;
+}
+
+function renderMeta(meta) {
+  const order = ["num_steps", "num_worlds", "max_newton_iters", "max_linear_iters_p1",
+                 "body_count", "dt", "has_pcr_history", "has_linesearch"];
+  const seen = new Set();
+  let html = "";
+  for (const k of order) {
+    if (k in meta) {
+      seen.add(k);
+      html += `<dt>${k}</dt><dd>${formatVal(meta[k])}</dd>`;
+    }
+  }
+  for (const [k, v] of Object.entries(meta)) {
+    if (!seen.has(k)) html += `<dt>${k}</dt><dd>${formatVal(v)}</dd>`;
+  }
+  $("meta").innerHTML = html || `<dd class="empty">empty</dd>`;
+}
+
+function formatVal(v) {
+  if (typeof v === "boolean") return v ? "yes" : "no";
+  if (typeof v === "number" && !Number.isInteger(v)) return v.toExponential(3);
+  return String(v);
+}
+
+// ---- charts -----------------------------------------------------------------
+
+function chartWidth(hostId) {
+  return Math.max(400, $(hostId).clientWidth || 700);
+}
+
+// Block colors for residual decomposition (consistent across charts).
+const BLOCK_COLORS = {
+  dynamics: "#5b6cff",
+  joint: "#22a06b",
+  control: "#a763d4",
+  normal: "#e89c2c",
+  friction: "#e35a4a",
+};
+const BLOCK_ORDER = ["dynamics", "joint", "control", "normal", "friction"];
+
+// ---- URL hash state --------------------------------------------------------
+
+function readHash() {
+  const out = {};
+  const h = location.hash.replace(/^#/, "");
+  if (!h) return out;
+  for (const part of h.split("&")) {
+    const [k, v] = part.split("=");
+    if (k && v != null) out[decodeURIComponent(k)] = decodeURIComponent(v);
+  }
+  return out;
+}
+
+function writeHash() {
+  const parts = [];
+  if (currentRun) parts.push(`run=${encodeURIComponent(currentRun)}`);
+  if (worldEl.value) parts.push(`world=${worldEl.value}`);
+  if (currentStep != null) parts.push(`step=${currentStep}`);
+  history.replaceState(null, "", "#" + parts.join("&"));
+}
+
+// ---- selection -------------------------------------------------------------
+
+async function selectStep(step) {
+  const numSteps = currentMeta?.num_steps ?? 0;
+  if (numSteps <= 0) return;
+  step = Math.max(0, Math.min(numSteps - 1, Math.round(step)));
+  const changed = step !== currentStep;
+  currentStep = step;
+  stepInput.value = String(step);
+  stepPrev.disabled = step <= 0;
+  stepNext.disabled = step >= numSteps - 1;
+  writeHash();
+
+  // Re-render annotations on overview charts (cheap; data is cached).
+  renderHeatmap();
+  renderOverview();
+  renderDecomposition();
+  renderBadSteps();
+
+  if (changed || $("nr-chart").childElementCount === 0) {
+    await renderStepDetail(step);
+  }
+}
+
+// ---- bad steps -------------------------------------------------------------
+
+function collectBadSteps() {
+  if (!cachedConvergence) return [];
+  const rows = [];
+  const {
+    step,
+    nr_iters,
+    final_residual_sq,
+    final_residual_sq_last,
+    best_idx,
+    max_newton_iters,
+  } = cachedConvergence;
+  const lastResid = final_residual_sq_last || final_residual_sq;
+  for (let i = 0; i < step.length; i++) {
+    const r = final_residual_sq[i];
+    if (r > ATOL_SQ || nr_iters[i] >= max_newton_iters) {
+      rows.push({
+        step: step[i],
+        nr: nr_iters[i],
+        res: r,
+        res_last: lastResid[i],
+        best_idx: best_idx ? best_idx[i] : nr_iters[i] - 1,
+        hit_max: nr_iters[i] >= max_newton_iters,
+      });
+    }
+  }
+  rows.sort((a, b) => b.res - a.res);
+  return rows.slice(0, BAD_STEPS_LIMIT);
+}
+
+function renderBadSteps() {
+  const rows = collectBadSteps();
+  const host = $("bad-steps-list");
+  if (!rows.length) {
+    host.innerHTML = `<div class="bad-empty">no steps above ‖r‖² = ${ATOL_SQ.toExponential(0)} or hitting max NR iters. nice run.</div>`;
+    return;
+  }
+  const total = cachedConvergence.step.length;
+  const head = `<thead><tr>
+    <th>step</th>
+    <th>NR iters</th>
+    <th>‖r‖² (picked)</th>
+    <th>‖r‖² (last)</th>
+    <th>picked iter</th>
+    <th></th>
+  </tr></thead>`;
+  const body = rows
+    .map((r) => {
+      const sel = r.step === currentStep ? " selected" : "";
+      const warnNr = r.hit_max ? " warn" : "";
+      const warnRes = r.res > ATOL_SQ ? " warn" : "";
+      const lastDiffers = Math.abs(Math.log10(r.res_last) - Math.log10(r.res)) > 0.5;
+      return `<tr class="bad-row${sel}" data-step="${r.step}">
+        <td>${r.step}</td>
+        <td class="${warnNr}">${r.nr}${r.hit_max ? " *" : ""}</td>
+        <td class="${warnRes}">${r.res.toExponential(2)}</td>
+        <td class="${lastDiffers ? "muted" : ""}">${r.res_last.toExponential(2)}</td>
+        <td class="muted">${r.best_idx} / ${r.nr - 1}</td>
+        <td class="muted">${r.hit_max ? "hit max" : ""}</td>
+      </tr>`;
+    })
+    .join("");
+  host.innerHTML = `
+    <div class="note">
+      ${rows.length} of ${total} step${total === 1 ? "" : "s"} flagged
+      (‖r‖² &gt; ${ATOL_SQ.toExponential(0)} or NR hit max).
+      "picked" is the iterate backtracking selected and carried into
+      the next step; "last" is the residual at the final NR iter and
+      is for diagnostics only.
+    </div>
+    <table class="bad">${head}<tbody>${body}</tbody></table>
+  `;
+  host.querySelectorAll("tr.bad-row").forEach((tr) => {
+    tr.addEventListener("click", () => selectStep(parseInt(tr.dataset.step, 10)));
+  });
+}
+
+// ---- chart rendering (uses cached data) ------------------------------------
+
+function selectionMark() {
+  if (currentStep == null) return null;
+  return Plot.ruleX([currentStep], {
+    stroke: SELECTION,
+    strokeWidth: 1.5,
+    strokeDasharray: "2,2",
+  });
+}
+
+function bindStepClick(chart, dataMaxStep) {
+  const xScale = chart.scale("x");
+  if (!xScale || typeof xScale.apply !== "function") return;
+  chart.style.cursor = "crosshair";
+  chart.addEventListener("click", (ev) => {
+    const rect = chart.getBoundingClientRect();
+    const px = ev.clientX - rect.left;
+    let best = 0,
+      bestDist = Infinity;
+    for (let s = 0; s <= dataMaxStep; s++) {
+      const cx = xScale.apply(s);
+      const d = Math.abs(cx - px);
+      if (d < bestDist) {
+        bestDist = d;
+        best = s;
+      }
+    }
+    selectStep(best);
+  });
+}
+
+function renderHeatmap() {
+  if (!cachedHeatmap) return;
+  const data = cachedHeatmap;
+  const values = data.rows.map((d) => d.log_res);
+  const hi = Math.max(2, Math.ceil(values.length ? Math.max(...values) : 2));
+
+  const marks = [
+    Plot.cell(data.rows, {
+      x: "step",
+      y: "iter",
+      fill: "log_res",
+      inset: 0,
+      title: (d) => `step ${d.step}, iter ${d.iter}\nlog₁₀‖r‖² = ${d.log_res.toFixed(2)}`,
+    }),
+  ];
+  const sel = selectionMark();
+  if (sel) marks.push(sel);
+
+  const chart = Plot.plot({
+    width: chartWidth("heatmap"),
+    height: 28 + (data.max_iter + 1) * 12,
+    marginLeft: 60,
+    marginBottom: 35,
+    style: { fontSize: 11 },
+    x: { label: "step", grid: false },
+    y: { label: "NR iter", reverse: true, grid: false },
+    color: {
+      type: "linear",
+      domain: [-6, hi],
+      range: ["#2b7cd6", "#f7f7f7", "#e35a4a"],
+      legend: true,
+      label: "log₁₀ ‖r‖²",
+    },
+    marks,
+  });
+  bindStepClick(chart, data.max_step);
+  $("heatmap").replaceChildren(chart);
+}
+
+function renderDecomposition() {
+  if (!cachedDecomp) return;
+  const data = cachedDecomp;
+  const eps = 1e-30;
+  const longRows = [];
+  for (const block of BLOCK_ORDER) {
+    if (!(block in data)) continue;
+    for (let i = 0; i < data.step.length; i++) {
+      longRows.push({
+        step: data.step[i],
+        block,
+        value: Math.max(data[block][i], eps),
+      });
+    }
+  }
+
+  const marks = [
+    Plot.line(longRows, {
+      x: "step",
+      y: "value",
+      stroke: "block",
+      strokeWidth: 1.2,
+      curve: "linear",
+    }),
+    Plot.tip(
+      longRows,
+      Plot.pointer({
+        x: "step",
+        y: "value",
+        stroke: "block",
+        format: { x: ".0f", y: ".2e" },
+      }),
+    ),
+  ];
+  const sel = selectionMark();
+  if (sel) marks.push(sel);
+
+  const chart = Plot.plot({
+    width: chartWidth("decomp"),
+    height: 280,
+    marginLeft: 70,
+    marginBottom: 35,
+    style: { fontSize: 11 },
+    x: { label: "step" },
+    y: { type: "log", label: "‖r_block‖² (final iter)", grid: true, tickFormat: ".0e" },
+    color: {
+      domain: BLOCK_ORDER,
+      range: BLOCK_ORDER.map((b) => BLOCK_COLORS[b]),
+      legend: true,
+    },
+    marks,
+  });
+  bindStepClick(chart, (data.step.length || 1) - 1);
+  $("decomp").replaceChildren(chart);
+}
+
+function renderOverview() {
+  if (!cachedConvergence) return;
+  const data = cachedConvergence;
+
+  // final_residual_sq is the post-backtrack picked-iter residual; this
+  // is the canonical "did this step actually converge?" number. The
+  // last-iter residual (final_residual_sq_last) is shown as a tooltip
+  // hint when the two differ noticeably.
+  const finalLast = data.final_residual_sq_last || data.final_residual_sq;
+  const rows = data.step.map((s, i) => {
+    const picked = Math.max(data.final_residual_sq[i], 1e-30);
+    const last = Math.max(finalLast[i], 1e-30);
+    return {
+      step: s,
+      res: picked,
+      res_last: last,
+      best_idx: (data.best_idx ? data.best_idx[i] : data.nr_iters[i] - 1),
+      nr: data.nr_iters[i],
+      hit_max: data.nr_iters[i] >= data.max_newton_iters,
+    };
+  });
+
+  const marks = [
+    Plot.ruleY([ATOL_SQ], { stroke: MUTED, strokeDasharray: "4,3" }),
+    Plot.dot(rows, {
+      x: "step",
+      y: "res",
+      fill: "hit_max",
+      r: 3,
+      title: (d) =>
+        `step ${d.step}\n` +
+        `picked iter ${d.best_idx} / ${d.nr - 1}\n` +
+        `‖r‖² (picked) = ${d.res.toExponential(2)}\n` +
+        `‖r‖² (last)   = ${d.res_last.toExponential(2)}\n` +
+        `NR iters = ${d.nr}`,
+    }),
+    Plot.tip(
+      rows,
+      Plot.pointer({
+        x: "step",
+        y: "res",
+        channels: { nr: "nr", best_idx: "best_idx", res_last: "res_last" },
+        format: {
+          x: ".0f",
+          y: ".2e",
+          nr: ".0f",
+          best_idx: ".0f",
+          res_last: ".2e",
+        },
+      }),
+    ),
+  ];
+  const sel = selectionMark();
+  if (sel) marks.push(sel);
+
+  const chart = Plot.plot({
+    width: chartWidth("overview"),
+    height: 320,
+    marginLeft: 70,
+    marginBottom: 35,
+    style: { fontSize: 11 },
+    x: { label: "step", grid: false },
+    y: { type: "log", label: "final NR ‖r‖²", grid: true, tickFormat: ".0e" },
+    color: {
+      domain: [false, true],
+      range: [ACCENT, WARN],
+      legend: true,
+      label: "hit max NR iters",
+    },
+    marks,
+  });
+  bindStepClick(chart, (data.step.length || 1) - 1);
+  $("overview").replaceChildren(chart);
+}
+
+async function renderStepDetail(step) {
+  const world = parseInt(worldEl.value, 10) || 0;
+  const data = await fetchJson(`/api/run/${currentRun}/step/${step}?world=${world}`);
+
+  const used = data.nr_iters_used;
+  const lastIdx = Math.max(used - 1, 0);
+  const bestIdx = (data.best_idx != null) ? data.best_idx : lastIdx;
+  const lastRes = data.nr_residual_sq[lastIdx];
+  const pickedRes = data.nr_residual_sq[bestIdx];
+  $("step-info").textContent =
+    `· step ${data.step} · world ${data.world} · NR ${used}/${data.max_newton_iters} iters · ` +
+    `picked iter ${bestIdx} (‖r‖²=${pickedRes.toExponential(2)}; last iter = ${lastRes.toExponential(2)})`;
+
+  // NR residual decay — mark the picked iter with a separate ring.
+  const nrRows = data.nr_residual_sq.slice(0, used).map((r, k) => ({
+    iter: k,
+    res: Math.max(r, 1e-30),
+    picked: k === bestIdx,
+  }));
+  const pickedRow = nrRows[bestIdx];
+  const nrChart = Plot.plot({
+    width: chartWidth("nr-chart"),
+    height: 240,
+    marginLeft: 70,
+    style: { fontSize: 11 },
+    x: { label: "NR iteration", grid: false },
+    y: { type: "log", label: "NR ‖r‖²", grid: true, tickFormat: ".0e" },
+    marks: [
+      Plot.ruleY([1e-6], { stroke: MUTED, strokeDasharray: "4,3" }),
+      Plot.line(nrRows, { x: "iter", y: "res", stroke: ACCENT, strokeWidth: 1.5 }),
+      Plot.dot(nrRows, { x: "iter", y: "res", fill: ACCENT, r: 3 }),
+      // Picked iter highlight: bigger hollow ring in green.
+      pickedRow
+        ? Plot.dot([pickedRow], {
+            x: "iter",
+            y: "res",
+            stroke: OK,
+            strokeWidth: 2,
+            r: 7,
+            fill: "none",
+          })
+        : null,
+      Plot.tip(
+        nrRows,
+        Plot.pointer({
+          x: "iter",
+          y: "res",
+          channels: { picked: "picked" },
+          format: { x: ".0f", y: ".2e", picked: ".0f" },
+        }),
+      ),
+    ].filter(Boolean),
+  });
+  $("nr-chart").replaceChildren(nrChart);
+
+  // Per-NR-iter decomposition for the selected step
+  if (data.decomposition) {
+    const eps = 1e-30;
+    const decompRows = [];
+    for (const block of BLOCK_ORDER) {
+      if (!(block in data.decomposition)) continue;
+      const arr = data.decomposition[block];
+      for (let k = 0; k < used; k++) {
+        decompRows.push({ iter: k, block, value: Math.max(arr[k], eps) });
+      }
+    }
+    const decompChart = Plot.plot({
+      width: chartWidth("decomp-step-chart"),
+      height: 220,
+      marginLeft: 70,
+      style: { fontSize: 11 },
+      x: { label: "NR iteration" },
+      y: { type: "log", label: "‖r_block‖²", grid: true, tickFormat: ".0e" },
+      color: {
+        domain: BLOCK_ORDER,
+        range: BLOCK_ORDER.map((b) => BLOCK_COLORS[b]),
+        legend: true,
+      },
+      marks: [
+        Plot.line(decompRows, {
+          x: "iter",
+          y: "value",
+          stroke: "block",
+          strokeWidth: 1.4,
+        }),
+        Plot.dot(decompRows, {
+          x: "iter",
+          y: "value",
+          fill: "block",
+          r: 2.5,
+        }),
+        Plot.tip(
+          decompRows,
+          Plot.pointer({
+            x: "iter",
+            y: "value",
+            stroke: "block",
+            format: { x: ".0f", y: ".2e" },
+          }),
+        ),
+      ],
+    });
+    $("decomp-step-chart").replaceChildren(decompChart);
+  } else {
+    $("decomp-step-chart").innerHTML = "";
+  }
+
+  // PCR iters per NR iter
+  if (data.pcr_iters_per_nr) {
+    const pcrMax = data.max_linear_iters_p1
+      ? data.max_linear_iters_p1 - 1
+      : (currentMeta.max_linear_iters_p1 ? currentMeta.max_linear_iters_p1 - 1 : null);
+    const pcrRows = data.pcr_iters_per_nr
+      .slice(0, used)
+      .map((c, k) => ({ iter: k, count: c, hit_max: pcrMax != null && c >= pcrMax }));
+    const pcrChart = Plot.plot({
+      width: chartWidth("pcr-chart"),
+      height: 200,
+      marginLeft: 70,
+      style: { fontSize: 11 },
+      x: { label: "NR iteration" },
+      y: { label: "PCR iters", grid: true },
+      color: { domain: [false, true], range: [ACCENT, WARN], legend: false },
+      marks: [
+        pcrMax != null
+          ? Plot.ruleY([pcrMax], { stroke: WARN, strokeDasharray: "4,3" })
+          : null,
+        Plot.barY(pcrRows, { x: "iter", y: "count", fill: "hit_max" }),
+        Plot.tip(
+          pcrRows,
+          Plot.pointer({
+            x: "iter",
+            y: "count",
+            format: { x: ".0f", y: ".0f" },
+          }),
+        ),
+      ].filter(Boolean),
+    });
+    $("pcr-chart").replaceChildren(pcrChart);
+  } else {
+    $("pcr-chart").innerHTML = "";
+  }
+
+  // Chosen α (linesearch)
+  if (data.chosen_alpha) {
+    const aRows = data.chosen_alpha
+      .slice(0, used)
+      .map((a, k) => ({ iter: k, alpha: Math.max(a, 1e-30) }));
+    const aChart = Plot.plot({
+      width: chartWidth("alpha-chart"),
+      height: 200,
+      marginLeft: 70,
+      style: { fontSize: 11 },
+      x: { label: "NR iteration" },
+      y: {
+        type: "log",
+        label: "chosen α",
+        domain: [1e-6, 2],
+        grid: true,
+        tickFormat: ".0e",
+      },
+      marks: [
+        Plot.ruleY([1.0], { stroke: MUTED, strokeDasharray: "4,3" }),
+        Plot.line(aRows, { x: "iter", y: "alpha", stroke: OK, strokeWidth: 1.5 }),
+        Plot.dot(aRows, { x: "iter", y: "alpha", fill: OK, r: 3 }),
+        Plot.tip(
+          aRows,
+          Plot.pointer({
+            x: "iter",
+            y: "alpha",
+            format: { x: ".0f", y: ".2e" },
+          }),
+        ),
+      ],
+    });
+    $("alpha-chart").replaceChildren(aChart);
+  } else {
+    $("alpha-chart").innerHTML = "";
+  }
+}
+
+// ---- wiring ----------------------------------------------------------------
+
+runSel.addEventListener("change", () => loadRun(currentStep));
+worldEl.addEventListener("change", async () => {
+  if (!currentRun) return;
+  await fetchOverviewData();
+  renderHeatmap();
+  renderOverview();
+  renderDecomposition();
+  renderBadSteps();
+  if (currentStep != null) renderStepDetail(currentStep);
+  writeHash();
+});
+
+// Step picker controls.
+stepInput.addEventListener("change", () => {
+  const v = parseInt(stepInput.value, 10);
+  if (!Number.isNaN(v)) selectStep(v);
+});
+stepPrev.addEventListener("click", () => {
+  if (currentStep != null) selectStep(currentStep - 1);
+});
+stepNext.addEventListener("click", () => {
+  if (currentStep != null) selectStep(currentStep + 1);
+});
+window.addEventListener("keydown", (ev) => {
+  if (ev.target.tagName === "INPUT" || ev.target.tagName === "SELECT") return;
+  if (currentStep == null) return;
+  if (ev.key === "ArrowLeft") selectStep(currentStep - 1);
+  else if (ev.key === "ArrowRight") selectStep(currentStep + 1);
+});
+
+// Browser-driven hash changes (e.g., user pastes a URL).
+window.addEventListener("hashchange", () => {
+  const h = readHash();
+  if (h.run && runSel.value !== h.run) {
+    runSel.value = h.run;
+    loadRun(h.step != null ? parseInt(h.step, 10) : null);
+  } else if (h.step != null) {
+    selectStep(parseInt(h.step, 10));
+  }
+});
+
+// rerender on resize so charts adapt
+let resizeTimer;
+window.addEventListener("resize", () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    if (!currentRun) return;
+    renderHeatmap();
+    renderOverview();
+    renderDecomposition();
+  }, 200);
+});
+
+loadRunList();
+</script>
+</body>
+</html>

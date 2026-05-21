@@ -2,7 +2,7 @@
 Jacobi preconditioner for the system matrix A = J M⁻¹ Jᵀ + C.
 """
 import warp as wp
-from axion.math import compute_spatial_momentum
+from axion.mechanics import compute_spatial_momentum
 from warp.optim.linear import LinearOperator
 
 

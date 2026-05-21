@@ -123,7 +123,7 @@ class PCRSolver:
         max_iters: int,
         batch_dim: int,
         vec_dim: int,
-        device: wp.context.Device,
+        device: wp.Device,
     ):
         self.max_iters = max_iters
         self.batch_dim = batch_dim

@@ -1,0 +1,14 @@
+defaults:
+  - simulation: uphill
+  - rendering: gl
+  - logging: disabled
+  - engine: axion
+  - _self_
+
+project_name: ${hydra:job.name}
+
+engine:
+  compliance:
+    joint: 5e-6
+  contacts:
+    max_per_world: 256

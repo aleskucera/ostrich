@@ -4,7 +4,7 @@ import numpy as np
 import time
 from matplotlib import pyplot as plt
 
-import axion.tiled.tiled_utils as tu
+import axion.tiled as tu
 
 np.random.seed(0)
 
@@ -46,7 +46,7 @@ sum_instances = {
 }
 sq_norm_instances = {
     f"{M}x{N}": {
-        f"{ts}x{bt}": tu.TiledSqrNorm((M, M), dtype=wp.float32, tile_size=ts, block_threads=bt)
+        f"{ts}x{bt}": tu.TiledSqNorm((M, M), dtype=wp.float32, tile_size=ts, block_threads=bt)
         for ts, bt in TS_BT
     }
     for M, N in M_N

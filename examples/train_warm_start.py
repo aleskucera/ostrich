@@ -20,7 +20,7 @@ from axion import EngineConfig
 from axion import LoggingConfig
 from axion import SimulationConfig
 from axion.core.model_builder import AxionModelBuilder
-from axion.generation.scene_generator_new import SceneGenerator
+from axion.generation import RandomSceneGenerator
 from axion.learning.torch_residual_ad import AxionResidualAD
 from axion.learning.warm_start_net import WarmStartNet
 from omegaconf import DictConfig
@@ -43,7 +43,7 @@ def build_random_model(num_worlds: int = 1, seed: int = SEED) -> newton.Model:
     builder.rigid_gap = 0.2
     builder.add_ground_plane()
 
-    gen = SceneGenerator(builder, seed=seed)
+    gen = RandomSceneGenerator(builder, seed=seed)
     np.random.seed(seed)
     num_objects = np.random.randint(3, 8)
     for _ in range(num_objects):

@@ -3,8 +3,8 @@ import time
 import numpy as np
 import warp as wp
 from axion.constraints import unconstrained_dynamics_kernel
-from axion.types import spatial_inertia_kernel
-from axion.types import SpatialInertia
+from axion.mechanics import spatial_inertia_kernel
+from axion.mechanics import SpatialInertia
 
 
 def setup_data(num_bodies, device):

@@ -1,7 +1,6 @@
 defaults:
   - simulation: helhest_diff
   - rendering: gl
-  - execution: cuda_graph
   - logging: disabled
   - engine: axion
   - _self_
