@@ -182,8 +182,14 @@ def align_real_to_sim(real: dict, heading_dist: float = 1.0):
 
 
 class HelhestJuniorReplaySimulator(InteractiveSimulator):
-    def __init__(self, *args, control_mode="velocity", **kwargs):
+    def __init__(self, *args, control_mode="velocity", mu_front=0.8, mu_rear=0.8, **kwargs):
         self.control_mode = control_mode
+        # Wheel-ground friction. mu_rear governs how easily the rear wheel skids
+        # sideways → how readily the robot yaws. Low rear mu = turns too easily;
+        # 0.8 (= front, same rubber) matches the real robot's near-straight
+        # heading far better than the old artificial 0.35 "slippery rear" value.
+        self.mu_front = mu_front
+        self.mu_rear = mu_rear
         super().__init__(*args, **kwargs)
         # [left, right, rear] velocity command consumed by control_policy.
         self.target_velocities = wp.zeros(3, dtype=wp.float32, device=self.model.device)
@@ -210,8 +216,8 @@ class HelhestJuniorReplaySimulator(InteractiveSimulator):
             control_mode=self.control_mode,
             k_p=250.0,
             k_d=0.0,
-            friction_left_right=0.8,
-            friction_rear=0.35,
+            friction_left_right=self.mu_front,
+            friction_rear=self.mu_rear,
         )
 
         return self.builder.finalize_replicated(num_worlds=self.simulation_config.num_worlds)
@@ -548,6 +554,12 @@ def main():
         metavar="X,Y,Z",
         help="prism mount offset in chassis frame (default: top-front " f"{tuple(PRISM_OFFSET)})",
     )
+    parser.add_argument("--mu-front", type=float, default=0.8,
+                        help="front-wheel ground friction (default 0.8)")
+    parser.add_argument("--mu-rear", type=float, default=0.8,
+                        help="rear-wheel ground friction; higher = resists sideways "
+                             "skid = turns less (default 0.8 = front; 0.35 was the old "
+                             "artificial slippery-rear value)")
     parser.add_argument(
         "--cuda-graph",
         action="store_true",
@@ -670,6 +682,8 @@ def main():
         engine_config,
         logging_config,
         control_mode="velocity",
+        mu_front=args.mu_front,
+        mu_rear=args.mu_rear,
     )
 
     if args.all:
