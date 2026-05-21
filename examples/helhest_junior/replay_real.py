@@ -240,6 +240,12 @@ class HelhestJuniorReplaySimulator(InteractiveSimulator):
         self.viewer.log_contacts(self.contacts, self.current_state)
         self.viewer.end_frame()
 
+    def reset_state(self):
+        """Reset the robot to its spawn pose at rest (for reusing one simulator
+        instance across multiple runs in a single process)."""
+        newton.eval_fk(self.model, self.model.joint_q, self.model.joint_qd, self.current_state)
+        self.current_state.body_qd.zero_()
+
     def replay(self, setpoints: np.ndarray, settle_steps: int = 60):
         """Settle on the ground at zero velocity, then drive with recorded
         setpoints. Returns chassis pose [T, 7] (px,py,pz, qx,qy,qz,qw)."""
@@ -547,6 +553,12 @@ def main():
         action="store_true",
         help="capture the physics step into a CUDA graph (faster; works headless and with GL)",
     )
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help="batch-process every run_*.h5 in the synced dir in ONE process "
+        "(reuses the simulator; --out is treated as a directory). Headless.",
+    )
     args = parser.parse_args()
 
     use_graph = args.cuda_graph and wp.get_device().is_cuda
@@ -558,11 +570,6 @@ def main():
         if args.prism
         else PRISM_OFFSET
     )
-
-    h5_path = pathlib.Path(args.run)
-    setpoints, real, run_id, _ = load_setpoints(h5_path, args.drive, args.dt, args.duration)
-    real_aligned, real_t = align_real_to_sim(real)
-    print(f"Run {run_id}: {setpoints.shape[0]} steps @ dt={args.dt}s, drive={args.drive}")
 
     # --- Fully explicit configuration (no reliance on dataclass defaults) ---
     # Every field of every (sub-)config is written out so the run is fully
@@ -578,7 +585,7 @@ def main():
         use_cuda_graph=True,
     )
     render_config = RenderingConfig(
-        vis_type="gl" if args.vis == "gl" else "null",
+        vis_type="null" if args.all else ("gl" if args.vis == "gl" else "null"),
         target_fps=int(round(1.0 / args.dt)),
         usd_file="sim.usd",  # only used when vis_type == "usd"
         usd_scaling=100.0,
@@ -654,6 +661,9 @@ def main():
         adjoint=AdjointLoggingConfig(enabled=False, file="adjoint.h5"),
     )
 
+    # Build the simulator ONCE. Process startup (warp init, model build, module
+    # loads) dominates a single replay, so batching all runs here — reusing this
+    # instance via reset_state — is far faster than relaunching per run.
     sim = HelhestJuniorReplaySimulator(
         sim_config,
         render_config,
@@ -661,8 +671,28 @@ def main():
         logging_config,
         control_mode="velocity",
     )
+
+    if args.all:
+        runs = sorted(SYNCED_DIR.glob("run_*.h5"))
+        out_dir = pathlib.Path(args.out) if args.out else None
+        if out_dir:
+            out_dir.mkdir(parents=True, exist_ok=True)
+        for h5_path in runs:
+            out_prefix = str(out_dir / h5_path.stem) if out_dir else None
+            _replay_one(sim, h5_path, args, use_graph, prism_offset, out_prefix)
+    else:
+        _replay_one(sim, pathlib.Path(args.run), args, use_graph, prism_offset, args.out)
+
+
+def _replay_one(sim, h5_path, args, use_graph, prism_offset, out_prefix):
+    """Run a single recorded run on an already-built simulator."""
     import time
 
+    setpoints, real, run_id, _ = load_setpoints(h5_path, args.drive, args.dt, args.duration)
+    real_aligned, real_t = align_real_to_sim(real)
+    print(f"\nRun {run_id}: {setpoints.shape[0]} steps @ dt={args.dt}s, drive={args.drive}")
+
+    sim.reset_state()
     t0 = time.perf_counter()
     if use_graph:
         sim_pose, sim_wheel_qd = sim.replay_graph(setpoints)
@@ -680,9 +710,9 @@ def main():
 
     _print_speed_decomposition(sim_pose, sim_wheel_qd, setpoints, args.dt, real_aligned, real_t)
 
-    if args.out:
+    if out_prefix:
         sim_prism = prism_track(sim_pose, prism_offset)
-        save_comparison(args.out, sim_prism, real_aligned, real_t, args.dt)
+        save_comparison(out_prefix, sim_prism, real_aligned, real_t, args.dt)
 
 
 def _print_speed_decomposition(sim_pose, sim_wheel_qd, setpoints, dt, real_aligned, real_t):
