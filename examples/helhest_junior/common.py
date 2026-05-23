@@ -118,6 +118,7 @@ def _add_wheel(
     ke: float = None,
     kd: float = None,
     kf: float = None,
+    mu_rolling: float = 0.7,
 ) -> int:
     """Adds a wheel link, shapes, and returns the link index."""
     pos_world = wp.transform_point(parent_xform, pos_local)
@@ -149,7 +150,7 @@ def _add_wheel(
         "is_visible": False,
         "collision_group": -1,
         "mu": mu,
-        "mu_rolling": 0.7,
+        "mu_rolling": mu_rolling,
     }
     if ke is not None:
         collision_cfg_kwargs["ke"] = ke
@@ -180,6 +181,7 @@ def create_helhest_junior_model(
     ke: float = None,
     kd: float = None,
     kf: float = None,
+    mu_rolling: float = 0.7,
 ):
     """
     Creates a Helhest Junior robot model — a smaller variant of the Helhest
@@ -215,6 +217,7 @@ def create_helhest_junior_model(
         ke=ke,
         kd=kd,
         kf=kf,
+        mu_rolling=mu_rolling,
     )
     right_wheel = _add_wheel(
         builder,
@@ -227,6 +230,7 @@ def create_helhest_junior_model(
         ke=ke,
         kd=kd,
         kf=kf,
+        mu_rolling=mu_rolling,
     )
     rear_wheel = _add_wheel(
         builder,
@@ -239,6 +243,7 @@ def create_helhest_junior_model(
         ke=ke,
         kd=kd,
         kf=kf,
+        mu_rolling=mu_rolling,
     )
 
     # 3. Wheel Joints

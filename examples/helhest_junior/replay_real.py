@@ -182,7 +182,11 @@ def align_real_to_sim(real: dict, heading_dist: float = 1.0):
 
 
 class HelhestJuniorReplaySimulator(InteractiveSimulator):
-    def __init__(self, *args, control_mode="velocity", mu_front=0.8, mu_rear=0.8, **kwargs):
+    def __init__(self, *args, control_mode="velocity",
+                 mu_front=0.8, mu_rear=0.8, mu_rolling=0.7,
+                 ground_ke=150.0, ground_kd=150.0, ground_kf=500.0,
+                 box_ke=150.0, box_kd=150.0, box_kf=500.0,
+                 **kwargs):
         self.control_mode = control_mode
         # Wheel-ground friction. mu_rear governs how easily the rear wheel skids
         # sideways → how readily the robot yaws. Low rear mu = turns too easily;
@@ -190,6 +194,11 @@ class HelhestJuniorReplaySimulator(InteractiveSimulator):
         # heading far better than the old artificial 0.35 "slippery rear" value.
         self.mu_front = mu_front
         self.mu_rear = mu_rear
+        # mu_rolling is the wheel's resistance to free spin / sideways torsion.
+        # It's the closest Axion analog to MuJoCo's torsional friction.
+        self.mu_rolling = mu_rolling
+        self.ground_cfg_kwargs = dict(ke=ground_ke, kd=ground_kd, kf=ground_kf)
+        self.box_cfg_kwargs = dict(ke=box_ke, kd=box_kd, kf=box_kf)
         super().__init__(*args, **kwargs)
         # [left, right, rear] velocity command consumed by control_policy.
         self.target_velocities = wp.zeros(3, dtype=wp.float32, device=self.model.device)
@@ -198,7 +207,7 @@ class HelhestJuniorReplaySimulator(InteractiveSimulator):
     def build_model(self) -> newton.Model:
         self.builder.rigid_gap = 0.2
 
-        ground_cfg = newton.ModelBuilder.ShapeConfig(mu=0.8, ke=150.0, kd=150.0, kf=500.0)
+        ground_cfg = newton.ModelBuilder.ShapeConfig(mu=0.8, **self.ground_cfg_kwargs)
         self.builder.add_ground_plane(cfg=ground_cfg)
 
         self.builder.add_shape_box(
@@ -207,7 +216,7 @@ class HelhestJuniorReplaySimulator(InteractiveSimulator):
             hx=BOX_HALF_EXTENTS[0],
             hy=BOX_HALF_EXTENTS[1],
             hz=BOX_HALF_EXTENTS[2],
-            cfg=newton.ModelBuilder.ShapeConfig(mu=0.8, ke=150.0, kd=150.0, kf=500.0),
+            cfg=newton.ModelBuilder.ShapeConfig(mu=0.8, **self.box_cfg_kwargs),
         )
 
         create_helhest_junior_model(
@@ -218,6 +227,7 @@ class HelhestJuniorReplaySimulator(InteractiveSimulator):
             k_d=0.0,
             friction_left_right=self.mu_front,
             friction_rear=self.mu_rear,
+            mu_rolling=self.mu_rolling,
         )
 
         return self.builder.finalize_replicated(num_worlds=self.simulation_config.num_worlds)

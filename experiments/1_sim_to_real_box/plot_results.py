@@ -44,7 +44,8 @@ def load_sweeps():
 
 def fmt_params(sim, bp):
     if sim == "Axion":
-        return rf"$\mu_r$={bp['mu_rear']}, $\Delta t$={bp['dt']}"
+        ke = bp.get("ke"); ke_s = rf", ke={ke:g}" if ke is not None else ""
+        return rf"$\mu_r$={bp['mu_rear']}{ke_s}, $\Delta t$={bp['dt']}"
     if sim == "MuJoCo":
         tor = bp.get("tor")
         tor_s = rf", tor={tor:g}" if tor is not None else ""

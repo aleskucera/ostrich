@@ -33,24 +33,26 @@ from examples.helhest_junior.replay_real import HelhestJuniorReplaySimulator
 DURATION = 12.0
 
 
-def make_engine_config():
+def make_engine_config(compliance_contact):
     return AxionEngineConfig(
         nr=NewtonRaphsonConfig(max_iters=16, backtrack_min_iter=12, atol=1e-3),
         linear=LinearSolverConfig(max_iters=16, tol=1e-3, atol=1e-3, regularization=1e-6),
-        compliance=ComplianceConfig(joint=6e-8, contact=1e-6, friction=1e-6),
+        compliance=ComplianceConfig(joint=6e-8, contact=compliance_contact, friction=1e-6),
         linesearch=LinesearchConfig(enabled=False),
         contacts=ContactsConfig(max_per_world=256),
     )
 
 
-def run_config(mu_front, mu_rear, dt, gts, use_graph):
+def run_config(mu_front, mu_rear, mu_rolling, ke, compliance_contact, dt, gts, use_graph):
     """Build one sim at these params, replay every GT run, return per-run scores."""
     sim = HelhestJuniorReplaySimulator(
         SimulationConfig(duration_seconds=DURATION, target_timestep_seconds=dt,
                          num_worlds=1, use_cuda_graph=False),
         RenderingConfig(vis_type="null", target_fps=int(round(1 / dt)), start_paused=False),
-        make_engine_config(), LoggingConfig(),
-        control_mode="velocity", mu_front=mu_front, mu_rear=mu_rear,
+        make_engine_config(compliance_contact), LoggingConfig(),
+        control_mode="velocity",
+        mu_front=mu_front, mu_rear=mu_rear, mu_rolling=mu_rolling,
+        ground_ke=ke, ground_kd=ke, box_ke=ke, box_kd=ke,
     )
     out = {}
     for name, gt in gts.items():
@@ -72,33 +74,40 @@ def main():
         str(DATA_DIR / "run_2026_05_20-18_10_33.json")])
     ap.add_argument("--dt", type=float, nargs="+", default=[0.05])
     ap.add_argument("--mu-front", type=float, nargs="+", default=[0.8])
-    ap.add_argument("--mu-rear", type=float, nargs="+", default=[0.35, 0.5, 0.7, 0.9])
+    ap.add_argument("--mu-rear", type=float, nargs="+", default=[1.0, 1.2, 1.5])
+    ap.add_argument("--mu-rolling", type=float, nargs="+", default=[0.7],
+                    help="wheel rolling friction (Axion's analog of MuJoCo torsional; "
+                         "flat impact at this scene)")
+    ap.add_argument("--ke", type=float, nargs="+", default=[150, 500, 1500],
+                    help="contact stiffness for ground+box (also used as kd)")
+    ap.add_argument("--compliance-contact", type=float, nargs="+", default=[1e-7, 1e-6],
+                    help="engine.compliance.contact (FB regularization on the contact block)")
     ap.add_argument("--save", default=str(RESULTS_DIR / "sweep_axion.json"))
     args = ap.parse_args()
 
     gts = {pathlib.Path(p).stem: load_gt(p) for p in args.gt}
     use_graph = wp.get_device().is_cuda
-    configs = list(itertools.product(args.dt, args.mu_front, args.mu_rear))
+    configs = list(itertools.product(args.dt, args.mu_front, args.mu_rear,
+                                     args.mu_rolling, args.ke, args.compliance_contact))
     print(f"Axion box sweep: {len(configs)} configs x {len(gts)} runs "
           f"({'cuda-graph' if use_graph else 'python-loop'})")
 
     best = None
     rows = []
-    for dt, mf, mr in configs:
+    for dt, mf, mr, mrol, ke, cc in configs:
         t0 = time.perf_counter()
-        scores = run_config(mf, mr, dt, gts, use_graph)
+        scores = run_config(mf, mr, mrol, ke, cc, dt, gts, use_graph)
         combined = float(np.mean([s["combined"] for s in scores.values()]))
-        rows.append({"dt": dt, "mu_front": mf, "mu_rear": mr, "combined": combined,
+        cfg = {"dt": dt, "mu_front": mf, "mu_rear": mr, "mu_rolling": mrol,
+               "ke": ke, "compliance_contact": cc}
+        rows.append({**cfg, "combined": combined,
                      "per_run": {n: {"combined": s["combined"], "xy": s["xy"], "z": s["z"]}
                                  for n, s in scores.items()}})
-        print(f"  dt={dt} mu_front={mf} mu_rear={mr}: combined={combined:.3f} m "
-              f"({time.perf_counter()-t0:.1f}s)")
+        print(f"  {cfg}: combined={combined:.3f} m ({time.perf_counter()-t0:.1f}s)")
         if best is None or combined < best["combined"]:
-            best = {"dt": dt, "mu_front": mf, "mu_rear": mr, "combined": combined,
-                    "scores": scores}
+            best = {**cfg, "combined": combined, "scores": scores}
 
-    # Persist best params + best trajectories (for plotting, no re-sim needed).
-    bp = {"dt": best["dt"], "mu_front": best["mu_front"], "mu_rear": best["mu_rear"]}
+    bp = {k: best[k] for k in ("dt", "mu_front", "mu_rear", "mu_rolling", "ke", "compliance_contact")}
     out = {
         "simulator": "Axion",
         "best_params": bp,

@@ -51,32 +51,48 @@ python experiments/1_sim_to_real_box/sweep_mujoco.py \
 python experiments/1_sim_to_real_box/plot_results.py --run 18_10_33
 ```
 
-## Current result (Axion vs *fully-tuned* MuJoCo, 2 runs: 18_04_51 + 18_10_33)
+## Current result (both engines fully tuned, 2 runs: 18_04_51 + 18_10_33)
 
 | Engine | best combined 3D L2 | best params | dt |
 |---|---|---|---|
-| **MuJoCo** | **0.048 m** | `μ=1.5, tor=10, condim=6, integrator=implicitfast` | 0.001 |
-| Axion | 0.056 m | `mu_front=0.8, mu_rear=1.0` | 0.05 |
+| **MuJoCo** | **0.048 m** | `μ=1.5, tor=10, condim=6, implicitfast` | 0.001 |
+| Axion | 0.054 m | `mu_front=0.8, mu_rear=1.2, mu_rolling=0.7, ke=150, compliance.contact=1e-6` | 0.05 |
 
-Essentially tied (within tuning noise) — but at **50× different timesteps**.
-MuJoCo needs dt≈10⁻³ s to land here; Axion does it at dt=5·10⁻² s.
+Essentially tied (within tuning noise, 6 mm apart) — but at **50× different
+timesteps**. MuJoCo needs dt≈10⁻³ s to land here; Axion does it at dt=5·10⁻² s.
 
-### MuJoCo tuning journey (why the strawman matters)
+### MuJoCo tuning journey
 
 | stage | best | what was added |
 |---|---|---|
 | initial sweep (dt × kv × μ) | 0.104 m | `condim=3`, default torsional |
-| stage 1 (+ integrator, condim, solref, ground torsional) | 0.066 m | **`condim=6`** + torsional 0.5 |
-| stage 2 (refine: higher μ + higher torsional) | 0.049 m | μ=1.2, torsional 5.0 |
+| stage 1 (+ integrator, condim, solref, torsional) | 0.066 m | **`condim=6`** + torsional 0.5 |
+| stage 2 (higher μ + higher torsional) | 0.049 m | μ=1.2, torsional 5.0 |
 | stage 3 (probe edges) | **0.048 m** | converged floor |
 
 The single biggest lever was **`condim=6` with torsional friction ≥ 2.0** —
 pyramidal cone with `condim=3` has no torsional component, so the rear wheel
-skids freely on box impact and the chassis acquires a spurious yaw (exactly
-the same physics as the Axion `mu_rear` tuning). With it, MuJoCo joins the
-floor at ~0.048 m. The remaining ~5 cm of error is the chassis Z baseline
-drifting down a couple of cm (contact compliance during the climb/descent)
-and a slightly lower climb peak — small residual physics.
+skids freely on box impact and the chassis acquires a spurious yaw.
+
+### Axion tuning journey (mirror)
+
+| stage | best | what was added |
+|---|---|---|
+| initial sweep (mu_front × mu_rear) | 0.056 m | exposed via `--mu-front/--mu-rear` |
+| stage 1 (mu_rolling, the torsional analog) | 0.057 m | **flat — no improvement** |
+| stage 2 (contact `ke`, `compliance.contact`, mu_rear) | **0.054 m** | ~2 mm of headroom from stiffer contact |
+
+**Notable asymmetry:** Axion's `mu_rolling` — the natural analog of MuJoCo's
+torsional friction — is *flat* across 0–5.0 (Δ ≈ 4 mm). Axion's plain friction
+model already handles the box-kick yaw, so there's no separate torsional
+channel to tune. By contrast, MuJoCo needs `condim=6` + torsional friction
+explicitly enabled, otherwise it's missing physics. This explains why the
+initial Axion sweep landed near its floor (0.056 m) while the initial MuJoCo
+sweep was 2× off (0.104 m).
+
+The remaining ~5 cm of error on both engines is real residual physics — the
+chassis Z baseline drifts down ~2 cm during the climb/descent (contact
+compliance) and the climb peak is slightly low on MuJoCo. Not friction.
 
 ## Adding more engines
 
