@@ -103,16 +103,12 @@ def main():
     ax_z.set_title(f"Climb — {args.run}")
     ax_z.grid(alpha=0.3); ax_z.legend(loc="best", fontsize=9)
 
-    # Accuracy bars (combined position+yaw error over the GT runs used by each sweep).
-    sims = [s for s in SIM_ORDER if s in sweeps]
-    errs = [sweeps[s]["best_error"] for s in sims]
-    # Mean yaw RMSE over runs (degrees), for the bar annotation.
-    def _mean_yaw(d):
-        per = d.get("best_per_run", {})
-        vals = [v.get("yaw_rmse_deg") for v in per.values()
-                if v.get("yaw_rmse_deg") is not None]
-        return float(np.mean(vals)) if vals else float("nan")
-    yaws = [_mean_yaw(sweeps[s]) for s in sims]
+    # Accuracy bars — per-run on the displayed run (the discriminator).
+    # Tuning still uses multiple runs (cherry-pick guard), but we report on
+    # one run so the bar matches the trajectory/climb panels above.
+    sims = [s for s in SIM_ORDER if s in sweeps and run_key in sweeps[s].get("best_per_run", {})]
+    errs = [sweeps[s]["best_per_run"][run_key]["combined_with_yaw"] for s in sims]
+    yaws = [sweeps[s]["best_per_run"][run_key].get("yaw_rmse_deg", float("nan")) for s in sims]
     bps = [fmt_params(s, sweeps[s]["best_params"]) for s in sims]
     order = np.argsort(errs)
     sims_o = [sims[i] for i in order]; errs_o = [errs[i] for i in order]
@@ -130,7 +126,7 @@ def main():
                     va="center", fontsize=9)
     ax_bar.set_xlim(right=max(errs_o) * 1.9)
     ax_bar.set_xlabel(r"Combined error [m]: $\sqrt{\langle|\Delta p|^2\rangle + (L \cdot \mathrm{RMSE}(\Delta\mathrm{yaw}))^2},\ L=0.5$")
-    ax_bar.set_title("Accuracy (lower is better)")
+    ax_bar.set_title(f"Accuracy on {args.run} (lower is better)")
     ax_bar.legend(loc="lower right", fontsize=9)
     ax_bar.grid(axis="x", alpha=0.3, zorder=0)
 

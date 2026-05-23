@@ -63,18 +63,32 @@ python experiments/1_sim_to_real_box/sweep_mujoco.py \
 python experiments/1_sim_to_real_box/plot_results.py --run 18_10_33
 ```
 
-## Current result (all 3 engines fully tuned, yaw-aware metric, 2 runs: 18_04_51 + 18_10_33)
+## Current result (all 3 engines fully tuned, yaw-aware metric, scored on the
+## discriminator run `18_10_33`; 18_04_51 used as a sanity floor during
+## tuning but not reported — see "Per-run breakdown" below for why)
 
 | Engine | combined (pos+yaw) | yaw RMSE | best params | dt |
 |---|---|---|---|---|
-| **MuJoCo** | **0.054 m** | **2.6°** | `μ=1.5, tor=10, condim=6, implicitfast` | 0.001 |
-| Axion | 0.062 m | 3.4° | `mu_rear=1.2, ke=150, compliance.contact=1e-7` | 0.05 |
-| Semi-Implicit | 0.110 m | 3.6° | `μ=0.05, ke=8e4, k_d_act=200, joint_attach_ke=1e6` | 0.0005 |
+| **MuJoCo** | **0.074 m** | **4.4°** | `μ=1.5, tor=10, condim=6, implicitfast` | 0.001 |
+| Axion | 0.092 m | 5.9° | `mu_rear=1.2, ke=150, compliance.contact=1e-7` | 0.05 |
+| Semi-Implicit | 0.189 m | 6.5° | `μ=0.05, ke=8e4, k_d_act=200, joint_attach_ke=1e6` | 0.0005 |
 
-MuJoCo and Axion are tied (~8 mm apart) at **50× different timesteps**.
-SemiImplicit is ~2× worse — and per-run it's actually competitive on the
-clean run (`18_04_51`: 0.031 m, ≈ Axion/MuJoCo) but its harder-run residual
-(`18_10_33`: 0.189 m) keeps the mean up.
+MuJoCo wins by ~2 cm over Axion (at 50× different timesteps); SemiImplicit
+is ~2.5× behind MuJoCo on this discriminator.
+
+### Per-run breakdown — why we don't report on `18_04_51`
+
+| Engine | `18_04_51` (easy, all engines tie) | `18_10_33` (discriminator) |
+|---|---|---|
+| Axion | 0.032 m | 0.092 m |
+| MuJoCo | 0.034 m | 0.074 m |
+| Semi-Implicit | 0.031 m | 0.189 m |
+
+All three engines land within **3 mm of each other** on the easy run — that
+run carries no signal between engines and dilutes the comparison when
+averaged in. We keep it in the sweeps as a cherry-pick guard (single-run
+tuning is fragile, see the SemiImplicit journey below), but the headline
+table and the plot report only the discriminating run's score.
 
 > ### Fixing a metric bias: dt-aware settle (commit TODO)
 >
