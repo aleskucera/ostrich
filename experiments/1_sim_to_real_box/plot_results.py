@@ -101,12 +101,20 @@ def main():
     ax_z.set_title(f"Climb — {args.run}")
     ax_z.grid(alpha=0.3); ax_z.legend(loc="best", fontsize=9)
 
-    # Accuracy bars (combined L2 over the GT runs used by each sweep).
+    # Accuracy bars (combined position+yaw error over the GT runs used by each sweep).
     sims = [s for s in SIM_ORDER if s in sweeps]
     errs = [sweeps[s]["best_error"] for s in sims]
+    # Mean yaw RMSE over runs (degrees), for the bar annotation.
+    def _mean_yaw(d):
+        per = d.get("best_per_run", {})
+        vals = [v.get("yaw_rmse_deg") for v in per.values()
+                if v.get("yaw_rmse_deg") is not None]
+        return float(np.mean(vals)) if vals else float("nan")
+    yaws = [_mean_yaw(sweeps[s]) for s in sims]
     bps = [fmt_params(s, sweeps[s]["best_params"]) for s in sims]
     order = np.argsort(errs)
-    sims_o = [sims[i] for i in order]; errs_o = [errs[i] for i in order]; bps_o = [bps[i] for i in order]
+    sims_o = [sims[i] for i in order]; errs_o = [errs[i] for i in order]
+    bps_o = [bps[i] for i in order]; yaws_o = [yaws[i] for i in order]
     y = np.arange(len(sims_o))
     colors = [SIM_COLORS.get(s, "tab:gray") for s in sims_o]
     ax_bar.barh(y, errs_o, color=colors, edgecolor="black", linewidth=0.7, zorder=3)
@@ -114,10 +122,12 @@ def main():
     ax_bar.invert_yaxis()
     ax_bar.axvline(ACCURACY_THRESHOLD, ls="--", color="red", alpha=0.6,
                    label=f"threshold ({ACCURACY_THRESHOLD} m)")
-    for i, (e, bp) in enumerate(zip(errs_o, bps_o)):
-        ax_bar.text(e + max(errs_o) * 0.02, i, f"{e:.3f}  ({bp})", va="center", fontsize=9)
-    ax_bar.set_xlim(right=max(errs_o) * 1.7)
-    ax_bar.set_xlabel("Combined 3D $L_2$ error [m]")
+    for i, (e, bp, yr) in enumerate(zip(errs_o, bps_o, yaws_o)):
+        yaw_s = rf"  yaw={yr:.1f}$^\circ$" if not np.isnan(yr) else ""
+        ax_bar.text(e + max(errs_o) * 0.02, i, f"{e:.3f}{yaw_s}  ({bp})",
+                    va="center", fontsize=9)
+    ax_bar.set_xlim(right=max(errs_o) * 1.9)
+    ax_bar.set_xlabel(r"Combined error [m]: $\sqrt{\langle|\Delta p|^2\rangle + (L \cdot \mathrm{RMSE}(\Delta\mathrm{yaw}))^2},\ L=0.5$")
     ax_bar.set_title("Accuracy (lower is better)")
     ax_bar.legend(loc="lower right", fontsize=9)
     ax_bar.grid(axis="x", alpha=0.3, zorder=0)

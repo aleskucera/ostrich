@@ -76,10 +76,12 @@ def main():
     ap.add_argument("--mu-front", type=float, nargs="+", default=[0.8])
     ap.add_argument("--mu-rear", type=float, nargs="+", default=[1.0, 1.2, 1.5])
     ap.add_argument("--mu-rolling", type=float, nargs="+", default=[0.7],
-                    help="wheel rolling friction (Axion's analog of MuJoCo torsional; "
-                         "flat impact at this scene)")
-    ap.add_argument("--ke", type=float, nargs="+", default=[150, 500, 1500],
-                    help="contact stiffness for ground+box (also used as kd)")
+                    help="wheel rolling friction (no measurable effect at this scene)")
+    # NOTE: ShapeConfig.ke/kd/kf are NOT consumed by the Axion solver — Axion
+    # uses its own compliance model. Kept here only for parity with the
+    # constructor signature; sweeping these does nothing for Axion accuracy.
+    ap.add_argument("--ke", type=float, nargs="+", default=[150],
+                    help="(IGNORED by Axion solver; kept for signature parity)")
     ap.add_argument("--compliance-contact", type=float, nargs="+", default=[1e-7, 1e-6],
                     help="engine.compliance.contact (FB regularization on the contact block)")
     ap.add_argument("--save", default=str(RESULTS_DIR / "sweep_axion.json"))
@@ -97,11 +99,13 @@ def main():
     for dt, mf, mr, mrol, ke, cc in configs:
         t0 = time.perf_counter()
         scores = run_config(mf, mr, mrol, ke, cc, dt, gts, use_graph)
-        combined = float(np.mean([s["combined"] for s in scores.values()]))
+        combined = float(np.mean([s["combined_with_yaw"] for s in scores.values()]))
         cfg = {"dt": dt, "mu_front": mf, "mu_rear": mr, "mu_rolling": mrol,
                "ke": ke, "compliance_contact": cc}
         rows.append({**cfg, "combined": combined,
-                     "per_run": {n: {"combined": s["combined"], "xy": s["xy"], "z": s["z"]}
+                     "per_run": {n: {"combined": s["combined"], "xy": s["xy"], "z": s["z"],
+                                     "combined_with_yaw": s["combined_with_yaw"],
+                                     "yaw_rmse_deg": s["yaw_rmse_deg"]}
                                  for n, s in scores.items()}})
         print(f"  {cfg}: combined={combined:.3f} m ({time.perf_counter()-t0:.1f}s)")
         if best is None or combined < best["combined"]:
@@ -113,6 +117,8 @@ def main():
         "best_params": bp,
         "best_error": best["combined"],
         "best_per_run": {n: {"combined": s["combined"], "xy": s["xy"], "z": s["z"],
+                             "combined_with_yaw": s["combined_with_yaw"],
+                             "yaw_rmse_deg": s["yaw_rmse_deg"],
                              "sim_rel": s["sim_rel"].tolist(),
                              "sim_t_aligned": s["sim_t_aligned"].tolist()}
                          for n, s in best["scores"].items()},

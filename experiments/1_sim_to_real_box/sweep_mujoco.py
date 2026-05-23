@@ -193,10 +193,12 @@ def main():
                   "solref0": sr0, "condim": args.condim, "integrator": args.integrator}
         t0 = time.perf_counter()
         scores = run_config(params, gts)
-        combined = float(np.mean([s["combined"] for s in scores.values()]))
+        combined = float(np.mean([s["combined_with_yaw"] for s in scores.values()]))
         rows.append({"dt": dt, "kv": kv, "mu": mu, "tor": tor, "solref0": sr0,
                      "combined": combined,
-                     "per_run": {n: {"combined": s["combined"], "xy": s["xy"], "z": s["z"]}
+                     "per_run": {n: {"combined": s["combined"], "xy": s["xy"], "z": s["z"],
+                                     "combined_with_yaw": s["combined_with_yaw"],
+                                     "yaw_rmse_deg": s["yaw_rmse_deg"]}
                                  for n, s in scores.items()}})
         print(f"  dt={dt} kv={kv} mu={mu} tor={tor} solref0={sr0}: "
               f"combined={combined:.3f} m ({time.perf_counter()-t0:.1f}s)")
@@ -212,6 +214,8 @@ def main():
         "best_params": bp,
         "best_error": best["combined"],
         "best_per_run": {n: {"combined": s["combined"], "xy": s["xy"], "z": s["z"],
+                             "combined_with_yaw": s["combined_with_yaw"],
+                             "yaw_rmse_deg": s["yaw_rmse_deg"],
                              "sim_rel": s["sim_rel"].tolist(),
                              "sim_t_aligned": s["sim_t_aligned"].tolist()}
                          for n, s in best["scores"].items()},

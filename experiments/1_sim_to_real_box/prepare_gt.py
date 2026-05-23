@@ -36,6 +36,10 @@ def build_gt(h5_path: pathlib.Path) -> dict:
 
     valid = ~np.isnan(real_aligned[:, 0])
     ra, rt = real_aligned[valid], real_t[valid]
+    # Yaw delta from start (radians). Frame-independent — only relative
+    # rotation matters when comparing to sim chassis yaw.
+    raw_yaw = real["yaw"][valid]
+    yaw_rel = (raw_yaw - raw_yaw[0]).astype(np.float64)
 
     return {
         "source": "real_robot_box",
@@ -54,6 +58,7 @@ def build_gt(h5_path: pathlib.Path) -> dict:
             "x": ra[:, 0].tolist(),
             "y": ra[:, 1].tolist(),
             "z": ra[:, 2].tolist(),
+            "yaw_rel": yaw_rel.tolist(),  # rad, relative to first valid sample
         },
     }
 

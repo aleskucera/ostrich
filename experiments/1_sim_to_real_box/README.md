@@ -27,12 +27,24 @@ synced rosbag .h5  ──prepare_gt.py──►  data/run_*.json  ──sweep_<e
 4. **`plot_results.py`** — 3-panel figure: top-down XY, prism Z vs time, and
    the combined 3D L2 accuracy bar chart.
 
-## Metric
+## Metric — position + yaw, NOT position alone
 
 `common_box.score()` tracks the prism point in sim, cross-correlates forward-x
-to absorb the wheel-vs-pose stream-zeroing offset (~0.3–0.5 s — a known
-data-side artifact, see the replay docs), then computes the combined 3D L2 of
-(Δx, Δy, Δz) over the overlap of valid samples. Returns combined / xy / z.
+to absorb the wheel-vs-pose stream-zeroing offset (~0.3–0.5 s, a known
+data-side artifact), then computes:
+
+  combined_with_yaw = sqrt( <|Δp|²> + (L · RMSE(Δyaw))² )
+
+where Δp is the prism position error (3D) and Δyaw is the chassis heading
+error (rad, relative to start). The lever arm `L = 0.5 m` (≈ half wheelbase)
+converts the yaw RMSE into a position-equivalent that a point at the chassis
+tip would see; this is the single number the sweeps minimize.
+
+**Why not position L2 alone?** A simulator that over-cranks torsional friction
+and refuses to rotate at all can hide its missing yaw dynamics behind a
+low position L2 — the chassis stays near the average of the real curve and
+"wins." The yaw term explicitly penalizes that degeneracy (see the MuJoCo
+tuning journey below).
 
 ## Quickstart
 
@@ -51,15 +63,26 @@ python experiments/1_sim_to_real_box/sweep_mujoco.py \
 python experiments/1_sim_to_real_box/plot_results.py --run 18_10_33
 ```
 
-## Current result (both engines fully tuned, 2 runs: 18_04_51 + 18_10_33)
+## Current result (both engines fully tuned, yaw-aware metric, 2 runs: 18_04_51 + 18_10_33)
 
-| Engine | best combined 3D L2 | best params | dt |
-|---|---|---|---|
-| **MuJoCo** | **0.048 m** | `μ=1.5, tor=10, condim=6, implicitfast` | 0.001 |
-| Axion | 0.054 m | `mu_front=0.8, mu_rear=1.2, mu_rolling=0.7, ke=150, compliance.contact=1e-6` | 0.05 |
+| Engine | combined error (pos+yaw) | yaw RMSE | best params | dt |
+|---|---|---|---|---|
+| **MuJoCo** | **0.055 m** | **2.7°** | `μ=1.5, tor=2, condim=6, implicitfast` | 0.001 |
+| Axion | 0.061 m | 3.2° | `mu_rear=1.5, compliance.contact=1e-7` | 0.05 |
 
-Essentially tied (within tuning noise, 6 mm apart) — but at **50× different
-timesteps**. MuJoCo needs dt≈10⁻³ s to land here; Axion does it at dt=5·10⁻² s.
+Essentially tied (~6 mm apart) at **50× different timesteps**. Both engines
+produce yaw responses of the same magnitude (real is ~0–3° depending on run);
+neither hides behind a locked chassis. MuJoCo needs dt≈10⁻³ s; Axion does it
+at dt=5·10⁻² s.
+
+> ### Why I no longer report the L2-only "MuJoCo 0.048 m" number
+>
+> An earlier sweep that minimized **position L2 alone** put MuJoCo at
+> `tor=10`, which produced **literally 0° chassis yaw on every run** — a
+> degenerate "robot refuses to rotate" solution that wins position L2 by
+> hugging the average real path. With the yaw-aware metric the optimum
+> moves to `tor=2` and the chassis actually rotates. The 0.048 was a
+> metric artifact, not a real physics win.
 
 ### MuJoCo tuning journey
 
@@ -80,19 +103,25 @@ skids freely on box impact and the chassis acquires a spurious yaw.
 |---|---|---|
 | initial sweep (mu_front × mu_rear) | 0.056 m | exposed via `--mu-front/--mu-rear` |
 | stage 1 (mu_rolling, the torsional analog) | 0.057 m | **flat — no improvement** |
-| stage 2 (contact `ke`, `compliance.contact`, mu_rear) | **0.054 m** | ~2 mm of headroom from stiffer contact |
+| stage 2 (contact `ke`, `compliance.contact`, mu_rear) | 0.054 m¹ | ~2 mm of headroom |
+| **switch to yaw-aware metric** | **0.061 m** | honest, no degeneracy |
+
+¹ NB: `ShapeConfig.ke/kd/kf` are not consumed by the Axion solver (Axion uses
+its own compliance model); the `--ke` CLI knob is kept for signature parity
+but has no effect.
 
 **Notable asymmetry:** Axion's `mu_rolling` — the natural analog of MuJoCo's
 torsional friction — is *flat* across 0–5.0 (Δ ≈ 4 mm). Axion's plain friction
-model already handles the box-kick yaw, so there's no separate torsional
-channel to tune. By contrast, MuJoCo needs `condim=6` + torsional friction
-explicitly enabled, otherwise it's missing physics. This explains why the
-initial Axion sweep landed near its floor (0.056 m) while the initial MuJoCo
-sweep was 2× off (0.104 m).
+model already handles the box-kick yaw without needing a separate torsional
+channel. By contrast, MuJoCo needs `condim=6` + torsional friction explicitly
+enabled, and the L2-only metric pushed it into the degenerate locked-yaw
+solution — both of which the yaw-aware metric exposes.
 
-The remaining ~5 cm of error on both engines is real residual physics — the
+The remaining ~5–6 cm of error on both engines is real residual physics — the
 chassis Z baseline drifts down ~2 cm during the climb/descent (contact
-compliance) and the climb peak is slightly low on MuJoCo. Not friction.
+compliance) and neither engine perfectly matches both real runs' yaw
+simultaneously (real is ~0° on 18_04_51 and ~+1° on 18_10_33; both sims
+overshoot to a few degrees).
 
 ## Adding more engines
 

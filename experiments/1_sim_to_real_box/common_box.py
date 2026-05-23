@@ -41,9 +41,24 @@ def load_gt(path) -> dict:
     # Convert lists to arrays for convenience.
     gt["control"]["t"] = np.asarray(gt["control"]["t"], dtype=np.float64)
     gt["control"]["lrr"] = np.asarray(gt["control"]["lrr"], dtype=np.float32)  # [T,3] L,R,rear
-    for k in ("t", "x", "y", "z"):
-        gt["real"][k] = np.asarray(gt["real"][k], dtype=np.float64)
+    for k in ("t", "x", "y", "z", "yaw_rel"):
+        if k in gt["real"]:  # yaw_rel was added later; tolerate old JSONs
+            gt["real"][k] = np.asarray(gt["real"][k], dtype=np.float64)
     return gt
+
+
+# Characteristic length used to fold yaw error into a position-equivalent
+# combined error. A point at distance L from the rotation centre is displaced
+# ~|Δp + L·Δyaw|; using L ≈ chassis half-length gives a metric that penalises
+# missing yaw response (e.g. a sim with locked chassis rotation cannot hide
+# behind low position L2). 0.5 m matches roughly half the junior wheelbase.
+YAW_LEVER_ARM = 0.5  # m
+
+
+def _yaw_from_quat_xyzw(q: np.ndarray) -> np.ndarray:
+    """Yaw (rotation about world +Z) from quaternions [N, 4] in xyzw order."""
+    qx, qy, qz, qw = q[:, 0], q[:, 1], q[:, 2], q[:, 3]
+    return np.arctan2(2 * (qw * qz + qx * qy), 1 - 2 * (qy * qy + qz * qz))
 
 
 def resample_setpoints(gt: dict, dt: float, duration: float) -> np.ndarray:
@@ -58,13 +73,16 @@ def resample_setpoints(gt: dict, dt: float, duration: float) -> np.ndarray:
     return out
 
 
-def score(sim_pose: np.ndarray, sim_dt: float, gt: dict, prism_offset=PRISM_OFFSET):
-    """Combined 3D L2 error (m) of an engine's chassis trajectory vs the real
-    prism trajectory, prism-tracked and time-aligned.
+def score(sim_pose: np.ndarray, sim_dt: float, gt: dict, prism_offset=PRISM_OFFSET,
+          yaw_lever_arm: float = YAW_LEVER_ARM):
+    """Position + yaw error of an engine's chassis trajectory vs the real one,
+    prism-tracked, time-aligned, and prism-vs-prism.
 
-    sim_pose: [N,7] chassis pose (px,py,pz, qx,qy,qz,qw) in the engine's world.
-    Returns dict with combined/xy/z RMSE (metres), the shift, and aligned arrays
-    for plotting.
+    Returns RMSE values (metres / radians) plus a combined score that folds
+    yaw into a position-equivalent error via the lever arm:
+        combined_with_yaw = sqrt(<|Δp|²> + (L · Δyaw_rmse)²)
+    The yaw term penalises sims whose chassis won't rotate (e.g. over-cranked
+    torsional friction), which pure position L2 misses entirely.
     """
     sim = prism_track(sim_pose, np.asarray(prism_offset, dtype=np.float32))
     sim = sim - sim[0]  # relative to start, like the real trajectory
@@ -72,7 +90,7 @@ def score(sim_pose: np.ndarray, sim_dt: float, gt: dict, prism_offset=PRISM_OFFS
 
     rt = gt["real"]["t"]
     rx, ry, rz = gt["real"]["x"], gt["real"]["y"], gt["real"]["z"]
-    real_xy = np.column_stack([rx, ry])  # already valid-only (no NaN) in the GT
+    real_xy = np.column_stack([rx, ry])
 
     shift = best_time_shift(sim, st, real_xy, rt)
     sta = st - shift
@@ -87,10 +105,26 @@ def score(sim_pose: np.ndarray, sim_dt: float, gt: dict, prism_offset=PRISM_OFFS
     combined = float(np.sqrt(np.mean(dx**2 + dy**2 + dz**2)))
     xy = float(np.sqrt(np.mean(dx**2 + dy**2)))
     z = float(np.sqrt(np.mean(dz**2)))
+
+    # Yaw RMSE (relative to each track's start, so absolute-frame offsets
+    # don't pollute the comparison).
+    yaw_rmse_rad = float("nan")
+    combined_with_yaw = combined
+    if "yaw_rel" in gt["real"]:
+        sim_yaw = _yaw_from_quat_xyzw(sim_pose[:, 3:7])
+        sim_yaw_rel = sim_yaw - sim_yaw[0]
+        sim_yaw_interp = np.interp(rtt, sta, sim_yaw_rel)
+        dyaw = sim_yaw_interp - gt["real"]["yaw_rel"][m]
+        yaw_rmse_rad = float(np.sqrt(np.mean(dyaw**2)))
+        combined_with_yaw = float(np.sqrt(combined**2 + (yaw_lever_arm * yaw_rmse_rad) ** 2))
+
     return {
-        "combined": combined,
+        "combined": combined,                         # position only
+        "combined_with_yaw": combined_with_yaw,       # the honest metric
         "xy": xy,
         "z": z,
+        "yaw_rmse_rad": yaw_rmse_rad,
+        "yaw_rmse_deg": float(np.degrees(yaw_rmse_rad)),
         "shift": float(shift),
         "sim_rel": sim,
         "sim_t_aligned": sta,
