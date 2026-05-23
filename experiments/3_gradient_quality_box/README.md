@@ -86,6 +86,17 @@ params (`μ=1.5, tor=10, condim=6, implicitfast, kv=1000`) as
 `experiments/1_sim_to_real_box/sweep_mujoco.py`, so the only difference
 vs the forward sweep is `mjx.step` + `jax.grad` for the adjoint.
 
+**MJX collision-shape workaround.** MJX doesn't implement cylinder↔box
+collisions. We patch the wheels from `type="cylinder"` to `type="capsule"`
+at XML-compile time (see `_patch_wheels_for_mjx` in `optimize_mjx.py`).
+The capsule's cylindrical body preserves the line-contact rolling
+behavior at ground level — hemispherical caps don't poke below — but it
+extends 0.35 m past each axle endpoint in Y, so the left/right wheels
+overlap by ~7 cm at the spawn pose. We isolate the wheels into
+`contype="1" conaffinity="2"` so wheel↔wheel contacts are skipped while
+wheel↔ground and wheel↔box (both default 1/1) still fire. Net effect on
+the chassis trajectory is small; the spline absorbs any residual bias.
+
 For now only Axion is implemented; the others will be added as their
 junior + box setups become available. `plot_results.py` picks up any
 present `*.json` automatically, so adding a new engine doesn't require

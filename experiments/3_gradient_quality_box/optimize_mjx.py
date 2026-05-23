@@ -76,6 +76,25 @@ def make_interp_matrix(T, K):
     return W
 
 
+def _patch_wheels_for_mjx(xml: str) -> str:
+    """Swap wheel cylinders → capsules + disable wheel↔wheel collisions.
+
+    MJX doesn't implement cylinder↔box collisions (the obstacle in this scene
+    is a box), so the wheels can't stay as cylinders. Capsules preserve the
+    cylinder's line-contact rolling behavior at ground level — the
+    hemispherical caps don't poke below the cylindrical body — but they do
+    extend ``radius`` (=0.35 m) past each axle endpoint in Y. With wheel
+    centers at y=±0.365 and a 0.40 m capsule half-Y-extent, the L/R wheels
+    overlap each other by ~7 cm at the spawn pose. We isolate the wheels into
+    their own contype group so wheel↔wheel contacts are skipped while
+    wheel↔ground and wheel↔box (both default 1/1) still fire.
+    """
+    return xml.replace(
+        '<geom type="cylinder" fromto="0 -0.05 0 0 0.05 0" size="0.35"',
+        '<geom type="capsule" fromto="0 -0.05 0 0 0.05 0" size="0.35" contype="1" conaffinity="2"',
+    )
+
+
 def build_mjx_model(dt, gt_box):
     """Compile MJCF (with our junior + box geometry) into an mjx.Model."""
     box = gt_box
@@ -89,6 +108,7 @@ def build_mjx_model(dt, gt_box):
            "box_hx": box["half_extents"][0], "box_hy": box["half_extents"][1],
            "box_hz": box["half_extents"][2]}
     xml = JUNIOR_BOX_XML.format(**fmt)
+    xml = _patch_wheels_for_mjx(xml)  # MJX collision-matrix workaround
     mj_model = mujoco.MjModel.from_xml_string(xml)
     return mjx.put_model(mj_model), mj_model
 

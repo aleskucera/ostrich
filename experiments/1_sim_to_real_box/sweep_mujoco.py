@@ -116,9 +116,31 @@ BASE_PARAMS = dict(
 )
 
 
+def _patch_wheel_geom(xml: str, geom: str) -> str:
+    """Optionally swap wheel cylinders → capsules + isolate wheel↔wheel collisions.
+
+    ``geom="cylinder"`` (default): no-op, keep the original cylinders.
+    ``geom="capsule"``: matches the MJX-side workaround so we can A/B whether
+    the capsule swap meaningfully changes the trajectory on the MuJoCo CPU
+    solver. Capsules preserve line-contact at the ground but their hemispherical
+    caps extend 0.35 m past each axle endpoint in Y, so the L/R wheels overlap
+    by ~7 cm at the spawn pose — we put wheels in ``contype=1 conaffinity=2``
+    so wheel↔wheel contacts are skipped while wheel↔ground/wheel↔box still fire.
+    """
+    if geom == "cylinder":
+        return xml
+    if geom == "capsule":
+        return xml.replace(
+            '<geom type="cylinder" fromto="0 -0.05 0 0 0.05 0" size="0.35"',
+            '<geom type="capsule" fromto="0 -0.05 0 0 0.05 0" size="0.35" contype="1" conaffinity="2"',
+        )
+    raise ValueError(f"unknown wheel geom: {geom!r}")
+
+
 def simulate(params, gt):
     """Run MuJoCo with GT wheel commands, return [N,7] chassis pose (x,y,z, qx,qy,qz,qw)."""
     xml = JUNIOR_BOX_XML.format(**params)
+    xml = _patch_wheel_geom(xml, params.get("wheel_geom", "cylinder"))
     model = mujoco.MjModel.from_xml_string(xml)
     data = mujoco.MjData(model)
     mujoco.mj_forward(model, data)
@@ -171,6 +193,8 @@ def main():
                     help="contact dimensionality (6 = pos+normal+friction+torsional)")
     ap.add_argument("--integrator", default="implicitfast",
                     choices=["Euler", "RK4", "implicit", "implicitfast"])
+    ap.add_argument("--wheel-geom", default="cylinder", choices=["cylinder", "capsule"],
+                    help="wheel collision shape (capsule disables wheel↔wheel)")
     ap.add_argument("--save", default=str(RESULTS_DIR / "sweep_mujoco.json"))
     args = ap.parse_args()
 
@@ -190,7 +214,8 @@ def main():
                   "ground_friction": mu, "box_friction": mu,
                   "front_friction": mu, "rear_friction": mu,
                   "ground_torsional": tor, "front_torsional": tor, "rear_torsional": tor,
-                  "solref0": sr0, "condim": args.condim, "integrator": args.integrator}
+                  "solref0": sr0, "condim": args.condim, "integrator": args.integrator,
+                  "wheel_geom": args.wheel_geom}
         t0 = time.perf_counter()
         scores = run_config(params, gts)
         combined = float(np.mean([s["combined_with_yaw"] for s in scores.values()]))
@@ -208,7 +233,8 @@ def main():
 
     bp = {"dt": best["dt"], "kv": best["kv"], "mu": best["mu"],
           "tor": best["tor"], "solref0": best["solref0"],
-          "condim": args.condim, "integrator": args.integrator}
+          "condim": args.condim, "integrator": args.integrator,
+          "wheel_geom": args.wheel_geom}
     out = {
         "simulator": "MuJoCo",
         "best_params": bp,
