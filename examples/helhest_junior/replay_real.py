@@ -276,10 +276,22 @@ class HelhestJuniorReplaySimulator(InteractiveSimulator):
         newton.eval_fk(self.model, self.model.joint_q, self.model.joint_qd, self.current_state)
         self.current_state.body_qd.zero_()
 
-    def replay(self, setpoints: np.ndarray, settle_steps: int = 60):
+    def _resolve_settle_steps(self, settle_steps, settle_time_s=0.5):
+        """dt-aware default: enforce at least ``settle_time_s`` of settle so the
+        chassis actually reaches equilibrium before recording starts. With the
+        old 60-step default at dt=5e-4, only 30 ms of settle happened — way
+        too short for SemiImplicit's soft penalty contacts on a 90 kg chassis,
+        which then "settled" during the recording and baked a constant z
+        offset into the error metric."""
+        if settle_steps is not None:
+            return settle_steps
+        return max(60, int(round(settle_time_s / self.clock.dt)))
+
+    def replay(self, setpoints: np.ndarray, settle_steps: int = None):
         """Settle on the ground at zero velocity, then drive with recorded
         setpoints. Returns chassis pose [T, 7] (px,py,pz, qx,qy,qz,qw)."""
         is_gl = self.rendering_config.vis_type == "gl"
+        settle_steps = self._resolve_settle_steps(settle_steps)
 
         # Settle: let the robot drop to the ground before motion starts.
         self.target_velocities.zero_()
@@ -350,7 +362,7 @@ class HelhestJuniorReplaySimulator(InteractiveSimulator):
         )
         wp.launch(_graph_advance_kernel, dim=1, inputs=[self._step_buf], device=self.model.device)
 
-    def replay_graph(self, setpoints: np.ndarray, settle_steps: int = 60):
+    def replay_graph(self, setpoints: np.ndarray, settle_steps: int = None):
         """CUDA-graph replay: capture one physics step (GPU-side control +
         logging via a step counter), then launch it T times with no Python in
         the physics loop. Works headless AND with the GL viewer — the captured
@@ -365,6 +377,7 @@ class HelhestJuniorReplaySimulator(InteractiveSimulator):
         self._wheel_log = wp.zeros((T, 3), dtype=wp.float32, device=self.model.device)
         self._jq = wp.zeros_like(self.model.joint_q)
         self._jqd = wp.zeros_like(self.model.joint_qd)
+        settle_steps = self._resolve_settle_steps(settle_steps)
 
         # Settle on the ground (uncaptured, zero command).
         self.target_velocities.zero_()

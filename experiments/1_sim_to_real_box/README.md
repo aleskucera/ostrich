@@ -67,14 +67,25 @@ python experiments/1_sim_to_real_box/plot_results.py --run 18_10_33
 
 | Engine | combined (pos+yaw) | yaw RMSE | best params | dt |
 |---|---|---|---|---|
-| **MuJoCo** | **0.055 m** | **2.7°** | `μ=1.5, tor=2, condim=6, implicitfast` | 0.001 |
-| Axion | 0.061 m | 3.2° | `mu_rear=1.5, compliance.contact=1e-7` | 0.05 |
-| Semi-Implicit | 0.169 m | 2.9° | `μ=0.05, ke=8e4, k_d_act=200, joint_attach_ke=1e6` | 0.0005 |
+| **MuJoCo** | **0.054 m** | **2.6°** | `μ=1.5, tor=10, condim=6, implicitfast` | 0.001 |
+| Axion | 0.062 m | 3.4° | `mu_rear=1.2, ke=150, compliance.contact=1e-7` | 0.05 |
+| Semi-Implicit | 0.110 m | 3.6° | `μ=0.05, ke=8e4, k_d_act=200, joint_attach_ke=1e6` | 0.0005 |
 
-MuJoCo and Axion are essentially tied (~6 mm apart) at **50× different
-timesteps**. SemiImplicit is ~3× worse — the residual gap is mostly the
-spring-damper contact compression visible in the Z plot (chassis baseline
-sinks ~15 cm during the climb), not in-plane error.
+MuJoCo and Axion are tied (~8 mm apart) at **50× different timesteps**.
+SemiImplicit is ~2× worse — and per-run it's actually competitive on the
+clean run (`18_04_51`: 0.031 m, ≈ Axion/MuJoCo) but its harder-run residual
+(`18_10_33`: 0.189 m) keeps the mean up.
+
+> ### Fixing a metric bias: dt-aware settle (commit TODO)
+>
+> The chassis is spawned 15 cm above its rest height and falls onto the
+> wheels. The earlier `replay_real.py` settled for only 60 steps regardless
+> of dt — adequate for Axion/MuJoCo's implicit contact (converges in a few
+> steps) but **way too short for SI's penalty contact on a 90 kg chassis at
+> dt=5e-4 (30 ms of settle)**. The chassis was still falling when recording
+> started, baking a constant ~15 cm Z offset into the SI score — a 5–8 cm
+> chunk of `combined`. Switching to a dt-aware settle (≥ 500 ms) drops SI
+> from 0.169 → 0.110 m. Implicit-contact engines barely move (0.061→0.062).
 
 > ### Why I no longer report the L2-only "MuJoCo 0.048 m" number
 >
