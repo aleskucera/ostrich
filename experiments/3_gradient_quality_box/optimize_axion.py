@@ -271,7 +271,11 @@ def main():
     ap.add_argument("--seed-base", type=int, default=42)
     ap.add_argument("--horizon-s", type=float, default=6.0,
                     help="trajectory horizon (s). Box crossing happens around t≈3-5 s")
-    ap.add_argument("--dt", type=float, default=0.02)
+    # dt=0.1 sits in Axion's accuracy plateau (~0.066 m mean vs 0.063 at
+    # dt=0.05; see experiments/2_dt_stability_box). Halves the step count
+    # for free. dt=0.2 would also be fine (~0.076 m), 0.3 starts costing
+    # accuracy (~0.088 m).
+    ap.add_argument("--dt", type=float, default=0.10)
     ap.add_argument("--save", default=None)
     args = ap.parse_args()
 

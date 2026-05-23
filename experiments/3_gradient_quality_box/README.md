@@ -89,14 +89,36 @@ forward+backward physics+loss into a CUDA graph when
 
 | | per iter | per-step adjoint | vs realtime (6 s sim) |
 |---|---|---|---|
-| **with CUDA graph** | ~1.0 s warm (3.4 s cold) | ~8 ms | **~6× faster than realtime** |
-| without CUDA graph | ~35 s warm (~45 s cold) | ~290 ms | ~6× slower than realtime |
+| **dt=0.10 (current default)** | **~0.50 s warm (~1.3 s cold)** | ~8 ms | **~12× faster than realtime** |
+| dt=0.05 | ~1.0 s warm (~3.4 s cold) | ~8 ms | ~6× faster than realtime |
+| dt=0.05, *no* CUDA graph | ~35 s warm (~45 s cold) | ~290 ms | ~6× **slower** than realtime |
 
-The 47× speedup is entirely the missing kernel-launch overhead — the box
-adds zero adjoint cost. Per-step we match the original
-`experiments/3_gradient_quality` Axion throughput (~9 ms/step adjoint).
+The 47× speedup over the no-CUDA-graph version is entirely the missing
+kernel-launch overhead — the box adds zero adjoint cost. Per-step we
+match the original `experiments/3_gradient_quality` Axion throughput
+(~9 ms/step adjoint).
 
-A full **50-iter × 3-trial** optimisation now finishes in ~2.5 min.
+A full **50-iter × 3-trial** optimisation finishes in ~80 s at the
+default dt=0.10.
+
+### Why dt=0.10 (not 0.05)?
+
+From `experiments/2_dt_stability_box`, Axion's forward error plateau
+extends from `dt=0.005` to `dt≈0.30` (combined error 0.063→0.088 m
+on this scene). dt=0.10 sits comfortably in the plateau yet halves the
+sim-step count vs dt=0.05 — for free. Larger dt is fine too:
+
+| `--dt` | per-iter warm | converged loss (3 trials) |
+|---|---|---|
+| 0.05 | ~1.0 s | ~0.045 m² |
+| **0.10 (default)** | **~0.50 s** | **~0.072 m²** |
+| 0.20 (untested here) | ~0.25 s | likely ~0.10 m² |
+
+The slightly higher *optimisation* loss at coarser dt isn't a gradient
+regression — it's that the K=10 spline finds a different optimum per
+dt (the spline has to compensate for the engine's per-dt response). The
+key signal (3 random seeds converging within ±5%) holds at every dt
+we've tried.
 
 ## Caveats
 
