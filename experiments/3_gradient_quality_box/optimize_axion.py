@@ -212,8 +212,13 @@ class HelhestJuniorBoxOptimizer(AxionDifferentiableSimulator):
 
 # ------------------------------ trial driver ---------------------------------
 def make_configs(duration, dt):
+    # use_cuda_graph=True is essential: AxionDifferentiableSimulator.diff_step()
+    # captures the full forward+backward into a CUDA graph and replays it each
+    # iteration. Without it every iter pays full kernel-launch overhead — we
+    # saw ~160 ms/step in that mode vs ~9 ms/step in original exp-3 (which
+    # uses CUDA graph).
     sim_cfg = SimulationConfig(duration_seconds=duration, target_timestep_seconds=dt,
-                                num_worlds=1, use_cuda_graph=False)
+                                num_worlds=1, use_cuda_graph=True)
     rc = RenderingConfig(vis_type="null", target_fps=max(1, int(1 / dt)), start_paused=False)
     ec = AxionEngineConfig(
         nr=NewtonRaphsonConfig(max_iters=16, backtrack_min_iter=12, atol=1e-3),

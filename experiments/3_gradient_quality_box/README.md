@@ -81,6 +81,23 @@ plot changes.
 }
 ```
 
+## Speed
+
+`AxionDifferentiableSimulator.diff_step()` captures the full
+forward+backward physics+loss into a CUDA graph when
+`use_cuda_graph=True` (the default in our `make_configs`). With it:
+
+| | per iter | per-step adjoint | vs realtime (6 s sim) |
+|---|---|---|---|
+| **with CUDA graph** | ~1.0 s warm (3.4 s cold) | ~8 ms | **~6× faster than realtime** |
+| without CUDA graph | ~35 s warm (~45 s cold) | ~290 ms | ~6× slower than realtime |
+
+The 47× speedup is entirely the missing kernel-launch overhead — the box
+adds zero adjoint cost. Per-step we match the original
+`experiments/3_gradient_quality` Axion throughput (~9 ms/step adjoint).
+
+A full **50-iter × 3-trial** optimisation now finishes in ~2.5 min.
+
 ## Caveats
 
 - The loss is on the chassis pose, but the real GT is the *prism* point
@@ -89,8 +106,3 @@ plot changes.
   offset is small (~11 cm constant) and gets folded into the loss baseline.
   If we add yaw-dependent terms later, this should switch to comparing
   prism-tracked positions on both sides.
-- Optimization is slow at fine `dt` (Axion adjoint ~35 s/iter at
-  `dt=0.02` over a 4 s horizon). Coarser `dt` (0.05) is much faster and
-  per `2_dt_stability_box` only marginally less accurate — but the
-  adjoint kernels were validated at `dt≤0.05` so we keep `dt=0.02` for
-  safety in v1.
