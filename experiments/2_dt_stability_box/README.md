@@ -56,13 +56,25 @@ These are exactly the per-engine tuned best params from the
 
 ## Reading the figure
 
+- **Semi-Implicit (orange)** — narrow stable range. Best mean error 0.10 m
+  at `dt = 5×10⁻⁴`; **NaN at `dt = 7×10⁻⁴`** and above (penalty contact
+  blows up). Usable wall: ~`5×10⁻⁴ s`.
 - **MuJoCo (pink)** — flat plateau of ~0.055 m from `dt = 10⁻⁴` to `10⁻²`
   (5 orders of magnitude!), then a sharp wall: 0.118 m at `dt = 0.02`,
   0.24 m at 0.03, 1.17 m at 0.05 (above threshold), NaN at 0.1.
+  Usable wall: ~`3×10⁻²ʼs`.
 - **Axion (blue)** — flat plateau of ~0.065–0.10 m across `dt = 5×10⁻³` to
-  `3×10⁻¹`, no wall anywhere in this range.
-- The shaded arrow shows `(Axion's max usable dt) / (MuJoCo's max usable dt)`
-  — read directly from the data, currently ~10×.
+  `3×10⁻¹` (almost 2 orders of magnitude flat!), starts climbing at 0.4
+  (0.18 m), still under threshold at 0.5 (0.28 m), first instability at
+  `dt = 0.7 s`, NaN at 1.0. Usable wall: ~`5×10⁻¹ s`.
+
+Resulting usable-dt ratios at the 0.5 m threshold:
+
+| pair | ratio |
+|---|---|
+| **Axion / MuJoCo** | **~17×** |
+| MuJoCo / Semi-Implicit | ~60× |
+| **Axion / Semi-Implicit** | **~1000×** (three orders of magnitude) |
 
 ## Caveats
 

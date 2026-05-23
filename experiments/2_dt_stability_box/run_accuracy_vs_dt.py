@@ -37,10 +37,21 @@ MUJOCO_PARAMS = dict(
     mu=1.5, tor=2.0, kv=1000.0, solref0=0.005,
     condim=6, integrator="implicitfast",
 )
+SEMI_IMPLICIT_PARAMS = dict(
+    mu=0.05, ke=8e4, kd=2e3, kf=1500.0, k_d_act=200.0,
+    joint_attach_ke=1e6, joint_attach_kd=1e2,
+)
 
-# dt grids — chosen to span each engine's full "interesting" range.
-AXION_DT_GRID  = [0.005, 0.01, 0.015, 0.02, 0.03, 0.05, 0.07, 0.10, 0.15, 0.20, 0.30]
-MUJOCO_DT_GRID = [1e-4, 2e-4, 5e-4, 1e-3, 2e-3, 5e-3, 1e-2, 1.5e-2, 2e-2, 3e-2, 5e-2, 7e-2, 1e-1]
+# dt grids — chosen to span each engine's full "interesting" range AND
+# to push past the wall on each side (so the figure shows where each
+# engine actually crashes, not just where its accuracy plateau ends).
+AXION_DT_GRID  = [0.005, 0.01, 0.015, 0.02, 0.03, 0.05, 0.07, 0.10,
+                  0.15, 0.20, 0.30, 0.40, 0.50, 0.70, 1.00]
+MUJOCO_DT_GRID = [1e-4, 2e-4, 5e-4, 1e-3, 2e-3, 5e-3, 1e-2, 1.5e-2,
+                  2e-2, 3e-2, 5e-2, 7e-2, 1e-1]
+# SemiImplicit: small grid because the small-dt end is expensive
+# (12 s / 5e-4 = 24k steps per run) and the stable region is narrow.
+SI_DT_GRID = [2e-4, 3e-4, 5e-4, 7e-4, 1e-3, 2e-3]
 
 
 # ------------------------------- runners -------------------------------------
@@ -88,9 +99,37 @@ def mujoco_runner(gt, dt):
     return simulate(p, gt)
 
 
+def semi_implicit_runner(gt, dt):
+    from axion import (LoggingConfig, RenderingConfig, SemiImplicitEngineConfig,
+                       SimulationConfig)
+    from examples.helhest_junior.replay_real import HelhestJuniorReplaySimulator
+
+    P = SEMI_IMPLICIT_PARAMS
+    sim = HelhestJuniorReplaySimulator(
+        SimulationConfig(duration_seconds=DURATION, target_timestep_seconds=dt,
+                         num_worlds=1, use_cuda_graph=False),
+        RenderingConfig(vis_type="null", target_fps=max(1, int(round(1 / dt))),
+                        start_paused=False),
+        SemiImplicitEngineConfig(angular_damping=0.05, friction_smoothing=0.1,
+                                 joint_attach_ke=P["joint_attach_ke"],
+                                 joint_attach_kd=P["joint_attach_kd"]),
+        LoggingConfig(), control_mode="velocity",
+        k_p=0.0, k_d=P["k_d_act"],
+        mu_front=P["mu"], mu_rear=P["mu"], mu_rolling=0.7,
+        ground_ke=P["ke"], ground_kd=P["kd"], ground_kf=P["kf"],
+        box_ke=P["ke"],    box_kd=P["kd"],    box_kf=P["kf"],
+        wheel_ke=P["ke"],  wheel_kd=P["kd"],  wheel_kf=P["kf"])
+    sp = resample_setpoints(gt, dt, DURATION)
+    sim.reset_state()
+    pose, _ = sim.replay_graph(sp)
+    del sim
+    return pose
+
+
 ENGINES = {
-    "Axion":  {"runner": axion_runner,  "dt_grid": AXION_DT_GRID,  "params": AXION_PARAMS},
-    "MuJoCo": {"runner": mujoco_runner, "dt_grid": MUJOCO_DT_GRID, "params": MUJOCO_PARAMS},
+    "Axion":         {"runner": axion_runner,         "dt_grid": AXION_DT_GRID,  "params": AXION_PARAMS},
+    "MuJoCo":        {"runner": mujoco_runner,        "dt_grid": MUJOCO_DT_GRID, "params": MUJOCO_PARAMS},
+    "Semi-Implicit": {"runner": semi_implicit_runner, "dt_grid": SI_DT_GRID,     "params": SEMI_IMPLICIT_PARAMS},
 }
 
 
