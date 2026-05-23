@@ -22,14 +22,15 @@ SEED_BASE="${SEED_BASE:-42}"
 K="${K:-10}"
 LR="${LR:-0.1}"
 
-RUN_AXION=false; RUN_MJX=false
+RUN_AXION=false; RUN_MJX=false; RUN_SEMI=false
 RUN_ALL=true
 EXTRA_ARGS=()
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --axion) RUN_AXION=true; RUN_ALL=false; shift;;
-        --mjx)   RUN_MJX=true;   RUN_ALL=false; shift;;
-        *)       EXTRA_ARGS+=("$1"); shift;;
+        --axion)         RUN_AXION=true; RUN_ALL=false; shift;;
+        --mjx)           RUN_MJX=true;   RUN_ALL=false; shift;;
+        --semi-implicit) RUN_SEMI=true;  RUN_ALL=false; shift;;
+        *)               EXTRA_ARGS+=("$1"); shift;;
     esac
 done
 
@@ -52,6 +53,13 @@ if $RUN_ALL || $RUN_MJX; then
     echo "=== MJX (jax.grad / BPTT)  [horizon=${HORIZON}s, iters=${ITERATIONS}, trials=${NUM_TRIALS}, K=${K}] ==="
     python "$DIR/optimize_mjx.py" \
         "${COMMON_ARGS[@]}" --save "$RESULTS/mjx.json" "${EXTRA_ARGS[@]}"
+    echo ""
+fi
+
+if $RUN_ALL || $RUN_SEMI; then
+    echo "=== Semi-Implicit (warp tape / BPTT)  [horizon=${HORIZON}s, iters=${ITERATIONS}, trials=${NUM_TRIALS}, K=${K}] ==="
+    python "$DIR/optimize_semi_implicit.py" \
+        "${COMMON_ARGS[@]}" --save "$RESULTS/semi_implicit.json" "${EXTRA_ARGS[@]}"
     echo ""
 fi
 

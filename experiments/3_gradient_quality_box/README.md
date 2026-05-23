@@ -41,8 +41,30 @@ python experiments/3_gradient_quality_box/plot_results.py
 |---|---|---|---|
 | `optimize_axion.py` | Axion | adjoint (`AxionDifferentiableSimulator`) | ✅ working |
 | `optimize_mjx.py` | MuJoCo MJX | `jax.grad` / BPTT through `mjx.step` | ✅ written (needs `jax` + `mujoco-mjx`) |
-| `optimize_semi_implicit.py` | Newton SemiImplicit | warp tape / BPTT | ⏳ TODO |
+| `optimize_semi_implicit.py` | Newton SemiImplicit | Warp tape / BPTT (via `NewtonDifferentiableSimulator`) | ✅ working |
 | `optimize_tinydiffsim.py` | TinyDiffSim | CppAD | ⏳ TODO (separate codebase) |
+
+### SemiImplicit setup
+
+```bash
+python experiments/3_gradient_quality_box/optimize_semi_implicit.py
+```
+
+Defaults: `dt=5e-4` (SI's stability edge on this scene — larger NaNs),
+`horizon=4s` → 8 000 SI steps per iter, `K=10`, 50 iters × 3 trials.
+Uses the SI tuned best from `1_sim_to_real_box` (mu=0.05, ke=8e4, kd=2e3,
+kf=1500, k_d_act=200, joint_attach_ke=1e6).
+
+Iteration timing on this scene (with CUDA-graph capture of the forward
++ Warp tape backward):
+
+  | | iter 0 (cold capture) | warm iter | per-step (8000 steps) |
+  |---|---|---|---|
+  | SemiImplicit | ~120 s | ~3 s | ~0.4 ms |
+
+So the cold capture dominates a single trial; the warm steady-state is
+actually *faster* per-step than Axion's adjoint (~8 ms) because SI's
+per-step solve is much cheaper (penalty contact, no NR iterations).
 
 ### MJX setup
 
