@@ -69,12 +69,12 @@ python experiments/1_sim_to_real_box/plot_results.py --run 18_10_33
 |---|---|---|---|---|
 | **MuJoCo** | **0.055 m** | **2.7°** | `μ=1.5, tor=2, condim=6, implicitfast` | 0.001 |
 | Axion | 0.061 m | 3.2° | `mu_rear=1.5, compliance.contact=1e-7` | 0.05 |
-| Semi-Implicit | 0.204 m | 3.1° | `μ=0.1, ke=8e4, kd=2e3, kf=1500, k_d_act=250` | 0.0005 |
+| Semi-Implicit | 0.169 m | 2.9° | `μ=0.05, ke=8e4, k_d_act=200, joint_attach_ke=1e6` | 0.0005 |
 
 MuJoCo and Axion are essentially tied (~6 mm apart) at **50× different
-timesteps**. SemiImplicit is ~4× worse — explicit spring-damper contact
-under a 90 kg chassis on a 12 cm box hits accuracy and stability limits
-its implicit-contact peers don't.
+timesteps**. SemiImplicit is ~3× worse — the residual gap is mostly the
+spring-damper contact compression visible in the Z plot (chassis baseline
+sinks ~15 cm during the climb), not in-plane error.
 
 > ### Why I no longer report the L2-only "MuJoCo 0.048 m" number
 >
@@ -105,7 +105,8 @@ skids freely on box impact and the chassis acquires a spurious yaw.
 | initial (mu=0.5, ke=4e4) | 1.5 m | wheels barely spun — `k_d=0` ok for Axion, broken for SI |
 | add `k_d_act` (velocity gain) | 2–3 m or NaN | torque applied but unstable at dt=0.001 |
 | drop to dt=5e-4 | 0.226 m | stability margin recovered |
-| refine ke/μ/k_d_act at dt=5e-4 | **0.204 m** | converged floor; tuning is fragile |
+| refine ke/μ/k_d_act at dt=5e-4 | 0.204 m | first floor; tuning is fragile |
+| add `joint_attach_ke` (engine knob) | **0.169 m** | library default 1e4 too soft for 90 kg chassis; 1e6 + lower μ=0.05 is robust on both runs (1e6 + μ=0.1 destabilises 18_10_33). Use `tune_semi_implicit.py` to keep iterating. |
 
 **SI is genuinely harder to use here, on three axes:**
 1. **`k_d=0` makes the wheels not spin** (in `TARGET_VELOCITY` mode, SI consumes
