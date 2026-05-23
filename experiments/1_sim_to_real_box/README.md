@@ -51,17 +51,32 @@ python experiments/1_sim_to_real_box/sweep_mujoco.py \
 python experiments/1_sim_to_real_box/plot_results.py --run 18_10_33
 ```
 
-## Current result (Axion vs MuJoCo, 2 runs: 18_04_51 + 18_10_33)
+## Current result (Axion vs *fully-tuned* MuJoCo, 2 runs: 18_04_51 + 18_10_33)
 
-| Engine | best combined 3D L2 | best params |
+| Engine | best combined 3D L2 | best params | dt |
+|---|---|---|---|
+| **MuJoCo** | **0.048 m** | `μ=1.5, tor=10, condim=6, integrator=implicitfast` | 0.001 |
+| Axion | 0.056 m | `mu_front=0.8, mu_rear=1.0` | 0.05 |
+
+Essentially tied (within tuning noise) — but at **50× different timesteps**.
+MuJoCo needs dt≈10⁻³ s to land here; Axion does it at dt=5·10⁻² s.
+
+### MuJoCo tuning journey (why the strawman matters)
+
+| stage | best | what was added |
 |---|---|---|
-| **Axion** | **0.056 m** | `mu_front=0.8, mu_rear=1.0, dt=0.05` |
-| MuJoCo | 0.104 m | `kv=1000, μ=0.8, dt=0.002` |
+| initial sweep (dt × kv × μ) | 0.104 m | `condim=3`, default torsional |
+| stage 1 (+ integrator, condim, solref, ground torsional) | 0.066 m | **`condim=6`** + torsional 0.5 |
+| stage 2 (refine: higher μ + higher torsional) | 0.049 m | μ=1.2, torsional 5.0 |
+| stage 3 (probe edges) | **0.048 m** | converged floor |
 
-Axion is ~2× more accurate at a ~25× larger timestep. The climb shape matches
-the real almost exactly for Axion; MuJoCo's climb peak is lower and the
-chassis Z baseline shifts slightly (tunable via `solref/solimp` contact
-stiffness — left as a follow-up).
+The single biggest lever was **`condim=6` with torsional friction ≥ 2.0** —
+pyramidal cone with `condim=3` has no torsional component, so the rear wheel
+skids freely on box impact and the chassis acquires a spurious yaw (exactly
+the same physics as the Axion `mu_rear` tuning). With it, MuJoCo joins the
+floor at ~0.048 m. The remaining ~5 cm of error is the chassis Z baseline
+drifting down a couple of cm (contact compliance during the climb/descent)
+and a slightly lower climb peak — small residual physics.
 
 ## Adding more engines
 

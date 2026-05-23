@@ -98,14 +98,20 @@ JUNIOR_BOX_XML = """<?xml version="1.0"?>
 </mujoco>
 """
 
+# Defaults below are the *tuned* configuration for the box scene — established
+# by staged exploration (condim=3 + low torsional → 0.104 m; condim=6 +
+# torsional≥2 → 0.048 m, a converged floor). Torsional friction governs how
+# easily the rear wheel skids sideways and thus how much the box-crossing
+# kicks the chassis heading; pyramidal cone with condim=3 has no torsional
+# component, which is why the strawman result was so much worse.
 BASE_PARAMS = dict(
     solver="Newton", iterations=50, ls_iterations=50,
     cone="pyramidal", integrator="implicitfast", impratio=1.0,
-    condim=3,
-    ground_torsional=0.1, ground_rolling=0.01,
-    front_torsional=0.1, front_rolling=0.01,
-    rear_torsional=0.1, rear_rolling=0.01,
-    solref0=0.005, solref1=1.0,
+    condim=6,                                # was 3; condim=6 enables torsional
+    ground_torsional=5.0, ground_rolling=0.01,
+    front_torsional=5.0, front_rolling=0.01,
+    rear_torsional=5.0, rear_rolling=0.01,
+    solref0=0.01, solref1=1.0,
     solimp0=0.9, solimp1=0.95, solimp2=0.001,
 )
 
@@ -153,10 +159,18 @@ def main():
     ap.add_argument("--gt", nargs="+", default=[
         str(DATA_DIR / "run_2026_05_20-18_04_51.json"),
         str(DATA_DIR / "run_2026_05_20-18_10_33.json")])
-    ap.add_argument("--dt", type=float, nargs="+", default=[0.002, 0.005])
-    ap.add_argument("--kv", type=float, nargs="+", default=[1000, 4000])
-    ap.add_argument("--mu", type=float, nargs="+", default=[0.4, 0.8],
+    ap.add_argument("--dt", type=float, nargs="+", default=[0.001, 0.002])
+    ap.add_argument("--kv", type=float, nargs="+", default=[1000])
+    ap.add_argument("--mu", type=float, nargs="+", default=[0.8, 1.0, 1.2, 1.5],
                     help="friction (applied to ground, box, both wheel sets)")
+    ap.add_argument("--tor", type=float, nargs="+", default=[2.0, 5.0, 10.0],
+                    help="torsional friction (needs --condim 6 to take effect)")
+    ap.add_argument("--solref0", type=float, nargs="+", default=[0.005, 0.01],
+                    help="contact reference time constant (smaller = stiffer)")
+    ap.add_argument("--condim", type=int, default=6,
+                    help="contact dimensionality (6 = pos+normal+friction+torsional)")
+    ap.add_argument("--integrator", default="implicitfast",
+                    choices=["Euler", "RK4", "implicit", "implicitfast"])
     ap.add_argument("--save", default=str(RESULTS_DIR / "sweep_mujoco.json"))
     args = ap.parse_args()
 
@@ -166,26 +180,33 @@ def main():
                     box_hx=box["half_extents"][0], box_hy=box["half_extents"][1],
                     box_hz=box["half_extents"][2])
 
-    configs = list(itertools.product(args.dt, args.kv, args.mu))
-    print(f"MuJoCo box sweep: {len(configs)} configs x {len(gts)} runs")
+    configs = list(itertools.product(args.dt, args.kv, args.mu, args.tor, args.solref0))
+    print(f"MuJoCo box sweep: {len(configs)} configs x {len(gts)} runs "
+          f"(condim={args.condim}, integrator={args.integrator})")
 
     best, rows = None, []
-    for dt, kv, mu in configs:
+    for dt, kv, mu, tor, sr0 in configs:
         params = {**BASE_PARAMS, **box_geom, "dt": dt, "kv": kv,
                   "ground_friction": mu, "box_friction": mu,
-                  "front_friction": mu, "rear_friction": mu}
+                  "front_friction": mu, "rear_friction": mu,
+                  "ground_torsional": tor, "front_torsional": tor, "rear_torsional": tor,
+                  "solref0": sr0, "condim": args.condim, "integrator": args.integrator}
         t0 = time.perf_counter()
         scores = run_config(params, gts)
         combined = float(np.mean([s["combined"] for s in scores.values()]))
-        rows.append({"dt": dt, "kv": kv, "mu": mu, "combined": combined,
+        rows.append({"dt": dt, "kv": kv, "mu": mu, "tor": tor, "solref0": sr0,
+                     "combined": combined,
                      "per_run": {n: {"combined": s["combined"], "xy": s["xy"], "z": s["z"]}
                                  for n, s in scores.items()}})
-        print(f"  dt={dt} kv={kv} mu={mu}: combined={combined:.3f} m "
-              f"({time.perf_counter()-t0:.1f}s)")
+        print(f"  dt={dt} kv={kv} mu={mu} tor={tor} solref0={sr0}: "
+              f"combined={combined:.3f} m ({time.perf_counter()-t0:.1f}s)")
         if best is None or combined < best["combined"]:
-            best = {"dt": dt, "kv": kv, "mu": mu, "combined": combined, "scores": scores}
+            best = {"dt": dt, "kv": kv, "mu": mu, "tor": tor, "solref0": sr0,
+                    "combined": combined, "scores": scores}
 
-    bp = {"dt": best["dt"], "kv": best["kv"], "mu": best["mu"]}
+    bp = {"dt": best["dt"], "kv": best["kv"], "mu": best["mu"],
+          "tor": best["tor"], "solref0": best["solref0"],
+          "condim": args.condim, "integrator": args.integrator}
     out = {
         "simulator": "MuJoCo",
         "best_params": bp,

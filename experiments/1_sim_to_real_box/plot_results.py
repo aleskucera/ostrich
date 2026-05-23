@@ -46,7 +46,9 @@ def fmt_params(sim, bp):
     if sim == "Axion":
         return rf"$\mu_r$={bp['mu_rear']}, $\Delta t$={bp['dt']}"
     if sim == "MuJoCo":
-        return rf"kv={bp['kv']:g}, $\mu$={bp['mu']}, $\Delta t$={bp['dt']}"
+        tor = bp.get("tor")
+        tor_s = rf", tor={tor:g}" if tor is not None else ""
+        return rf"$\mu$={bp['mu']}{tor_s}, $\Delta t$={bp['dt']}"
     return ", ".join(f"{k}={v}" for k, v in bp.items())
 
 
