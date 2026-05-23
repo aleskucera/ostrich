@@ -40,9 +40,29 @@ python experiments/3_gradient_quality_box/plot_results.py
 | script | engine | gradient mechanism | status |
 |---|---|---|---|
 | `optimize_axion.py` | Axion | adjoint (`AxionDifferentiableSimulator`) | ✅ working |
+| `optimize_mjx.py` | MuJoCo MJX | `jax.grad` / BPTT through `mjx.step` | ✅ written (needs `jax` + `mujoco-mjx`) |
 | `optimize_semi_implicit.py` | Newton SemiImplicit | warp tape / BPTT | ⏳ TODO |
-| `optimize_mjx.py` | MuJoCo MJX | `jax.grad` / BPTT | ⏳ TODO (needs JAX + JAX junior model) |
 | `optimize_tinydiffsim.py` | TinyDiffSim | CppAD | ⏳ TODO (separate codebase) |
+
+### MJX setup
+
+```bash
+# in a separate venv (axion's main env doesn't carry JAX)
+pip install jax mujoco-mjx
+
+python experiments/3_gradient_quality_box/optimize_mjx.py
+```
+
+Defaults: `dt=5e-3`, `horizon=6s` → 1200 BPTT steps. Extrapolating from a
+measured `1.1 GB / 2 s` BPTT footprint (typical mjx config), this should
+land around **~0.7 GB peak GPU memory** at the default — well within any
+modern GPU. dt=1e-2 (still in MJX's accuracy plateau on this scene) halves
+that again if memory matters.
+
+The MJX script uses the same junior + box MJCF template + tuned best
+params (`μ=1.5, tor=10, condim=6, implicitfast, kv=1000`) as
+`experiments/1_sim_to_real_box/sweep_mujoco.py`, so the only difference
+vs the forward sweep is `mjx.step` + `jax.grad` for the adjoint.
 
 For now only Axion is implemented; the others will be added as their
 junior + box setups become available. `plot_results.py` picks up any
