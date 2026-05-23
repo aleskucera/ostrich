@@ -50,6 +50,8 @@ def fmt_params(sim, bp):
         tor = bp.get("tor")
         tor_s = rf", tor={tor:g}" if tor is not None else ""
         return rf"$\mu$={bp['mu']}{tor_s}, $\Delta t$={bp['dt']}"
+    if sim == "Semi-Implicit":
+        return rf"$\mu$={bp['mu']}, ke={bp['ke']:g}, $\Delta t$={bp['dt']}"
     return ", ".join(f"{k}={v}" for k, v in bp.items())
 
 

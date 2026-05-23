@@ -63,17 +63,18 @@ python experiments/1_sim_to_real_box/sweep_mujoco.py \
 python experiments/1_sim_to_real_box/plot_results.py --run 18_10_33
 ```
 
-## Current result (both engines fully tuned, yaw-aware metric, 2 runs: 18_04_51 + 18_10_33)
+## Current result (all 3 engines fully tuned, yaw-aware metric, 2 runs: 18_04_51 + 18_10_33)
 
-| Engine | combined error (pos+yaw) | yaw RMSE | best params | dt |
+| Engine | combined (pos+yaw) | yaw RMSE | best params | dt |
 |---|---|---|---|---|
 | **MuJoCo** | **0.055 m** | **2.7°** | `μ=1.5, tor=2, condim=6, implicitfast` | 0.001 |
 | Axion | 0.061 m | 3.2° | `mu_rear=1.5, compliance.contact=1e-7` | 0.05 |
+| Semi-Implicit | 0.204 m | 3.1° | `μ=0.1, ke=8e4, kd=2e3, kf=1500, k_d_act=250` | 0.0005 |
 
-Essentially tied (~6 mm apart) at **50× different timesteps**. Both engines
-produce yaw responses of the same magnitude (real is ~0–3° depending on run);
-neither hides behind a locked chassis. MuJoCo needs dt≈10⁻³ s; Axion does it
-at dt=5·10⁻² s.
+MuJoCo and Axion are essentially tied (~6 mm apart) at **50× different
+timesteps**. SemiImplicit is ~4× worse — explicit spring-damper contact
+under a 90 kg chassis on a 12 cm box hits accuracy and stability limits
+its implicit-contact peers don't.
 
 > ### Why I no longer report the L2-only "MuJoCo 0.048 m" number
 >
@@ -96,6 +97,30 @@ at dt=5·10⁻² s.
 The single biggest lever was **`condim=6` with torsional friction ≥ 2.0** —
 pyramidal cone with `condim=3` has no torsional component, so the rear wheel
 skids freely on box impact and the chassis acquires a spurious yaw.
+
+### SemiImplicit tuning journey
+
+| stage | best | what was learned |
+|---|---|---|
+| initial (mu=0.5, ke=4e4) | 1.5 m | wheels barely spun — `k_d=0` ok for Axion, broken for SI |
+| add `k_d_act` (velocity gain) | 2–3 m or NaN | torque applied but unstable at dt=0.001 |
+| drop to dt=5e-4 | 0.226 m | stability margin recovered |
+| refine ke/μ/k_d_act at dt=5e-4 | **0.204 m** | converged floor; tuning is fragile |
+
+**SI is genuinely harder to use here, on three axes:**
+1. **`k_d=0` makes the wheels not spin** (in `TARGET_VELOCITY` mode, SI consumes
+   `target_kd` as the velocity-feedback gain; Axion doesn't). One forgotten
+   knob → silent ~1.5 m error.
+2. **`ke` had to be ~10× exp-1's helhest value** because the junior chassis is
+   heavier and contact must be stiffer to keep the wheels from sinking into
+   the box during the climb. Even so, the climb plot shows the chassis Z
+   sinking to −18 cm — a spring-damper compression artifact, not real motion.
+3. **The stable parameter region is narrow** — many neighbouring configs
+   diverge (combined of 14, 18, 28, 100 m, or NaN). MuJoCo and Axion don't
+   show this; their tuning is robust.
+
+The 0.204 m floor is ~4× the implicit-contact engines. Most of that gap is the
+chassis-Z sink, not the in-plane error.
 
 ### Axion tuning journey (mirror)
 

@@ -186,8 +186,16 @@ class HelhestJuniorReplaySimulator(InteractiveSimulator):
                  mu_front=0.8, mu_rear=0.8, mu_rolling=0.7,
                  ground_ke=150.0, ground_kd=150.0, ground_kf=500.0,
                  box_ke=150.0, box_kd=150.0, box_kf=500.0,
+                 wheel_ke=None, wheel_kd=None, wheel_kf=None,
+                 k_p=250.0, k_d=0.0,
                  **kwargs):
         self.control_mode = control_mode
+        # Wheel actuator gains. With TARGET_VELOCITY mode, different solvers
+        # consume these differently: Axion drives well from k_p alone, while
+        # SemiImplicit needs a non-zero k_d (velocity-feedback gain) to apply
+        # torque at all — leaving k_d=0 yields a robot that barely spins.
+        self.k_p = k_p
+        self.k_d = k_d
         # Wheel-ground friction. mu_rear governs how easily the rear wheel skids
         # sideways → how readily the robot yaws. Low rear mu = turns too easily;
         # 0.8 (= front, same rubber) matches the real robot's near-straight
@@ -199,6 +207,11 @@ class HelhestJuniorReplaySimulator(InteractiveSimulator):
         self.mu_rolling = mu_rolling
         self.ground_cfg_kwargs = dict(ke=ground_ke, kd=ground_kd, kf=ground_kf)
         self.box_cfg_kwargs = dict(ke=box_ke, kd=box_kd, kf=box_kf)
+        # Wheel contact stiffness. Axion solver ignores ShapeConfig.ke/kd/kf;
+        # SemiImplicit and other Newton solvers consume them.
+        self.wheel_ke = wheel_ke
+        self.wheel_kd = wheel_kd
+        self.wheel_kf = wheel_kf
         super().__init__(*args, **kwargs)
         # [left, right, rear] velocity command consumed by control_policy.
         self.target_velocities = wp.zeros(3, dtype=wp.float32, device=self.model.device)
@@ -223,11 +236,12 @@ class HelhestJuniorReplaySimulator(InteractiveSimulator):
             self.builder,
             xform=wp.transform(wp.vec3(0.0, 0.0, 0.5), wp.quat_identity()),
             control_mode=self.control_mode,
-            k_p=250.0,
-            k_d=0.0,
+            k_p=self.k_p,
+            k_d=self.k_d,
             friction_left_right=self.mu_front,
             friction_rear=self.mu_rear,
             mu_rolling=self.mu_rolling,
+            ke=self.wheel_ke, kd=self.wheel_kd, kf=self.wheel_kf,
         )
 
         return self.builder.finalize_replicated(num_worlds=self.simulation_config.num_worlds)
