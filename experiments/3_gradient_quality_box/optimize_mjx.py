@@ -207,10 +207,9 @@ def run_trial(target_xyz_rel, target_t, K, lr, iterations, seed, horizon, dt, gt
             n_clipped += 1
         losses.append(loss_val); grad_norms.append(gnorm)
         params_np = opt.step(params_np, grad_np).astype(np.float32)
-        if it % 5 == 0 or it == iterations - 1:
-            clipped = " *" if (clip_grad_norm is not None and gnorm > clip_grad_norm) else ""
-            print(f"    iter {it:3d}: loss={loss_val:.4f}  |g|={gnorm:.3f}{clipped}  "
-                  f"({time.perf_counter() - t0:.2f}s)")
+        clipped = " *" if (clip_grad_norm is not None and gnorm > clip_grad_norm) else ""
+        print(f"    iter {it:3d}: loss={loss_val:.4f}  |g|={gnorm:.3f}{clipped}  "
+              f"({time.perf_counter() - t0:.2f}s)", flush=True)
     elapsed = time.perf_counter() - t0_total
     if clip_grad_norm is not None:
         print(f"    grad clipped on {n_clipped}/{iterations} iters (threshold {clip_grad_norm})")
