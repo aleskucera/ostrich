@@ -153,16 +153,17 @@ def main():
         delta = xy_batch - target_xy[None, :, :]            # [W, T, 2]
         return jnp.mean(jnp.sum(delta**2, axis=-1))
 
-    value_fn = jax.jit(trajectory_loss)
-    grad_fn = jax.jit(jax.grad(trajectory_loss))
+    # Combined value+grad: one forward + one backward, vs separate value_fn
+    # and grad_fn which would be two forwards + one backward (~33% wasted).
+    value_and_grad = jax.jit(jax.value_and_grad(trajectory_loss))
     params = jnp.tile(jnp.array([2.0, 2.0, 2.0]), (K, 1))
 
     finalize_nvml = _nvml_poller()
 
     print("Compiling...")
     t_compile = time.perf_counter()
-    loss = value_fn(params); loss.block_until_ready()
-    grad = grad_fn(params); grad.block_until_ready()
+    loss, grad = value_and_grad(params)
+    loss.block_until_ready(); grad.block_until_ready()
     print(f"  compile: {time.perf_counter() - t_compile:.1f}s")
 
     optimizer = optax.adam(learning_rate=0.05)
@@ -173,8 +174,7 @@ def main():
     time_ms_list = []
     for i in range(ITERATIONS):
         t0 = time.perf_counter()
-        loss = value_fn(params)
-        grad = grad_fn(params)
+        loss, grad = value_and_grad(params)
         loss.block_until_ready(); grad.block_until_ready()
         t_iter = (time.perf_counter() - t0) * 1000
         mem_stats = device.memory_stats()

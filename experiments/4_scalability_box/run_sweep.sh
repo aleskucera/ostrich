@@ -20,7 +20,9 @@ mkdir -p "$RESULTS"
 
 AXION_WORLDS=(1 2 4 8 16 32 64 128 256 512 1024 2048 4096 8192 16384 32768 65536 131072)
 MJX_WORLDS=(1 2 4 8 16 32 64)
-SI_WORLDS=(1 2 4 8 16 32)
+# SI surprisingly memory-efficient (~26 MB/world at N=32), should scale much
+# higher than the original cap. Extended to 1024 to find the real wall.
+SI_WORLDS=(1 2 4 8 16 32 64 128 256 512 1024)
 
 RUN_ALL=true; RUN_AXION=false; RUN_MJX=false; RUN_SI=false
 while [[ $# -gt 0 ]]; do
