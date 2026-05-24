@@ -163,8 +163,15 @@ class SplineAdam:
 
 
 # ------------------------------ trial driver --------------------------------
-def run_trial(target_xyz_rel, target_t, K, lr, iterations, seed, horizon, dt, gt_box):
-    """One full optimisation trial. Returns dict with losses + wall time."""
+def run_trial(target_xyz_rel, target_t, K, lr, iterations, seed, horizon, dt, gt_box,
+              clip_grad_norm=None):
+    """One full optimisation trial. Returns dict with losses + wall time.
+
+    clip_grad_norm: if not None, scale the gradient so its global L2 norm is at
+    most this value before passing to the optimizer. Surgically removes the
+    occasional spike (typically at contact-event iterations) that otherwise
+    knocks Adam out of discovered minima despite cosine LR decay.
+    """
     # Build the MJX model + initial state.
     mx, mj_model = build_mjx_model(dt, gt_box)
     dx0 = make_init_data(mx, mj_model)
@@ -188,18 +195,27 @@ def run_trial(target_xyz_rel, target_t, K, lr, iterations, seed, horizon, dt, gt
     params_np = (2.0 + 0.5 * rng.standard_normal((K, 3))).astype(np.float32)
     opt = SplineAdam(K=K, num_dofs=3, lr=lr, lr_min_ratio=0.2, total_steps=iterations)
 
-    losses = []
+    losses, grad_norms, n_clipped = [], [], 0
     t0_total = time.perf_counter()
     for it in range(iterations):
         t0 = time.perf_counter()
         loss_val, grad = value_and_grad(jnp.asarray(params_np))
         loss_val = float(loss_val); grad_np = np.asarray(grad).astype(np.float64)
-        losses.append(loss_val)
+        gnorm = float(np.linalg.norm(grad_np))
+        if clip_grad_norm is not None and gnorm > clip_grad_norm:
+            grad_np = grad_np * (clip_grad_norm / gnorm)
+            n_clipped += 1
+        losses.append(loss_val); grad_norms.append(gnorm)
         params_np = opt.step(params_np, grad_np).astype(np.float32)
         if it % 5 == 0 or it == iterations - 1:
-            print(f"    iter {it:3d}: loss={loss_val:.4f}  ({time.perf_counter() - t0:.2f}s)")
+            clipped = " *" if (clip_grad_norm is not None and gnorm > clip_grad_norm) else ""
+            print(f"    iter {it:3d}: loss={loss_val:.4f}  |g|={gnorm:.3f}{clipped}  "
+                  f"({time.perf_counter() - t0:.2f}s)")
     elapsed = time.perf_counter() - t0_total
-    return {"seed": int(seed), "losses": losses, "wall_s": elapsed,
+    if clip_grad_norm is not None:
+        print(f"    grad clipped on {n_clipped}/{iterations} iters (threshold {clip_grad_norm})")
+    return {"seed": int(seed), "losses": losses, "grad_norms": grad_norms,
+            "n_clipped": int(n_clipped), "wall_s": elapsed,
             "best_loss": float(min(losses))}
 
 
@@ -223,6 +239,11 @@ def main():
     # BPTT memory ~ 0.7 GB at this dt + horizon=6 s (extrapolated from a
     # measured 1.1 GB / 2 s at typical dt).
     ap.add_argument("--dt", type=float, default=5e-3)
+    ap.add_argument("--clip-grad-norm", type=float, default=1.0,
+                    help="global-norm gradient clip (None to disable). Default 1.0 "
+                         "stabilises the back half of optimisation against "
+                         "contact-event gradient spikes that knock Adam out of "
+                         "discovered minima.")
     ap.add_argument("--save", default=None)
     args = ap.parse_args()
 
@@ -251,7 +272,8 @@ def main():
         seed = args.seed_base + k
         print(f"\n--- trial {k + 1}/{args.num_trials} (seed={seed}) ---")
         trials.append(run_trial(real_xy, real_t, args.K, args.lr, args.iterations,
-                                  seed, args.horizon_s, args.dt, gt["box"]))
+                                  seed, args.horizon_s, args.dt, gt["box"],
+                                  clip_grad_norm=args.clip_grad_norm))
 
     out = {
         "simulator": "MJX",
@@ -259,6 +281,7 @@ def main():
         "gt": gt["run_id"],
         "K": args.K, "lr": args.lr, "iterations": args.iterations,
         "horizon_s": args.horizon_s, "dt": args.dt,
+        "clip_grad_norm": args.clip_grad_norm,
         "num_trials": args.num_trials, "seed_base": args.seed_base,
         "params": MJX_PARAMS, "trials": trials,
     }
