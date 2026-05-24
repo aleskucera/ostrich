@@ -185,7 +185,16 @@ class HelhestJuniorBoxSIOptimizer(NewtonDifferentiableSimulator):
         pass
 
     # ---- one optimisation iteration ----
-    def opt_step(self):
+    def opt_step(self, clip_grad_norm=None):
+        """One optimisation step. Returns (loss, gnorm, was_clipped).
+
+        clip_grad_norm: if not None, scale the [K, NUM_WHEEL_DOFS] gradient
+        so its global L2 norm is at most this value before passing to Adam.
+        Mirrors the MJX-side safety net — SI's BPTT can produce gradient
+        spikes when the optimiser pushes wheel velocities past the
+        penalty-contact stability edge (at horizon=6s + dt=5e-4 these were
+        large enough to send Adam state to NaN within ~30 iters).
+        """
         self.diff_step()
         wp.synchronize()
         loss_val = float(self.loss.numpy()[0])
@@ -198,11 +207,16 @@ class HelhestJuniorBoxSIOptimizer(NewtonDifferentiableSimulator):
             grad_v[i] = g[WHEEL_DOF_OFFSET:WHEEL_DOF_OFFSET + NUM_WHEEL_DOFS]
             self.controls[i].joint_target_vel.grad.zero_()
         grad_params = self._contract(grad_v)
+        gnorm = float(np.linalg.norm(grad_params))
+        was_clipped = False
+        if clip_grad_norm is not None and gnorm > clip_grad_norm:
+            grad_params = grad_params * (clip_grad_norm / gnorm)
+            was_clipped = True
         self.spline_params = self.spline_adam.step(self.spline_params, grad_params)
         self._apply_params(self.spline_params)
         self.tape.zero()
         self.loss.zero_()
-        return loss_val
+        return loss_val, gnorm, was_clipped
 
 
 # ------------------------------ trial driver ---------------------------------
@@ -218,7 +232,8 @@ def make_configs(duration, dt):
     return sim_cfg, rc, ec
 
 
-def run_trial(target_xyz_rel, target_t, K, lr, iterations, seed, duration, dt):
+def run_trial(target_xyz_rel, target_t, K, lr, iterations, seed, duration, dt,
+              clip_grad_norm=None):
     sim_cfg, rc, ec = make_configs(duration, dt)
     sim = HelhestJuniorBoxSIOptimizer(sim_cfg, rc, ec, LoggingConfig(),
                                        target_xyz_rel, target_t, K=K)
@@ -229,18 +244,24 @@ def run_trial(target_xyz_rel, target_t, K, lr, iterations, seed, duration, dt):
                                   lr=lr, lr_min_ratio=0.2, total_steps=iterations)
     sim._apply_params(sim.spline_params)
 
-    losses = []
+    losses, grad_norms, n_clipped = [], [], 0
     t0_total = time.perf_counter()
     for it in range(iterations):
         t0 = time.perf_counter()
-        loss = sim.opt_step()
-        losses.append(loss)
-        if it % 5 == 0 or it == iterations - 1:
-            print(f"    iter {it:3d}: loss={loss:.4f}  ({time.perf_counter() - t0:.2f}s)")
+        loss, gnorm, clipped = sim.opt_step(clip_grad_norm=clip_grad_norm)
+        if clipped:
+            n_clipped += 1
+        losses.append(loss); grad_norms.append(gnorm)
+        star = " *" if clipped else ""
+        print(f"    iter {it:3d}: loss={loss:.4f}  |g|={gnorm:.3f}{star}  "
+              f"({time.perf_counter() - t0:.2f}s)", flush=True)
     elapsed = time.perf_counter() - t0_total
+    if clip_grad_norm is not None:
+        print(f"    grad clipped on {n_clipped}/{iterations} iters (threshold {clip_grad_norm})")
     sim.close()
     del sim
-    return {"seed": int(seed), "losses": losses, "wall_s": elapsed,
+    return {"seed": int(seed), "losses": losses, "grad_norms": grad_norms,
+            "n_clipped": int(n_clipped), "wall_s": elapsed,
             "best_loss": float(min(losses))}
 
 
@@ -262,6 +283,12 @@ def main():
     # dt=5e-4 is the stability edge on this scene (2_dt_stability_box: 7e-4
     # already NaNs at our tuned k_d_act). Don't bump this without re-tuning.
     ap.add_argument("--dt", type=float, default=5e-4)
+    ap.add_argument("--clip-grad-norm", type=float, default=1.0,
+                    help="global-norm gradient clip (None to disable). Default "
+                         "1.0 mirrors optimize_mjx.py — keeps Adam state stable "
+                         "against gradient spikes at the penalty-contact "
+                         "stability edge, where unclipped grads sent SI to NaN "
+                         "within ~30 iters at horizon=6s.")
     ap.add_argument("--save", default=None)
     args = ap.parse_args()
 
@@ -284,7 +311,8 @@ def main():
         seed = args.seed_base + k
         print(f"\n--- trial {k + 1}/{args.num_trials} (seed={seed}) ---")
         trials.append(run_trial(real_xyz, real_t, args.K, args.lr, args.iterations,
-                                  seed, args.horizon_s, args.dt))
+                                  seed, args.horizon_s, args.dt,
+                                  clip_grad_norm=args.clip_grad_norm))
 
     out = {
         "simulator": "Semi-Implicit",
@@ -292,6 +320,7 @@ def main():
         "gt": gt["run_id"],
         "K": args.K, "lr": args.lr, "iterations": args.iterations,
         "horizon_s": args.horizon_s, "dt": args.dt,
+        "clip_grad_norm": args.clip_grad_norm,
         "num_trials": args.num_trials, "seed_base": args.seed_base,
         "trials": trials,
     }
