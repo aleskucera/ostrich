@@ -157,14 +157,16 @@ class SplineAdam:
         self.t += 1
         self.m = self.b1 * self.m + (1 - self.b1) * grad
         self.v = self.b2 * self.v + (1 - self.b2) * grad * grad
-        mh = self.m / (1 - self.b1**self.t)
+        # bias correction: with b1=0 the formula reduces to m_t = grad, no
+        # correction needed (1 - 0**t = 1); same handling drops out for b2.
+        mh = self.m / (1 - self.b1**self.t) if self.b1 > 0 else self.m
         vh = self.v / (1 - self.b2**self.t)
         return params - self._lr() * mh / (np.sqrt(vh) + self.eps)
 
 
 # ------------------------------ trial driver --------------------------------
 def run_trial(target_xyz_rel, target_t, K, lr, iterations, seed, horizon, dt, gt_box,
-              clip_grad_norm=None):
+              clip_grad_norm=None, beta1=0.9, beta2=0.999):
     """One full optimisation trial. Returns dict with losses + wall time.
 
     clip_grad_norm: if not None, scale the gradient so its global L2 norm is at
@@ -193,7 +195,8 @@ def run_trial(target_xyz_rel, target_t, K, lr, iterations, seed, horizon, dt, gt
     # Initial spline params — small forward bias + per-trial noise.
     rng = np.random.default_rng(seed)
     params_np = (2.0 + 0.5 * rng.standard_normal((K, 3))).astype(np.float32)
-    opt = SplineAdam(K=K, num_dofs=3, lr=lr, lr_min_ratio=0.2, total_steps=iterations)
+    opt = SplineAdam(K=K, num_dofs=3, lr=lr, lr_min_ratio=0.2, total_steps=iterations,
+                     betas=(beta1, beta2))
 
     losses, grad_norms, n_clipped = [], [], 0
     t0_total = time.perf_counter()
@@ -243,6 +246,13 @@ def main():
                          "stabilises the back half of optimisation against "
                          "contact-event gradient spikes that knock Adam out of "
                          "discovered minima.")
+    ap.add_argument("--beta1", type=float, default=0.9,
+                    help="Adam first-moment decay. Set to 0 to disable momentum "
+                         "(reduces Adam to RMSprop). Without momentum, bad gradient "
+                         "directions from contact-event spikes don't get averaged "
+                         "into the running mean and carried forward ~10 iters.")
+    ap.add_argument("--beta2", type=float, default=0.999,
+                    help="Adam second-moment decay.")
     ap.add_argument("--save", default=None)
     args = ap.parse_args()
 
@@ -272,7 +282,8 @@ def main():
         print(f"\n--- trial {k + 1}/{args.num_trials} (seed={seed}) ---")
         trials.append(run_trial(real_xy, real_t, args.K, args.lr, args.iterations,
                                   seed, args.horizon_s, args.dt, gt["box"],
-                                  clip_grad_norm=args.clip_grad_norm))
+                                  clip_grad_norm=args.clip_grad_norm,
+                                  beta1=args.beta1, beta2=args.beta2))
 
     out = {
         "simulator": "MJX",
@@ -281,6 +292,7 @@ def main():
         "K": args.K, "lr": args.lr, "iterations": args.iterations,
         "horizon_s": args.horizon_s, "dt": args.dt,
         "clip_grad_norm": args.clip_grad_norm,
+        "beta1": args.beta1, "beta2": args.beta2,
         "num_trials": args.num_trials, "seed_base": args.seed_base,
         "params": MJX_PARAMS, "trials": trials,
     }
