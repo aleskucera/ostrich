@@ -69,17 +69,28 @@ def load_results() -> dict[str, dict[int, dict]]:
 
 
 def _add_oom_extrapolation(ax_mem, sim_data, sim_name, ann_y_factor=7.0,
-                            ann_x_factor=6.0, ann_rotation=52):
-    """Linear-fit memory growth, draw dashed extrapolation + OOM x marker."""
+                            ann_x_factor=6.0, ann_rotation=52, slope_fit_min_n=None):
+    """Linear-fit memory growth, draw dashed extrapolation + OOM x marker.
+
+    ``slope_fit_min_n``: if set, only use data points with N >= this value
+    for the linear fit. Useful for engines like Axion whose memory is flat
+    until a GPU-saturation knee — fitting through the flat region would
+    underestimate the per-world slope.
+    """
     if sim_name not in sim_data:
         return
     d = sim_data[sim_name]
-    worlds = np.array(d["worlds"])
     mems = np.array([m for m in d["mems"] if m is not None])
     mem_worlds = np.array([w for w, m in zip(d["worlds"], d["mems"]) if m is not None])
     if len(mem_worlds) < 2:
         return
-    coeffs = np.polyfit(mem_worlds, mems, 1)
+    if slope_fit_min_n is not None:
+        fit_mask = mem_worlds >= slope_fit_min_n
+        if fit_mask.sum() < 2:
+            fit_mask = slice(None)
+        coeffs = np.polyfit(mem_worlds[fit_mask], mems[fit_mask], 1)
+    else:
+        coeffs = np.polyfit(mem_worlds, mems, 1)
     slope_gb = coeffs[0] / 1024
     color = STYLES[sim_name]["color"]
     mid_idx = len(mem_worlds) // 2
@@ -88,7 +99,8 @@ def _add_oom_extrapolation(ax_mem, sim_data, sim_name, ann_y_factor=7.0,
                 rf"$\sim{slope_gb:.2f}$\,GB/world",
                 fontsize=7, color=color, alpha=0.8,
                 rotation=ann_rotation, rotation_mode="anchor")
-    extrap_worlds = np.array([mem_worlds[-1], 32, 64, 128, 256, 512, 1024])
+    extrap_worlds = np.array([mem_worlds[-1], 32, 64, 128, 256, 512, 1024,
+                               2048, 4096, 8192, 16384, 32768])
     extrap_worlds = extrap_worlds[extrap_worlds > mem_worlds[-1]]
     if len(extrap_worlds) > 0:
         extrap_worlds = np.concatenate([[mem_worlds[-1]], extrap_worlds])
@@ -147,16 +159,23 @@ def main():
                 transform=blended_transform_factory(ax_mem.transAxes, ax_mem.transData))
 
     # OOM extrapolation + markers per failing engine (different annotation
-    # placements to avoid label overlap).
+    # placements to avoid label overlap). Axion's memory curve is flat below
+    # ~512 worlds (GPU underutilised), so we fit the slope on N>=512 only —
+    # otherwise the flat-region pre-knee points pull the per-world slope down
+    # by ~50x. Confirmed wall: Axion OOM at 16384 on a 24 GB 3090.
     oom_mjx = _add_oom_extrapolation(ax_mem, sim_data, "MJX-grad",
                                       ann_x_factor=6.0, ann_y_factor=7.0,
                                       ann_rotation=52)
     oom_si = _add_oom_extrapolation(ax_mem, sim_data, "Semi-Implicit",
                                      ann_x_factor=3.0, ann_y_factor=2.5,
                                      ann_rotation=40)
+    oom_axion = _add_oom_extrapolation(ax_mem, sim_data, "Axion",
+                                        ann_x_factor=0.18, ann_y_factor=4.0,
+                                        ann_rotation=52, slope_fit_min_n=512)
 
     # OOM markers on time panel too (same world count as memory failure)
-    for sim_name, oom_w in [("MJX-grad", oom_mjx), ("Semi-Implicit", oom_si)]:
+    for sim_name, oom_w in [("MJX-grad", oom_mjx), ("Semi-Implicit", oom_si),
+                            ("Axion", oom_axion)]:
         if oom_w is None or sim_name not in sim_data:
             continue
         median_t = np.median(sim_data[sim_name]["times"])
