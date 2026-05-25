@@ -114,6 +114,9 @@ def main():
     ap.add_argument("--gt", default=str(pathlib.Path(__file__).resolve().parents[1]
                                          / "1_sim_to_real_box" / "data"
                                          / "run_2026_05_20-18_10_33.json"))
+    ap.add_argument("--no-vmap", action="store_true",
+                    help="Diagnostic: skip jax.vmap (only valid at --num-worlds 1). "
+                         "Use to isolate vmap-induced gradient-compilation overhead.")
     ap.add_argument("--save", default=None)
     args = ap.parse_args()
     num_worlds = args.num_worlds
@@ -142,16 +145,27 @@ def main():
     target_xy = jnp.asarray(target_xy)
 
     W = jnp.asarray(make_interp_matrix(T, K))
-    dx_batch = jax.tree_util.tree_map(lambda x: jnp.stack([x] * num_worlds), dx0)
-    rollout_batch = jax.vmap(rollout_one, in_axes=(None, 0, None))
 
-    def trajectory_loss(params):
-        # Same spline drives all worlds (broadcast). Each world simulates the
-        # same trajectory; loss averages across worlds (batch-size independent).
-        ctrl_traj = W @ params               # [T, 3]
-        xy_batch = rollout_batch(mx, dx_batch, ctrl_traj)   # [W, T, 2]
-        delta = xy_batch - target_xy[None, :, :]            # [W, T, 2]
-        return jnp.mean(jnp.sum(delta**2, axis=-1))
+    if args.no_vmap:
+        # Diagnostic path: skip jax.vmap entirely; only valid at num_worlds=1.
+        # Used to isolate vmap-induced gradient-compilation overhead.
+        assert num_worlds == 1, "--no-vmap requires --num-worlds 1"
+        def trajectory_loss(params):
+            ctrl_traj = W @ params                          # [T, 3]
+            xy = rollout_one(mx, dx0, ctrl_traj)            # [T, 2]
+            delta = xy - target_xy                          # [T, 2]
+            return jnp.mean(jnp.sum(delta ** 2, axis=-1))
+    else:
+        dx_batch = jax.tree_util.tree_map(lambda x: jnp.stack([x] * num_worlds), dx0)
+        rollout_batch = jax.vmap(rollout_one, in_axes=(None, 0, None))
+
+        def trajectory_loss(params):
+            # Same spline drives all worlds (broadcast). Each world simulates the
+            # same trajectory; loss averages across worlds (batch-size independent).
+            ctrl_traj = W @ params                          # [T, 3]
+            xy_batch = rollout_batch(mx, dx_batch, ctrl_traj)   # [W, T, 2]
+            delta = xy_batch - target_xy[None, :, :]            # [W, T, 2]
+            return jnp.mean(jnp.sum(delta**2, axis=-1))
 
     # Combined value+grad: one forward + one backward, vs separate value_fn
     # and grad_fn which would be two forwards + one backward (~33% wasted).
