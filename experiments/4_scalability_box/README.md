@@ -7,6 +7,12 @@ per iteration and peak GPU memory. The figure shows how each engine scales —
 both in compute (does it stay fast at high world counts?) and in memory
 (when does it OOM?).
 
+> **For findings, see [`RESULTS.md`](RESULTS.md)** — headline numbers,
+> per-engine wall analysis (Axion 8192 / MJX 2 / SI 512), and what the
+> three-way memory-vs-speed corners say about each engine's gradient
+> mechanism. This README covers the setup; `RESULTS.md` covers what
+> we learned.
+
 ## Pipeline
 
 ```
