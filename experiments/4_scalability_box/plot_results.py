@@ -22,32 +22,49 @@ from matplotlib.transforms import blended_transform_factory
 RESULTS_DIR = pathlib.Path(__file__).parent / "results"
 PAPER_DIR = pathlib.Path(__file__).resolve().parents[2] / ".." / "axion_paper" / "figures"
 
-plt.rcParams.update({
-    "text.usetex": True,
-    "text.latex.preamble": r"\usepackage{amsmath}",
-    "font.family": "serif",
-    "font.size": 12,
-    "axes.labelsize": 12,
-    "xtick.labelsize": 12,
-    "ytick.labelsize": 12,
-    "legend.fontsize": 11,
-    "axes.spines.top": False,
-    "axes.spines.right": False,
-})
+plt.rcParams.update(
+    {
+        "text.usetex": True,
+        "text.latex.preamble": r"\usepackage{amsmath}",
+        "font.family": "serif",
+        "font.size": 11,
+        "axes.labelsize": 11,
+        "xtick.labelsize": 10,
+        "ytick.labelsize": 10,
+        "legend.fontsize": 10,
+        "axes.spines.top": False,
+        "axes.spines.right": False,
+    }
+)
 
 STYLES = {
-    "Axion":         {"color": "#2196F3", "marker": "o", "lw": 2.0, "zorder": 5},
-    "MJX-grad":      {"color": "#E91E63", "marker": "s", "lw": 1.8, "zorder": 4},
+    "Axion": {"color": "#2196F3", "marker": "o", "lw": 2.0, "zorder": 5},
+    "MJX-grad": {"color": "#E91E63", "marker": "s", "lw": 1.8, "zorder": 4},
     "Semi-Implicit": {"color": "#FF9800", "marker": "^", "lw": 1.8, "zorder": 3},
 }
 LABELS = {
-    "Axion":         r"\textbf{Axion}",
-    "MJX-grad":      "MJX-grad",
+    "Axion": r"\textbf{Axion}",
+    "MJX-grad": "MJX",
     "Semi-Implicit": "Semi-Impl.",
 }
 SIM_ORDER = list(STYLES.keys())
 
 GPU_MEM_LIMIT_MB = 24 * 1024  # 24 GB (RTX 3090 on dasenka)
+
+# -----------------------------------------------------------------------------
+# Manual slope-label positions for the memory panel. Edit these to taste —
+# no other plot code needs to change. Coordinates are in data space (x =
+# num_worlds, y = MB). Rotation is in degrees, anchored at (x, y).
+# Auto-defaults (geometric midpoint of the dashed extrapolation, rotation
+# matching the visual line slope) are used for any engine NOT listed here.
+# Set ``"text"`` to override the auto-formatted "X.X GB/world" label.
+# -----------------------------------------------------------------------------
+SLOPE_LABEL_POSITIONS: dict[str, dict] = {
+    "MJX-grad": {"x": 3.6, "y": 9000, "rotation": 57},
+    "Semi-Implicit": {"x": 340, "y": 4000, "rotation": 55},
+    "Axion": {"x": 5000, "y": 3300, "rotation": 55},
+}
+HIDE_SLOPE_LABEL: set[str] = set()  # add engine names here to suppress label
 
 
 def load_results() -> dict[str, dict[int, dict]]:
@@ -68,22 +85,30 @@ def load_results() -> dict[str, dict[int, dict]]:
     return out
 
 
-def _add_oom_extrapolation(ax_mem, sim_data, sim_name, ann_y_factor=7.0,
-                            ann_x_factor=6.0, ann_rotation=52, slope_fit_min_n=None):
-    """Linear-fit memory growth, draw dashed extrapolation + OOM x marker.
+def _segment_display_angle_deg(ax, x0, y0, x1, y1):
+    """Angle in degrees of segment (x0,y0)->(x1,y1) as it appears on screen,
+    accounting for log scales and axes aspect ratio."""
+    p0 = ax.transData.transform((x0, y0))
+    p1 = ax.transData.transform((x1, y1))
+    return float(np.degrees(np.arctan2(p1[1] - p0[1], p1[0] - p0[0])))
 
-    ``slope_fit_min_n``: if set, only use data points with N >= this value
-    for the linear fit. Useful for engines like Axion whose memory is flat
-    until a GPU-saturation knee — fitting through the flat region would
-    underestimate the per-world slope.
+
+def _add_oom_extrapolation(ax_mem, sim_data, sim_name, slope_fit_min_n=None):
+    """Linear-fit memory growth, extend a dashed line along the fitted slope
+    up to the observed OOM N (= 2x last successful), and place an X marker
+    where the line ends (or at the 24 GB limit, whichever is lower).
+
+    Slope label is rotated to match the actual displayed slope of the
+    dashed extrapolation line (computed in display coordinates so it
+    accounts for log scales and the axes aspect ratio).
     """
     if sim_name not in sim_data:
-        return
+        return None
     d = sim_data[sim_name]
     mems = np.array([m for m in d["mems"] if m is not None])
     mem_worlds = np.array([w for w, m in zip(d["worlds"], d["mems"]) if m is not None])
     if len(mem_worlds) < 2:
-        return
+        return None
     if slope_fit_min_n is not None:
         fit_mask = mem_worlds >= slope_fit_min_n
         if fit_mask.sum() < 2:
@@ -91,27 +116,47 @@ def _add_oom_extrapolation(ax_mem, sim_data, sim_name, ann_y_factor=7.0,
         coeffs = np.polyfit(mem_worlds[fit_mask], mems[fit_mask], 1)
     else:
         coeffs = np.polyfit(mem_worlds, mems, 1)
-    slope_gb = coeffs[0] / 1024
+    slope_mb = float(coeffs[0])
     color = STYLES[sim_name]["color"]
-    mid_idx = len(mem_worlds) // 2
-    ax_mem.text(mem_worlds[mid_idx] * ann_x_factor,
-                mems[mid_idx] * ann_y_factor,
-                rf"$\sim{slope_gb:.2f}$\,GB/world",
-                fontsize=7, color=color, alpha=0.8,
-                rotation=ann_rotation, rotation_mode="anchor")
-    extrap_worlds = np.array([mem_worlds[-1], 32, 64, 128, 256, 512, 1024,
-                               2048, 4096, 8192, 16384, 32768])
-    extrap_worlds = extrap_worlds[extrap_worlds > mem_worlds[-1]]
-    if len(extrap_worlds) > 0:
-        extrap_worlds = np.concatenate([[mem_worlds[-1]], extrap_worlds])
-        extrap_mems = np.polyval(coeffs, extrap_worlds)
-        ax_mem.plot(extrap_worlds, extrap_mems, color=color,
-                    linestyle="--", linewidth=1.2, alpha=0.5, zorder=2)
-        oom_w = int(mem_worlds[-1]) * 2
-        ax_mem.plot(oom_w, GPU_MEM_LIMIT_MB, "x",
-                    color="red", markersize=8, markeredgewidth=2.0, zorder=6)
+
+    oom_w = int(mem_worlds[-1]) * 2  # observed OOM = next power of 2
+    extrap_x = np.array([mem_worlds[-1], oom_w])
+    extrap_y = np.polyval(coeffs, extrap_x)
+    ax_mem.plot(extrap_x, extrap_y, color=color, linestyle="--", linewidth=1.2, alpha=0.6, zorder=2)
+    # X at observed OOM, clipped to GPU limit so it always sits on or below
+    # the limit line.
+    oom_y = float(min(extrap_y[-1], GPU_MEM_LIMIT_MB))
+    ax_mem.plot(oom_w, oom_y, "x", color="red", markersize=9, markeredgewidth=2.0, zorder=6)
+
+    # Slope label. Default: at geometric-mean midpoint of the dashed
+    # extrapolation, rotated to match the visual slope. Override per-engine
+    # via SLOPE_LABEL_POSITIONS at top of file.
+    if sim_name in HIDE_SLOPE_LABEL:
         return oom_w
-    return None
+    if slope_mb >= 1024:
+        auto_label = rf"${slope_mb / 1024:.1f}$\,GB/world"
+    elif slope_mb >= 10:
+        auto_label = rf"${slope_mb:.0f}$\,MB/world"
+    else:
+        auto_label = rf"${slope_mb:.1f}$\,MB/world"
+    auto_x = float(np.sqrt(mem_worlds[-1] * oom_w))
+    auto_y = float(np.polyval(coeffs, auto_x))
+    auto_rot = _segment_display_angle_deg(ax_mem, mem_worlds[-1], mems[-1], oom_w, extrap_y[-1])
+    cfg = SLOPE_LABEL_POSITIONS.get(sim_name, {})
+    ax_mem.text(
+        cfg.get("x", auto_x),
+        cfg.get("y", auto_y),
+        cfg.get("text", auto_label),
+        fontsize=cfg.get("fontsize", 8),
+        color=color,
+        alpha=0.95,
+        ha=cfg.get("ha", "center"),
+        va=cfg.get("va", "bottom"),
+        rotation=cfg.get("rotation", auto_rot),
+        rotation_mode="anchor",
+        zorder=7,
+    )
+    return oom_w
 
 
 def main():
@@ -124,8 +169,8 @@ def main():
         print("No results found. Run run_sweep.sh first.")
         return
 
-    fig, (ax_time, ax_mem) = plt.subplots(1, 2, figsize=(7.0, 3.0))
-    fig.subplots_adjust(wspace=0.35)
+    fig, (ax_time, ax_mem) = plt.subplots(1, 2, figsize=(9.0, 3.6))
+    fig.subplots_adjust(wspace=0.30)
 
     sim_data = {}
     for sim in SIM_ORDER:
@@ -135,109 +180,122 @@ def main():
         worlds = sorted(by_worlds.keys())
         style = STYLES[sim]
         times = [by_worlds[n]["median_time_ms"] for n in worlds]
-        mems_raw = [by_worlds[n].get("peak_gpu_mb_nvml_absolute")
-                    or by_worlds[n].get("peak_gpu_mb")
-                    for n in worlds]
+        mems_raw = [
+            by_worlds[n].get("peak_gpu_mb_nvml_absolute") or by_worlds[n].get("peak_gpu_mb")
+            for n in worlds
+        ]
         sim_data[sim] = {"worlds": worlds, "times": times, "mems": mems_raw}
 
-        ax_time.plot(worlds, times, color=style["color"], marker=style["marker"],
-                     linewidth=style["lw"], markersize=5,
-                     label=LABELS[sim], zorder=style["zorder"])
+        ax_time.plot(
+            worlds,
+            times,
+            color=style["color"],
+            marker=style["marker"],
+            linewidth=style["lw"],
+            markersize=5,
+            label=LABELS[sim],
+            zorder=style["zorder"],
+        )
 
         mem_worlds = [w for w, m in zip(worlds, mems_raw) if m is not None]
         mems = [m for m in mems_raw if m is not None]
         if mems:
-            ax_mem.plot(mem_worlds, mems, color=style["color"], marker=style["marker"],
-                        linewidth=style["lw"], markersize=5,
-                        label=LABELS[sim], zorder=style["zorder"])
+            ax_mem.plot(
+                mem_worlds,
+                mems,
+                color=style["color"],
+                marker=style["marker"],
+                linewidth=style["lw"],
+                markersize=5,
+                label=LABELS[sim],
+                zorder=style["zorder"],
+            )
 
-    # 24 GB GPU limit + shading
-    ax_mem.axhline(GPU_MEM_LIMIT_MB, color="red", linestyle="-", linewidth=0.8,
-                   alpha=0.7, zorder=1)
-    ax_mem.text(0.99, GPU_MEM_LIMIT_MB * 1.3, r"24\,GB GPU limit",
-                fontsize=8, color="red", alpha=0.8, ha="right",
-                transform=blended_transform_factory(ax_mem.transAxes, ax_mem.transData))
+    # 24 GB GPU limit line + OOM shading
+    ax_mem.axhline(GPU_MEM_LIMIT_MB, color="red", linestyle="-", linewidth=0.8, alpha=0.6, zorder=1)
 
-    # OOM extrapolation + markers per failing engine (different annotation
-    # placements to avoid label overlap). Axion's memory curve is flat below
-    # ~512 worlds (GPU underutilised), so we fit the slope on N>=512 only —
-    # otherwise the flat-region pre-knee points pull the per-world slope down
-    # by ~50x. Confirmed wall: Axion OOM at 16384 on a 24 GB 3090.
-    oom_mjx = _add_oom_extrapolation(ax_mem, sim_data, "MJX-grad",
-                                      ann_x_factor=6.0, ann_y_factor=7.0,
-                                      ann_rotation=52)
-    oom_si = _add_oom_extrapolation(ax_mem, sim_data, "Semi-Implicit",
-                                     ann_x_factor=3.0, ann_y_factor=2.5,
-                                     ann_rotation=40)
-    oom_axion = _add_oom_extrapolation(ax_mem, sim_data, "Axion",
-                                        ann_x_factor=0.18, ann_y_factor=4.0,
-                                        ann_rotation=52, slope_fit_min_n=512)
+    # OOM extrapolation + memory-panel markers per engine. Axion's memory
+    # curve is flat below ~512 worlds (GPU underutilised), so we fit slope
+    # only on N>=512 — otherwise the flat-region pre-knee points pull the
+    # per-world slope down by ~50x.
+    # Slope labels are placed *along* each engine's dashed extrapolation,
+    # rotated to match the displayed slope (see _segment_display_angle_deg).
+    oom_info = {}
+    oom_info["MJX-grad"] = _add_oom_extrapolation(ax_mem, sim_data, "MJX-grad")
+    oom_info["Semi-Implicit"] = _add_oom_extrapolation(ax_mem, sim_data, "Semi-Implicit")
+    oom_info["Axion"] = _add_oom_extrapolation(ax_mem, sim_data, "Axion", slope_fit_min_n=512)
 
-    # OOM markers on time panel too (same world count as memory failure)
-    for sim_name, oom_w in [("MJX-grad", oom_mjx), ("Semi-Implicit", oom_si),
-                            ("Axion", oom_axion)]:
+    # Time-panel OOM markers: place X at the y-value where each engine's
+    # time curve last had data, then extend with a short dashed segment to
+    # the OOM x-coord (so the X visually continues the line).
+    for sim_name, oom_w in oom_info.items():
         if oom_w is None or sim_name not in sim_data:
             continue
-        median_t = np.median(sim_data[sim_name]["times"])
-        ax_time.plot(oom_w, median_t, "x", color="red",
-                     markersize=8, markeredgewidth=2.0, zorder=6)
-
-    # Axion-vs-MJX speedup double-arrow at the smallest common world count
-    if "Axion" in sim_data and "MJX-grad" in sim_data:
-        ax_d = sim_data["Axion"]; mx_d = sim_data["MJX-grad"]
-        common = sorted(set(ax_d["worlds"]) & set(mx_d["worlds"]))
-        if common:
-            w = common[0]
-            ax_t = ax_d["times"][ax_d["worlds"].index(w)]
-            mx_t = mx_d["times"][mx_d["worlds"].index(w)]
-            ratio = mx_t / ax_t
-            ax_time.annotate("", xy=(w, mx_t), xytext=(w, ax_t),
-                             arrowprops=dict(arrowstyle="<->", color="0.3",
-                                             lw=1.2, shrinkA=3, shrinkB=3))
-            mid_y = np.sqrt(ax_t * mx_t)
-            ax_time.text(w * 1.6, mid_y, rf"${ratio:.0f}\times$",
-                         fontsize=10, color="0.3", fontweight="bold",
-                         va="center", ha="left")
-
-    # Axion knee (GPU saturated)
-    _knee_w = None
-    if "Axion" in sim_data:
-        ax_d = sim_data["Axion"]
-        # Heuristic knee: world count where time/world starts growing.
-        # Pick 512 (matches flat exp 4) if present, else the inflection.
-        for candidate in (512, 256, 1024):
-            if candidate in ax_d["worlds"]:
-                _knee_w = candidate
-                break
-        if _knee_w is not None:
-            for ax in (ax_time, ax_mem):
-                ax.axvline(_knee_w, color="#2196F3", linestyle="--",
-                           linewidth=1.2, alpha=0.75)
+        d = sim_data[sim_name]
+        worlds = d["worlds"]
+        times = d["times"]
+        color = STYLES[sim_name]["color"]
+        last_w = worlds[-1]
+        last_t = times[-1]
+        # Linear extrapolation of time-curve slope in log-log to the OOM N.
+        if len(worlds) >= 2:
+            log_slope = (np.log(times[-1]) - np.log(times[-2])) / (
+                np.log(worlds[-1]) - np.log(worlds[-2])
+            )
+            log_t_oom = np.log(last_t) + log_slope * (np.log(oom_w) - np.log(last_w))
+            t_oom = np.exp(log_t_oom)
+        else:
+            t_oom = last_t
+        ax_time.plot(
+            [last_w, oom_w],
+            [last_t, t_oom],
+            color=color,
+            linestyle="--",
+            linewidth=1.2,
+            alpha=0.55,
+            zorder=2,
+        )
+        ax_time.plot(oom_w, t_oom, "x", color="red", markersize=9, markeredgewidth=2.0, zorder=6)
 
     for ax in (ax_time, ax_mem):
-        ax.set_xscale("log"); ax.set_yscale("log")
+        ax.set_xscale("log")
+        ax.set_yscale("log")
         ax.set_xlabel("Number of worlds")
-        ax.xaxis.set_major_formatter(ticker.ScalarFormatter())
+        ax.xaxis.set_major_locator(ticker.LogLocator(base=10, numticks=10))
+        ax.xaxis.set_major_formatter(ticker.LogFormatterMathtext())
+        ax.xaxis.set_minor_locator(ticker.LogLocator(base=10, subs=(2, 5), numticks=12))
         ax.xaxis.set_minor_formatter(ticker.NullFormatter())
-        ax.grid(True, which="both", alpha=0.35, linewidth=0.6)
+        ax.grid(True, which="major", alpha=0.35, linewidth=0.6)
+        ax.grid(True, which="minor", alpha=0.12, linewidth=0.4)
 
     ax_time.set_ylabel("Median time per iteration (ms)")
     ax_mem.set_ylabel("Peak GPU memory (MB)")
-    ax_mem.axhspan(GPU_MEM_LIMIT_MB, ax_mem.get_ylim()[1], color="red",
-                   alpha=0.05, zorder=0)
+    # 24 GB limit text — inside the shaded OOM band so it doesn't conflict
+    # with the MJX (red) slope label at top-left.
+    ax_mem.text(
+        0.5,
+        GPU_MEM_LIMIT_MB * 1.6,
+        r"24\,GB GPU limit",
+        fontsize=8,
+        color="red",
+        alpha=0.85,
+        ha="center",
+        va="bottom",
+        transform=blended_transform_factory(ax_mem.transAxes, ax_mem.transData),
+    )
+    ax_mem.axhspan(GPU_MEM_LIMIT_MB, ax_mem.get_ylim()[1] * 2, color="red", alpha=0.05, zorder=0)
 
-    if _knee_w is not None:
-        for ax in (ax_time, ax_mem):
-            ax.text(_knee_w - 100, 0.13, "GPU saturated",
-                    rotation=90, fontsize=8, color="#2196F3",
-                    ha="right", va="bottom",
-                    transform=blended_transform_factory(ax.transData, ax.transAxes))
-
-    ax_time.plot([], [], "x", color="red", markersize=8, markeredgewidth=2.0,
-                 label="Out of Memory")
+    ax_time.plot([], [], "x", color="red", markersize=9, markeredgewidth=2.0, label="Out of memory")
     handles, labels = ax_time.get_legend_handles_labels()
-    fig.legend(handles, labels, loc="lower center", ncol=len(handles),
-               bbox_to_anchor=(0.5, -0.22), frameon=False, columnspacing=1.5)
+    fig.legend(
+        handles,
+        labels,
+        loc="lower center",
+        ncol=len(handles),
+        bbox_to_anchor=(0.5, -0.14),
+        frameon=False,
+        columnspacing=1.8,
+    )
 
     out = RESULTS_DIR / "scalability_box.png"
     plt.savefig(out, dpi=300, bbox_inches="tight")
