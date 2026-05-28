@@ -80,6 +80,29 @@ class SplineAdam:
 
 # ------------------------------ loss kernels ---------------------------------
 @wp.kernel
+def chassis_track_step_kernel(
+    body_q: wp.array(dtype=wp.transform),    # state.body_q (single timestep)
+    ref_x: float, ref_y: float,
+    weight: float,
+    loss: wp.array(dtype=wp.float32),
+):
+    """Per-step chassis-xy tracking loss against a reference waypoint.
+
+    L_track = w * Σ_t ‖xy(t) − ref_xy(t)‖²  (chassis = body 0). Launched once
+    per timestep on that state's body_q (SI keeps per-step State objects, so
+    there is no batched body_pose array to launch over in one go like Axion).
+
+    Gives each spline knot a direct gradient signal at every timestep instead
+    of relying on the terminal loss to compound back through thousands of BPTT
+    steps — the same shaping term used in optimize_axion.py / optimize_mjx.py.
+    """
+    p = wp.transform_get_translation(body_q[0])
+    dx = p[0] - ref_x
+    dy = p[1] - ref_y
+    wp.atomic_add(loss, 0, weight * (dx * dx + dy * dy))
+
+
+@wp.kernel
 def final_pos_loss_step_kernel(
     body_q: wp.array(dtype=wp.transform),    # state.body_q (single timestep)
     target_x: float, target_y: float,
@@ -171,6 +194,16 @@ class HelhestJuniorBoxFinalPoseSI(NewtonDifferentiableSimulator):
         self.W, self.W_col_sums = make_interp_matrix(T, K)
         self.loss = wp.zeros(1, dtype=float, requires_grad=True)
 
+        # Waypoint reference path: linear interpolation in xy from IC to
+        # target, sampled at every state timestep (T_states = T+1). Used by
+        # chassis_track_step_kernel for the per-step shaping signal.
+        T_states = T + 1
+        t_norm = np.arange(T_states, dtype=np.float32) / max(T_states - 1, 1)
+        ref_xy_np = np.zeros((T_states, 2), dtype=np.float32)
+        ref_xy_np[:, 0] = self.ic_xy[0] + t_norm * (self.target_xy[0] - self.ic_xy[0])
+        ref_xy_np[:, 1] = self.ic_xy[1] + t_norm * (self.target_xy[1] - self.ic_xy[1])
+        self.ref_xy_np = ref_xy_np
+
     def build_model(self):
         self.builder.rigid_gap = 0.2
         ground_cfg = newton.ModelBuilder.ShapeConfig(mu=SI_MU, ke=SI_KE, kd=SI_KD, kf=SI_KF)
@@ -216,6 +249,21 @@ class HelhestJuniorBoxFinalPoseSI(NewtonDifferentiableSimulator):
         tail_start = T - tail_len
         device = self.solver.model.device
         w = self.weights
+
+        # 0. Per-step waypoint tracking — dense shaping signal. One launch per
+        #    state (T+1 of them), each reading that step's chassis xy. The
+        #    weight/T_states normalisation makes the term a mean over steps, so
+        #    its magnitude is dt-independent and comparable to Axion/MJX.
+        if w.get("track", 0.0) > 0.0:
+            T_states = T + 1
+            per_step_track = float(w["track"] / T_states)
+            for i in range(T_states):
+                wp.launch(chassis_track_step_kernel, dim=1,
+                          inputs=[self.states[i].body_q,
+                                  float(self.ref_xy_np[i, 0]),
+                                  float(self.ref_xy_np[i, 1]),
+                                  per_step_track],
+                          outputs=[self.loss], device=device)
 
         # 1. Final position (single launch on state[T])
         wp.launch(final_pos_loss_step_kernel, dim=1,
@@ -344,40 +392,83 @@ def sample_ic_target(rng, ic_perturb, target_perturb):
     return ic, target
 
 
+WHEEL_RADIUS = 0.35  # m — matches examples/helhest_junior/common.py
+INIT_TYPES = ("constant", "distance-aware")
+
+
+def initial_spline(K, num_dofs, seed, init_type, target_xy, horizon,
+                   noise_std=0.2, const_mean=2.0, const_std=0.5):
+    """K×num_dofs initial spline guess — same helper as optimize_axion.py.
+
+    'distance-aware' starts as a decaying ramp from 2·ω_avg to 0, where
+    ω_avg = |target_x| / (horizon · wheel_radius); 'constant' is the old
+    mean=2.0 init. Distance-aware bakes in the "drive then stop" shape.
+    """
+    rng = np.random.default_rng(seed)
+    if init_type == "constant":
+        return (const_mean + const_std * rng.standard_normal((K, num_dofs))).astype(np.float64)
+    if init_type == "distance-aware":
+        v_avg = float(abs(target_xy[0])) / max(horizon, 1e-6)
+        omega_avg = v_avg / WHEEL_RADIUS
+        ramp = np.linspace(2.0 * omega_avg, 0.0, K)
+        init = ramp[:, None] * np.ones(num_dofs)
+        init = init + noise_std * rng.standard_normal((K, num_dofs))
+        return init.astype(np.float64)
+    raise ValueError(f"unknown init_type: {init_type}. Choices: {INIT_TYPES}")
+
+
 def run_trial(seed, K, lr, iterations, horizon, dt, ic, target, weights,
-              clip_grad_norm=1.0):
+              clip_grad_norm=1.0, init_type="distance-aware", init_noise_std=0.2):
     sim_cfg, rc, ec = make_configs(horizon, dt)
     sim = HelhestJuniorBoxFinalPoseSI(
         sim_cfg, rc, ec, LoggingConfig(),
         ic_xy=ic["xy"], ic_yaw=ic["yaw"],
         target_xy=target["xy"], target_yaw=target["yaw"],
         weights=weights, K=K)
-    rng = np.random.default_rng(seed)
-    init = 2.0 + 0.5 * rng.standard_normal((K, NUM_WHEEL_DOFS))
-    sim.spline_params = init.astype(np.float64)
+    sim.spline_params = initial_spline(
+        K, NUM_WHEEL_DOFS, seed, init_type, target["xy"], horizon,
+        noise_std=init_noise_std)
     sim.spline_adam = SplineAdam(K=K, num_dofs=NUM_WHEEL_DOFS,
                                   lr=lr, lr_min_ratio=0.2, total_steps=iterations)
     sim._apply_params(sim.spline_params)
 
     losses, grad_norms, n_clipped = [], [], 0
+    best_loss = float("inf"); best_iter = 0
+    best_params = sim.spline_params.copy()
     t0 = time.perf_counter()
     for it in range(iterations):
         loss, gnorm = sim.opt_step(clip_grad_norm=clip_grad_norm)
         losses.append(loss); grad_norms.append(gnorm)
         if clip_grad_norm is not None and gnorm > clip_grad_norm:
             n_clipped += 1
+        # Snapshot best-iter params — the noisy contact gradient makes Adam
+        # wander past discovered minima, so the deployable params are the
+        # best Adam visited, not iter N-1. Matches optimize_axion / _mjx.
+        if loss < best_loss:
+            best_loss = float(loss); best_iter = it
+            best_params = sim.spline_params.copy()
         if it % 10 == 0 or it == iterations - 1:
             star = " *" if (clip_grad_norm is not None and gnorm > clip_grad_norm) else ""
             print(f"    iter {it:3d}: loss={loss:.4f} |g|={gnorm:.2f}{star}", flush=True)
     wall = time.perf_counter() - t0
+
+    # Restore best-iter params, re-roll out, then read metrics from that.
+    sim.spline_params = best_params
+    sim._apply_params(best_params)
+    sim.diff_step(); wp.synchronize()
     metrics = sim.final_metrics()
     metrics["success"] = bool(metrics["pos_error_m"] < 0.2
                               and metrics["terminal_speed_mps"] < 0.3)
+    print(f"    BEST-iter restored: iter {best_iter}, loss {best_loss:.4f}  "
+          f"-> pos_err={metrics['pos_error_m']:.3f}m  "
+          f"vel={metrics['terminal_speed_mps']:.3f}m/s  "
+          f"{'OK' if metrics['success'] else 'FAIL'}", flush=True)
     sim.close(); del sim
     return {"seed": int(seed), "ic": ic, "target": target,
             "losses": losses, "grad_norms": grad_norms,
             "n_clipped": int(n_clipped), "wall_s": wall,
-            "best_loss": float(min(losses)),
+            "best_loss": float(best_loss), "best_iter": int(best_iter),
+            "final_loss": float(losses[-1]),
             "final_metrics": metrics}
 
 
@@ -391,17 +482,28 @@ def main():
     ap.add_argument("--seed-base", type=int, default=42)
     ap.add_argument("--horizon-s", type=float, default=6.0)
     ap.add_argument("--dt", type=float, default=5e-4)
-    ap.add_argument("--ic-xy", type=float, default=0.3)
-    ap.add_argument("--ic-yaw-deg", type=float, default=15.0)
+    ap.add_argument("--ic-xy", type=float, default=0.1,
+                    help="±range for IC xy perturbation (m). Matched to "
+                    "optimize_axion / _mjx (reduced from the original ±0.3).")
+    ap.add_argument("--ic-yaw-deg", type=float, default=5.0,
+                    help="±range for IC yaw perturbation (deg). Matched to "
+                    "optimize_axion / _mjx (reduced from ±15°).")
     ap.add_argument("--target-x", type=float, default=3.0)
     ap.add_argument("--target-y", type=float, default=0.0)
     ap.add_argument("--target-xy-jitter", type=float, default=0.3)
     ap.add_argument("--target-yaw-deg", type=float, default=15.0)
+    ap.add_argument("--w-track", type=float, default=1.0,
+                    help="Per-step chassis-xy tracking weight against a linear "
+                    "IC→target reference (the shaping term). Matches "
+                    "optimize_axion / _mjx. Set to 0 to disable.")
     ap.add_argument("--w-pos", type=float, default=1.0)
     ap.add_argument("--w-yaw", type=float, default=0.5)
     ap.add_argument("--w-vel", type=float, default=0.3)
     ap.add_argument("--w-smooth", type=float, default=1e-3)
     ap.add_argument("--w-reg", type=float, default=1e-5)
+    ap.add_argument("--init-type", choices=INIT_TYPES, default="distance-aware",
+                    help="initial spline guess; matched to optimize_axion.")
+    ap.add_argument("--init-noise-std", type=float, default=0.2)
     ap.add_argument("--clip-grad-norm", type=float, default=1.0)
     ap.add_argument("--save", default=None)
     args = ap.parse_args()
@@ -410,8 +512,8 @@ def main():
     target_perturb = {"xy_center": (args.target_x, args.target_y),
                        "xy_jitter": args.target_xy_jitter,
                        "yaw_rad": np.deg2rad(args.target_yaw_deg)}
-    weights = {"pos": args.w_pos, "yaw": args.w_yaw, "vel": args.w_vel,
-               "smooth": args.w_smooth, "reg": args.w_reg}
+    weights = {"track": args.w_track, "pos": args.w_pos, "yaw": args.w_yaw,
+               "vel": args.w_vel, "smooth": args.w_smooth, "reg": args.w_reg}
 
     print(f"K={args.K} iters={args.iterations} lr={args.lr} "
           f"trials={args.num_trials} dt={args.dt} horizon={args.horizon_s}s")
@@ -430,7 +532,9 @@ def main():
               f"target=({target['xy'][0]:.2f},{target['xy'][1]:+.2f},{np.rad2deg(target['yaw']):+.1f}°) ---")
         t = run_trial(spline_seed, args.K, args.lr, args.iterations,
                       args.horizon_s, args.dt, ic, target, weights,
-                      clip_grad_norm=args.clip_grad_norm)
+                      clip_grad_norm=args.clip_grad_norm,
+                      init_type=args.init_type,
+                      init_noise_std=args.init_noise_std)
         m = t["final_metrics"]
         print(f"  -> pos_err={m['pos_error_m']:.3f}m  vel={m['terminal_speed_mps']:.2f}m/s  "
               f"jerk={m['control_jerk']:.1f}  {'OK' if m['success'] else 'FAIL'}", flush=True)
@@ -451,6 +555,8 @@ def main():
         "target_perturbation": {**target_perturb,
                                  "xy_center": list(target_perturb["xy_center"])},
         "loss_weights": weights,
+        "init_type": args.init_type,
+        "init_noise_std": args.init_noise_std,
         "aggregate": {
             "success_rate": success_rate,
             "median_pos_error_m": median_pos,
