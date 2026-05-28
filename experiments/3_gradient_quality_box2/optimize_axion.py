@@ -856,11 +856,12 @@ def main():
     ap.add_argument(
         "--init-type",
         choices=INIT_TYPES,
-        default="distance-aware",
-        help="initial spline guess. 'distance-aware' (default) "
-        "starts as a decaying ramp from 2·ω_avg to 0 based "
-        "on the target distance; 'constant' is the old "
-        "mean=2.0 init.",
+        default="constant",
+        help="initial spline guess. 'constant' (default) is the "
+        "mean=2.0 init — the canonical apples-to-apples init shared "
+        "with MJX/SI (also yields higher success than distance-aware "
+        "under the matched task). 'distance-aware' starts as a "
+        "decaying ramp from 2·ω_avg to 0 based on target distance.",
     )
     ap.add_argument(
         "--init-noise-std",

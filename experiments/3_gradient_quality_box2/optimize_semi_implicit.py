@@ -251,13 +251,16 @@ class HelhestJuniorBoxFinalPoseSI(NewtonDifferentiableSimulator):
         w = self.weights
 
         # 0. Per-step waypoint tracking — dense shaping signal. One launch per
-        #    state (T+1 of them), each reading that step's chassis xy. The
-        #    weight/T_states normalisation makes the term a mean over steps, so
-        #    its magnitude is dt-independent and comparable to Axion/MJX.
+        #    POST-STEP state (states[1..T]), each reading that step's chassis
+        #    xy. We deliberately skip states[0]: it is the eval_fk initial leaf
+        #    (not produced by a sim step), and backpropping a loss through it
+        #    NaNs the semi-implicit adjoint. box1 (3_gradient_quality_box) does
+        #    the same. Normalise by T so the term is a mean over steps —
+        #    dt-independent and comparable to Axion/MJX.
         if w.get("track", 0.0) > 0.0:
             T_states = T + 1
-            per_step_track = float(w["track"] / T_states)
-            for i in range(T_states):
+            per_step_track = float(w["track"] / T)
+            for i in range(1, T_states):
                 wp.launch(chassis_track_step_kernel, dim=1,
                           inputs=[self.states[i].body_q,
                                   float(self.ref_xy_np[i, 0]),
@@ -501,8 +504,9 @@ def main():
     ap.add_argument("--w-vel", type=float, default=0.3)
     ap.add_argument("--w-smooth", type=float, default=1e-3)
     ap.add_argument("--w-reg", type=float, default=1e-5)
-    ap.add_argument("--init-type", choices=INIT_TYPES, default="distance-aware",
-                    help="initial spline guess; matched to optimize_axion.")
+    ap.add_argument("--init-type", choices=INIT_TYPES, default="constant",
+                    help="initial spline guess; matched to optimize_axion "
+                    "(constant mean=2.0 — the canonical apples-to-apples init).")
     ap.add_argument("--init-noise-std", type=float, default=0.2)
     ap.add_argument("--clip-grad-norm", type=float, default=1.0)
     ap.add_argument("--save", default=None)
