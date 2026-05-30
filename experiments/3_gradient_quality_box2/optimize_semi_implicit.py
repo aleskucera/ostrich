@@ -324,8 +324,30 @@ class HelhestJuniorBoxFinalPoseSI(NewtonDifferentiableSimulator):
             g = self.controls[i].joint_target_vel.grad.numpy()
             grad_v[i] = g[WHEEL_DOF_OFFSET:WHEEL_DOF_OFFSET + NUM_WHEEL_DOFS]
             self.controls[i].joint_target_vel.grad.zero_()
+
+        # NaN/Inf salvage. The SI adjoint over thousands of stiff-contact
+        # steps can emit non-finite per-step gradients — typically a blow-up
+        # originating at the violent box-contact step that then propagates
+        # backward. If we let even one NaN through, the clip check
+        # (`nan > clip` is False) passes it unclipped, Adam folds NaN into
+        # m/v/params, and EVERY later iter is NaN — one bad backward kills the
+        # whole run. Instead, zero only the non-finite entries (keeping the
+        # finite components, often the post-contact timesteps) so the step
+        # direction stays usable. Count them so the caller can report how
+        # degenerate the gradient was.
+        n_bad_grad = int((~np.isfinite(grad_v)).sum())
+        if n_bad_grad > 0:
+            grad_v = np.nan_to_num(grad_v, nan=0.0, posinf=0.0, neginf=0.0)
+        self._last_n_bad_grad = n_bad_grad
+
         grad_params = self._contract(grad_v)
         gnorm = float(np.linalg.norm(grad_params))
+        # Backstop: if salvage still left a non-finite norm (or the whole
+        # gradient was non-finite), skip the update so params/Adam stay clean.
+        if not np.isfinite(gnorm):
+            self.tape.zero()
+            self.loss.zero_()
+            return loss_val, gnorm
         if clip_grad_norm is not None and gnorm > clip_grad_norm:
             grad_params = grad_params * (clip_grad_norm / gnorm)
         self.spline_params = self.spline_adam.step(self.spline_params, grad_params)
@@ -436,6 +458,7 @@ def run_trial(seed, K, lr, iterations, horizon, dt, ic, target, weights,
     sim._apply_params(sim.spline_params)
 
     losses, grad_norms, n_clipped = [], [], 0
+    n_nan_grad_iters, total_bad_grad = 0, 0
     best_loss = float("inf"); best_iter = 0
     best_params = sim.spline_params.copy()
     t0 = time.perf_counter()
@@ -444,6 +467,9 @@ def run_trial(seed, K, lr, iterations, horizon, dt, ic, target, weights,
         losses.append(loss); grad_norms.append(gnorm)
         if clip_grad_norm is not None and gnorm > clip_grad_norm:
             n_clipped += 1
+        n_bad = getattr(sim, "_last_n_bad_grad", 0)
+        if n_bad > 0:
+            n_nan_grad_iters += 1; total_bad_grad += n_bad
         # Snapshot best-iter params — the noisy contact gradient makes Adam
         # wander past discovered minima, so the deployable params are the
         # best Adam visited, not iter N-1. Matches optimize_axion / _mjx.
@@ -452,8 +478,12 @@ def run_trial(seed, K, lr, iterations, horizon, dt, ic, target, weights,
             best_params = sim.spline_params.copy()
         if it % 10 == 0 or it == iterations - 1:
             star = " *" if (clip_grad_norm is not None and gnorm > clip_grad_norm) else ""
-            print(f"    iter {it:3d}: loss={loss:.4f} |g|={gnorm:.2f}{star}", flush=True)
+            nanflag = f" nan_grad={n_bad}" if n_bad > 0 else ""
+            print(f"    iter {it:3d}: loss={loss:.4f} |g|={gnorm:.2f}{star}{nanflag}", flush=True)
     wall = time.perf_counter() - t0
+    if n_nan_grad_iters > 0:
+        print(f"    [nan-grad] {n_nan_grad_iters}/{iterations} iters had "
+              f"non-finite grad entries ({total_bad_grad} total, salvaged)", flush=True)
 
     # Restore best-iter params, re-roll out, then read metrics from that.
     sim.spline_params = best_params
@@ -470,6 +500,8 @@ def run_trial(seed, K, lr, iterations, horizon, dt, ic, target, weights,
     return {"seed": int(seed), "ic": ic, "target": target,
             "losses": losses, "grad_norms": grad_norms,
             "n_clipped": int(n_clipped), "wall_s": wall,
+            "n_nan_grad_iters": int(n_nan_grad_iters),
+            "total_bad_grad": int(total_bad_grad),
             "best_loss": float(best_loss), "best_iter": int(best_iter),
             "final_loss": float(losses[-1]),
             "final_metrics": metrics}
