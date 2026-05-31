@@ -26,36 +26,30 @@ Usage:
 import argparse
 import json
 import pathlib
+import sys
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+import paper_style as ps  # noqa: E402
+
 RESULTS_DIR = pathlib.Path(__file__).parent / "results"
 PAPER_DIR = pathlib.Path(__file__).resolve().parents[2] / ".." / "axion_paper" / "figures"
 
-plt.rcParams.update({
-    "text.usetex": True,
-    "text.latex.preamble": r"\usepackage{amsmath}",
-    "font.family": "serif",
-    "font.size": 12,
-    "axes.labelsize": 12,
-    "xtick.labelsize": 11,
-    "ytick.labelsize": 11,
-    "legend.fontsize": 11,
-    "axes.spines.top": False,
-    "axes.spines.right": False,
-})
+ps.apply()
 
+_LW = ps.LINEWIDTH
 STYLES = {
-    "Axion":         {"color": "#2196F3", "marker": "o", "lw": 2.0, "zorder": 5},
-    "MJX":           {"color": "#E91E63", "marker": "s", "lw": 1.8, "zorder": 4},
-    "Semi-Implicit": {"color": "#FF9800", "marker": "^", "lw": 1.8, "zorder": 3},
-    "MuJoCo":        {"color": "#E91E63", "marker": "s", "lw": 1.8, "zorder": 4},
-    "TinyDiffSim":   {"color": "#607D8B", "marker": "D", "lw": 1.8, "zorder": 2},
+    "Axion":         {"color": ps.COLORS["Axion"],       "marker": "o", "lw": _LW, "zorder": 5},
+    "MJX":           {"color": ps.COLORS["MJX"],         "marker": "s", "lw": _LW, "zorder": 4},
+    "Semi-Implicit": {"color": ps.COLORS["Semi-Implicit"], "marker": "^", "lw": _LW, "zorder": 3},
+    "MuJoCo":        {"color": ps.COLORS["MuJoCo"],      "marker": "s", "lw": _LW, "zorder": 4},
+    "TinyDiffSim":   {"color": ps.COLORS["TinyDiffSim"], "marker": "D", "lw": _LW, "zorder": 2},
 }
 LABELS = {
-    "Axion":         r"\textbf{Axion}",
+    "Axion":         r"\textbf{Ostrich}",
     "MJX":           "MJX",
     "MuJoCo":        "MuJoCo",
     "Semi-Implicit": "Semi-Impl.",

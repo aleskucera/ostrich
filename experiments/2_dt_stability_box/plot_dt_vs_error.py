@@ -51,7 +51,7 @@ STYLES = {
     "Semi-Implicit": {"color": "#FF9800", "marker": "^", "lw": 1.8, "zorder": 3},
 }
 LABELS = {
-    "Axion": r"\textbf{Axion}",
+    "Axion": r"\textbf{Ostrich}",
     "MuJoCo": "MuJoCo",
     "Semi-Implicit": "Semi-Impl.",
 }
