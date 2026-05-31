@@ -22,11 +22,11 @@ plt.rcParams.update({
     "text.usetex": True,
     "text.latex.preamble": r"\usepackage{amsmath}",
     "font.family": "serif",
-    "font.size": 18,
-    "axes.labelsize": 18,
-    "xtick.labelsize": 14,
-    "ytick.labelsize": 14,
-    "legend.fontsize": 11,
+    "font.size": 11,
+    "axes.labelsize": 11,
+    "xtick.labelsize": 10,
+    "ytick.labelsize": 10,
+    "legend.fontsize": 10,
     "axes.spines.top": False,
     "axes.spines.right": False,
 })
@@ -43,9 +43,12 @@ def smooth(x, window=7):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--batch-dir", type=str, required=True)
-    parser.add_argument("--seed", type=int, required=True,
-                        help="Seed to use for the example trajectory panel")
+    parser.add_argument("--batch-dir", type=str, default="results/terrain_batch_old",
+                        help="Directory of seed_*.json (default: the 50-seed "
+                             "batch behind the paper figure)")
+    parser.add_argument("--seed", type=int, default=24,
+                        help="Seed for the example trajectory panel "
+                             "(default: 24, the example shown in the paper)")
     parser.add_argument("--show", action="store_true")
     args = parser.parse_args()
 
@@ -69,7 +72,7 @@ def main():
 
     # --- Figure ---
     fig, (ax_traj, ax_conv) = plt.subplots(
-        1, 2, figsize=(11.0, 3.8),
+        1, 2, figsize=(9.0, 3.6),
         gridspec_kw={"width_ratios": [1, 1], "wspace": 0.35},
     )
 
@@ -106,11 +109,11 @@ def main():
     # Best
     t_best = trajs.get(str(best_iter))
     if t_best:
-        ax_traj.plot(t_best["x"], t_best["y"], color=AXION_COLOR, linewidth=2.5,
+        ax_traj.plot(t_best["x"], t_best["y"], color=AXION_COLOR, linewidth=2.0,
                      label=f"iter {best_iter} ({best_rmse:.2f}\\,m)")
 
     # Target
-    ax_traj.plot(target["x"], target["y"], color=TARGET_COLOR, linewidth=2.5,
+    ax_traj.plot(target["x"], target["y"], color=TARGET_COLOR, linewidth=2.0,
                  linestyle="--", label="target")
     ax_traj.plot(target["x"][0], target["y"][0], "o", color=TARGET_COLOR, markersize=5, zorder=5)
     if t_best:
@@ -121,7 +124,7 @@ def main():
     ax_traj.set_aspect("auto")
     ax_traj.grid(True, which="major", alpha=0.25, linewidth=0.5)
     ax_traj.legend(loc="upper center", bbox_to_anchor=(0.5, -0.25),
-                   ncol=2, fontsize=13, framealpha=0.85, columnspacing=1.2,
+                   ncol=2, fontsize=10, framealpha=0.85, columnspacing=1.2,
                    handlelength=1.5)
 
     # ===== Panel 2: Convergence envelope =====
@@ -144,7 +147,7 @@ def main():
     ax_conv.set_ylabel("RMSE (m)")
     ax_conv.grid(True, which="major", alpha=0.25, linewidth=0.5)
     ax_conv.legend(loc="upper right", fontsize=10)
-    ax_conv.set_title(f"{num_seeds} random terrains", fontsize=14)
+    ax_conv.set_title(f"{num_seeds} random terrains", fontsize=11)
 
     all_best = np.array([min(d["rmse_m"]) for d in all_data])
 
