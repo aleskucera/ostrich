@@ -54,6 +54,14 @@ def load_gt(path) -> dict:
 # behind low position L2). 0.5 m matches roughly half the junior wheelbase.
 YAW_LEVER_ARM = 0.5  # m
 
+# Settled-baseline window for the z reference (seconds). The chassis spawns
+# slightly high and drops onto its wheels in the first ~0.2 s; the robot reaches
+# the box near-face only after travelling ~1 m (≳2.5 s at the recorded speeds).
+# [0.3, 1.0] s is safely after the settle and before any box contact, so its
+# median z is the flat-ground resting height used as z=0 for every engine.
+Z_SETTLE_LO = 0.3  # s
+Z_SETTLE_HI = 1.0  # s
+
 
 def _yaw_from_quat_xyzw(q: np.ndarray) -> np.ndarray:
     """Yaw (rotation about world +Z) from quaternions [N, 4] in xyzw order."""
@@ -85,8 +93,23 @@ def score(sim_pose: np.ndarray, sim_dt: float, gt: dict, prism_offset=PRISM_OFFS
     torsional friction), which pure position L2 misses entirely.
     """
     sim = prism_track(sim_pose, np.asarray(prism_offset, dtype=np.float32))
-    sim = sim - sim[0]  # relative to start, like the real trajectory
     st = np.arange(sim.shape[0]) * sim_dt
+    # Zero x,y against the spawn pose (no transient there), but zero z against
+    # the *settled* pre-box baseline rather than sim[0]. The chassis spawns
+    # slightly above its resting height and drops onto its wheels over the
+    # first ~0.2 s; engines that settle more (e.g. MuJoCo's softer contact)
+    # would otherwise get their whole z curve shifted down by that settle,
+    # because sim[0,2] is read before the drop completes. The real data is
+    # already settled at t=0, so its baseline has no such drop. We take the
+    # median z over a settled window [Z_SETTLE_LO, Z_SETTLE_HI] s — after the
+    # contact settle, before the robot reaches the box — as the z=0 reference.
+    sim = sim - sim[0]  # x,y relative to start (z fixed up next)
+    lo = int(round(Z_SETTLE_LO / sim_dt))
+    hi = min(int(round(Z_SETTLE_HI / sim_dt)), sim.shape[0])
+    if hi > lo:
+        # sim[:,2] was just shifted by sim[0,2]; rebase z on the settled median.
+        z_baseline_rel = float(np.median(sim[lo:hi, 2]))
+        sim[:, 2] -= z_baseline_rel
 
     rt = gt["real"]["t"]
     rx, ry, rz = gt["real"]["x"], gt["real"]["y"], gt["real"]["z"]

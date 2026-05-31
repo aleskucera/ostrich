@@ -1,5 +1,12 @@
 """3-panel comparison figure for the box sim-to-real benchmark.
 
+    DEV / DIAGNOSTIC FIGURE — NOT the paper figure.
+    This script writes results/box_sim_to_real.png with per-panel titles, a
+    suptitle, and verbose bar labels (yaw, full param strings) — useful while
+    iterating, but it must NOT be installed into axion_paper/figures/.
+    The PAPER figure is produced by plot_paper_panels.py; install it with
+    `bash make_paper_figs.sh`.
+
 Reads ``results/sweep_<engine>.json`` from each engine and overlays the best
 trajectory of each on the real total-station data for one representative run.
 

@@ -1,11 +1,16 @@
 """Paper-ready figures for the box-obstacle experiments.
 
+    THIS is the canonical PAPER figure source (clean: serif fonts, no per-panel
+    titles, shared bottom legend, spines off). Do NOT use plot_results.py for the
+    paper — that one is dev/diagnostic. To regenerate AND install into the paper
+    tree in one step, run `bash make_paper_figs.sh` (never hand-`cp`).
+
 Mirrors the old `experiments/1_sim_to_real/plot_results.py` layout:
 one wide multi-panel PNG per figure, shared legend at the bottom, serif fonts,
 top/right spines off. Pairs with a separately-rendered scene viz PNG in LaTeX
 via the same minipage pattern as the existing Fig 2 in the paper.
 
-Outputs:
+Outputs (then installed to axion_paper/figures/ by make_paper_figs.sh):
   results/paper_panels/box_sim_to_real.png   -- 3 panels (xy, z, bar)
   results/paper_panels/box_dt_stability.png  -- 1 panel (dt sweep)
 """
