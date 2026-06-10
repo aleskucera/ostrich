@@ -199,3 +199,40 @@ examples/comparison_scalability/*/results/
 
 *.npz
 *.blend
+
+# ---- repo cleanup (2026-06): large data / generated / third-party / scratch ----
+# Raw data, baselines, rosbags (never tracked)
+/data/rosbags/
+/data/baselines/
+/data/*.pdf
+# Standalone third-party clones (carry their own .git)
+/third_party/Genesis/
+/third_party/diffarticulated/
+# Top-level scratch run outputs
+/results/
+# Scratch & debug scripts
+/test_scripts/
+# Thesis PDFs + review notes
+/thesis/
+# Friction-gradient toy exploration
+/friction_gradient_toy/
+# Ablation experiments depending on the dropped use_best_iterate toggle
+/experiments/5_ablation_backtracking_box/
+/experiments/6_ablation_backtracking_terrain/
+# Per-experiment generated data / renders / archives
+experiments/1_sim_to_real_box/data/
+experiments/1_sim_to_real_box/render/
+experiments/1_sim_to_real_box/results/_archive/
+# Large blender/figure binaries for the helhest_junior gradient figure
+examples/helhest_junior/gradient/assets/
+examples/helhest_junior/gradient/data/
+examples/helhest_junior/gradient/figures/
+examples/helhest_junior/gradient/figures_remote/
+# Blender autosave backups & MuJoCo logs
+*.blend1
+MUJOCO_LOG.TXT
+# Root-level scratch
+/examples/ball_fall2.py
+/implicit_gradient.pdf
+/draft_anchors.json
+/animated.blend1
