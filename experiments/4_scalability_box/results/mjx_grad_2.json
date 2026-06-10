@@ -1,0 +1,19 @@
+{
+  "simulator": "MJX-grad",
+  "num_worlds": 2,
+  "median_time_ms": 204113.10215396225,
+  "peak_gpu_mb": 13989.59912109375,
+  "peak_gpu_mb_nvml_absolute": null,
+  "peak_gpu_mb_nvml": null,
+  "time_ms": [
+    203731.50274797808,
+    203786.17342800135,
+    203865.70940504316,
+    203740.16409897013,
+    204486.04020895436
+  ],
+  "K": 10,
+  "dt": 0.005,
+  "duration_s": 6.0,
+  "iterations": 5
+}
