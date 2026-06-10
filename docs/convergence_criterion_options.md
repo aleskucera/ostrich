@@ -2,7 +2,7 @@
 
 ## The problem
 
-Newton-Raphson stops when `||r||² < newton_atol²`, with `newton_atol = 1e-3`
+Newton-Raphson stops when $\|r\|^2 < \texttt{newton\_atol}^2$, with `newton_atol = 1e-3`
 in `examples/conf/engine/axion.yaml`. There are two things wrong with that:
 
 **1. The threshold has no physical meaning.** It was picked by trial
@@ -13,21 +13,21 @@ how a tolerance should be specified for a physics solver where users
 will reason about the output ("how accurate is my contact force?",
 "how much does my robot drift per second?").
 
-**2. The residual vector has heterogeneous units.** `r` is the
+**2. The residual vector has heterogeneous units.** $r$ is the
 concatenation of:
 
-| block         | row content                                  | physical units            |
-|---------------|----------------------------------------------|---------------------------|
-| dynamics      | `M(v − v_old)/dt − f_ext − J^T λ`            | force (N)                 |
-| contact-FB    | `φ_FB(λ_n, J_n v + b_n)` per contact         | mixed (force × velocity)  |
-| friction-FB   | `φ_FB^{2D}(λ_t, J_t v, μ·f_n_prev)` per c.   | mixed                     |
-| joint (pos)   | `g_joint(q)` per joint                       | meters or radians         |
-| control       | `J_ctrl·v − v_target` per actuator           | m/s or rad/s              |
+| block         | row content                                                                                                | physical units            |
+|---------------|------------------------------------------------------------------------------------------------------------|---------------------------|
+| dynamics      | $M(v - v_{\text{old}})/dt - f_{\text{ext}} - J^{\top}\lambda$                                              | force (N)                 |
+| contact-FB    | $\varphi_{\text{FB}}(\lambda_n,\, J_n v + b_n)$ per contact                                                | mixed (force × velocity)  |
+| friction-FB   | $\varphi_{\text{FB}}^{2D}(\lambda_t,\, J_t v,\, \mu \cdot f_n^{\text{prev}})$ per c.                       | mixed                     |
+| joint (pos)   | $g_{\text{joint}}(q)$ per joint                                                                            | meters or radians         |
+| control       | $J_{\text{ctrl}} \cdot v - v_{\text{target}}$ per actuator                                                 | m/s or rad/s              |
 
-`||r||²` sums squares of entries with different units. The norm is
+$\|r\|^2$ sums squares of entries with different units. The norm is
 dominated by whichever block has the largest *natural* scale,
-regardless of which one the engineer cares about. A residual of 1e-3
-could mean "10 mN dynamic imbalance", "1 mm joint drift", "1e-3
+regardless of which one the engineer cares about. A residual of $10^{-3}$
+could mean "10 mN dynamic imbalance", "1 mm joint drift", "$10^{-3}$
 unitless complementarity violation", or any combination — they're
 all in the same scalar bucket.
 
@@ -53,44 +53,46 @@ Two practical consequences:
 
 Five approaches, roughly ordered by effort.
 
-### Option 1: Use `||Δλ|| < ε_step` as the convergence check
+### Option 1: Use $\|\Delta\lambda\| < \varepsilon_{\text{step}}$ as the convergence check
 
-Stop NR when the Newton step itself is small. Since `Δλ` has units of
+Stop NR when the Newton step itself is small. Since $\Delta\lambda$ has units of
 force (N), the threshold is engineering-meaningful: "I will accept the
 solution when one more Newton iteration would change my contact forces
 by less than 0.01 N."
 
-Implementation: trivial. We already compute `Δλ` (`data._dconstr_force`)
+Implementation: trivial. We already compute $\Delta\lambda$ (`data._dconstr_force`)
 each iter as the linear-solve output. One reduction kernel
-(`||Δλ||_∞` or `||Δλ||_2`) and a comparison.
+($\|\Delta\lambda\|_{\infty}$ or $\|\Delta\lambda\|_2$) and a comparison.
 
 Trade-offs:
 * **Pro:** physical units, single threshold, the threshold means
   exactly what it says.
 * **Con:** can declare convergence too early near the FB cone corner
-  where Newton stagnates (small `Δλ` but residual still large).
-  Mitigated by keeping `||r||` as a secondary check.
+  where Newton stagnates (small $\Delta\lambda$ but residual still large).
+  Mitigated by keeping $\|r\|$ as a secondary check.
 * **Con:** doesn't catch the case where Newton is *not* converging at
-  all — large `||Δλ||` indefinitely. Need a max-iter cap (which we
+  all — large $\|\Delta\lambda\|$ indefinitely. Need a max-iter cap (which we
   have).
 
 **Production solvers** (e.g., MuJoCo CG/Newton paths) typically use
-`||Δλ||` (or `||Δq||`) as a *primary* check alongside a residual
+$\|\Delta\lambda\|$ (or $\|\Delta q\|$) as a *primary* check alongside a residual
 check.
 
 ### Option 2: Per-block residual thresholds
 
-Split `r` at the offsets we already track in `EngineDimensions`
+Split $r$ at the offsets we already track in `EngineDimensions`
 (`offset_n`, `offset_f`, joint slots, control slots) and check each
 block independently:
 
-```
-||r_dyn||_∞      < ε_force      e.g. 1e-2 N
-||r_contact||_∞  < ε_compl      e.g. 1e-4 (FB units)
-||r_friction||_∞ < ε_compl      e.g. 1e-4
-||r_joint||_∞    < ε_pos        e.g. 1e-3 m
-||r_ctrl||_∞     < ε_vel        e.g. 1e-3 m/s
-```
+$$
+\begin{aligned}
+\|r_{\text{dyn}}\|_{\infty}      &< \varepsilon_{\text{force}}    &&\text{e.g. } 10^{-2}\ \text{N}\\
+\|r_{\text{contact}}\|_{\infty}  &< \varepsilon_{\text{compl}}    &&\text{e.g. } 10^{-4}\ \text{(FB units)}\\
+\|r_{\text{friction}}\|_{\infty} &< \varepsilon_{\text{compl}}    &&\text{e.g. } 10^{-4}\\
+\|r_{\text{joint}}\|_{\infty}    &< \varepsilon_{\text{pos}}      &&\text{e.g. } 10^{-3}\ \text{m}\\
+\|r_{\text{ctrl}}\|_{\infty}     &< \varepsilon_{\text{vel}}      &&\text{e.g. } 10^{-3}\ \text{m/s}
+\end{aligned}
+$$
 
 NR exits only when *all* hold. Each threshold is in its own physical
 units and can be set by the engineer based on what they care about
@@ -106,41 +108,41 @@ Trade-offs:
   from the others.
 * **Con:** more knobs to tune (4–5 instead of 1). Mostly mitigated
   by sensible defaults.
-* **Con:** complementarity rows (`r_contact`, `r_friction`) still
-  have mixed units inside themselves — FB combines λ (N) and gap
+* **Con:** complementarity rows ($r_{\text{contact}}$, $r_{\text{friction}}$) still
+  have mixed units inside themselves — FB combines $\lambda$ (N) and gap
   velocity (m/s). Option 4 fixes this; option 2 alone leaves it.
 
 ### Option 3: Diagonal scaling of the residual norm
 
-Compute `||r||² = Σ_i r_i² / diag(A)_ii` instead of `Σ_i r_i²`. This
-is the diagonal approximation of the *energy norm* `r^T A^{-1} r`,
-which has physical meaning (it equals `||Δx||²` where Δx is the
-Newton step in the diagonal-A approximation). The scalar threshold
-then has the same units as `||Δλ||²` from option 1.
+Compute $\|r\|^2 = \sum_i r_i^2 / \mathrm{diag}(A)_{ii}$ instead of $\sum_i r_i^2$. This
+is the diagonal approximation of the *energy norm* $r^{\top} A^{-1} r$,
+which has physical meaning (it equals $\|\Delta x\|^2$ where $\Delta x$ is the
+Newton step in the diagonal-$A$ approximation). The scalar threshold
+then has the same units as $\|\Delta\lambda\|^2$ from option 1.
 
-Implementation: low. We already compute `diag(A)` for the Jacobi
+Implementation: low. We already compute $\mathrm{diag}(A)$ for the Jacobi
 preconditioner. One scaled-reduction kernel.
 
 Trade-offs:
 * **Pro:** keeps the single-threshold ergonomics, just makes the
   scalar mean something.
 * **Pro:** automatically rebalances when you change `dt`, compliance,
-  etc. — `diag(A)` shifts with them.
+  etc. — $\mathrm{diag}(A)$ shifts with them.
 * **Con:** still fundamentally a single number — engineers can't
   state per-block tolerances.
 
 ### Option 4: Convert each block to an engineering metric, then mix
 
-Translate each row of `r` to a homogeneous physical unit before
+Translate each row of $r$ to a homogeneous physical unit before
 combining:
-* `r_dyn` → divide by mass to get velocity error (m/s)
-* `r_contact` → convert FB to penetration-velocity (m/s) or
-  λ-violation (N/typical_normal_force)
-* `r_friction` → convert to tangential-force violation (N)
-* `r_joint` → already in meters (pos-level)
-* `r_ctrl` → already in m/s
+* $r_{\text{dyn}}$ → divide by mass to get velocity error (m/s)
+* $r_{\text{contact}}$ → convert FB to penetration-velocity (m/s) or
+  $\lambda$-violation (N/typical_normal_force)
+* $r_{\text{friction}}$ → convert to tangential-force violation (N)
+* $r_{\text{joint}}$ → already in meters (pos-level)
+* $r_{\text{ctrl}}$ → already in m/s
 
-Then take `||r_normalized||_∞` with a single threshold in normalized
+Then take $\|r_{\text{normalized}}\|_{\infty}$ with a single threshold in normalized
 units.
 
 Implementation: high. Per-block conversion functions, careful about
@@ -158,9 +160,9 @@ Trade-offs:
 ### Option 5: KKT-residual decomposition (textbook approach)
 
 Split into the three classical KKT components and threshold each:
-* **Stationarity**: `M(v − v_old)/dt − f_ext − J^T λ` (force units)
-* **Primal feasibility**: `min(0, g(q))` — penetration depth (m)
-* **Complementarity**: `λ_n · g_n` — should go to 0
+* **Stationarity**: $M(v - v_{\text{old}})/dt - f_{\text{ext}} - J^{\top}\lambda$ (force units)
+* **Primal feasibility**: $\min(0, g(q))$ — penetration depth (m)
+* **Complementarity**: $\lambda_n \cdot g_n$ — should go to 0
 
 This is what Bullet, MuJoCo, ODE, and most rigid-body literature
 compute. Conceptually cleaner than option 2 because each component
@@ -168,7 +170,7 @@ has a well-defined optimization-theory meaning.
 
 Implementation: medium-to-high. Restructures how the residual is
 assembled — stationarity is mostly what we already compute as
-`r_dyn`, but primal feasibility (gap depth) isn't currently in `r`
+$r_{\text{dyn}}$, but primal feasibility (gap depth) isn't currently in $r$
 at all (it's hidden inside the FB function). Adding it explicitly
 might change the linearization structure.
 
@@ -180,7 +182,7 @@ Trade-offs:
 
 ## Recommendation
 
-The original recommendation was to start with option 1 (`||Δλ|| < ε`).
+The original recommendation was to start with option 1 ($\|\Delta\lambda\| < \varepsilon$).
 That was wrong. We tried it; it didn't deliver. See the postscript
 below for what we measured. If you're still after a *speed* lever for
 the solver, the right place to look is the *linear* solver, not the
@@ -223,7 +225,7 @@ Two findings:
    broken). Looser still (1e-1) saves iters but eats one bad step.
 
 The check is *not bad as insurance* — the underlying motivation
-(residual oscillates near the FB cone corner with tiny Δλ) is real,
+(residual oscillates near the FB cone corner with tiny $\Delta\lambda$) is real,
 just rare enough on the test scenes that we can't measure it. If
 that regime ever shows up empirically (e.g., a scene where NR
 provably stagnates per the candidates_res log), the check is a
@@ -282,7 +284,7 @@ GPU-event profiling told a different story:
     mass, atol=1e-5                6.817 ms   7.738 ms   +29.9%
 
 Tightening atol consistently makes wall-clock *worse*. The cost
-model assumed per-NR-iter overhead ≈ per-PCR-iter cost; the data
+model assumed per-NR-iter overhead $\approx$ per-PCR-iter cost; the data
 showed the per-NR-iter overhead (linear-system build, residual
 eval, candidate save, history save) is roughly 5× a single PCR iter.
 So adding 1000 NR iters costs more than the saved PCR iters
@@ -356,12 +358,12 @@ Three reasons we weren't aware of going in:
 * **The convergence-criterion shape is downstream of the corner.**
   Like options 1 and 5 (postscripts above and the EW doc), this
   experiment ran into the FB-NR corner indirectly. Re-weighting
-  the norm doesn't help iterates near `(λ>0, g=0)` converge any
+  the norm doesn't help iterates near $(\lambda > 0,\ g = 0)$ converge any
   better — it just changes which sub-optimal candidate gets
   picked.
 * **If you want a *speed* lever, look at the linear solver, not the
   NR-norm metric.** Five experiments (cross-step warm-start,
-  iterate seeding, ||Δλ|| check, Eisenstat-Walker, weighted norm)
+  iterate seeding, $\|\Delta\lambda\|$ check, Eisenstat-Walker, weighted norm)
   have all run aground on the corner. Preconditioner reuse
   (`pcr_warm_start_options.md` option 3) is the one remaining
   low-risk linear-solver lever we haven't tried.
@@ -375,7 +377,7 @@ Three reasons we weren't aware of going in:
   boundaries (option 2 keys off these)
 * [`warm_start_iterate_seeding_issue.md`](warm_start_iterate_seeding_issue.md)
   — the FB cone corner is the regime where option 1 specifically
-  helps (residual oscillates, Δλ doesn't)
+  helps (residual oscillates, $\Delta\lambda$ doesn't)
 * [`pcr_warm_start_options.md`](pcr_warm_start_options.md) — sister
   doc on the linear-solver side; same flavor of "what's the principled
   thing to do" question

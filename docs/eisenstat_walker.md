@@ -24,54 +24,65 @@ nonlinear solvers.
 
 ## The math
 
-At NR iter k we want to solve `A_k Δλ_k = b_k` where `b_k = -r_NR(λ_k)`.
+At NR iter $k$ we want to solve $A_k\,\Delta\lambda_k = b_k$ where $b_k = -r_{\text{NR}}(\lambda_k)$.
 Standard PCR exits when
 
-    ‖A_k Δλ_k - b_k‖ ≤ max(atol, η · ‖b_k‖)
+$$
+\|A_k\,\Delta\lambda_k - b_k\| \le \max(\text{atol},\, \eta \cdot \|b_k\|)
+$$
 
-where `η` is the *forcing term*. Today `η = linear_tol = 1e-5`,
+where $\eta$ is the *forcing term*. Today $\eta = \texttt{linear\_tol} = 10^{-5}$,
 constant.
 
 Eisenstat-Walker's two choices:
 
 **Choice 1** (more sophisticated):
 
-    η_k = ‖r_NR_k - (r_NR_{k-1} - A_{k-1} Δλ_{k-1})‖ / ‖r_NR_{k-1}‖
+$$
+\eta_k = \frac{\|r_{\text{NR},k} - (r_{\text{NR},k-1} - A_{k-1}\,\Delta\lambda_{k-1})\|}{\|r_{\text{NR},k-1}\|}
+$$
 
 Numerator: how much did the *actual* outer residual differ from what
 the linear model predicted? When Newton is converging well (model
-predicts well), η_k is tiny. When it's stagnating (model is wrong),
-η_k is closer to 1 (give up on tight solves until things move).
+predicts well), $\eta_k$ is tiny. When it's stagnating (model is wrong),
+$\eta_k$ is closer to 1 (give up on tight solves until things move).
 Maintains superlinear NR convergence.
 
 **Choice 2** (simpler, more common):
 
-    η_k = γ · (‖r_NR_k‖ / ‖r_NR_{k-1}‖)^α
+$$
+\eta_k = \gamma \cdot \left(\frac{\|r_{\text{NR},k}\|}{\|r_{\text{NR},k-1}\|}\right)^{\alpha}
+$$
 
-with γ ∈ (0, 1] and α ∈ (1, 2]. Just scales by the residual reduction
+with $\gamma \in (0, 1]$ and $\alpha \in (1, 2]$. Just scales by the residual reduction
 rate. Maintains Q-quadratic NR convergence with appropriate bounds.
 
-Standard parameters: `γ = 0.9`, `α = 2.0`. Bound `η_k ∈ [η_min, η_max]`
-to prevent both overshoot (η too large → no progress) and underflow
-(η too small → asking PCR for impossible precision). Typical bounds:
-`η_min = 1e-10`, `η_max = 0.99`.
+Standard parameters: $\gamma = 0.9$, $\alpha = 2.0$. Bound $\eta_k \in [\eta_{\min}, \eta_{\max}]$
+to prevent both overshoot ($\eta$ too large → no progress) and underflow
+($\eta$ too small → asking PCR for impossible precision). Typical bounds:
+$\eta_{\min} = 10^{-10}$, $\eta_{\max} = 0.99$.
 
-Concretely, at iter k:
+Concretely, at iter $k$:
 
-    ratio = ‖r_NR_k‖ / ‖r_NR_{k-1}‖
-    η_k = clip(0.9 · ratio², 1e-10, 0.99)
-    PCR.solve(tol = η_k, atol = linear_atol, ...)
+$$
+\text{ratio} = \frac{\|r_{\text{NR},k}\|}{\|r_{\text{NR},k-1}\|},\qquad
+\eta_k = \mathrm{clip}\!\left(0.9 \cdot \text{ratio}^2,\ 10^{-10},\ 0.99\right)
+$$
 
-Worked example with `α = 2`:
-* outer residual halves: ratio=0.5, η=0.9·0.25=0.225 (loose)
-* outer residual goes 1 → 1e-3 (great progress): η=0.9·1e-6=9e-7 (very tight)
-* outer residual stagnates: ratio=1, η=0.9 (give up on precision)
+then PCR is called with $\text{tol} = \eta_k$ and `atol = linear_atol` (other args unchanged).
 
-There's also a "safeguard": if `η_k` is much smaller than the
+Worked example with $\alpha = 2$:
+* outer residual halves: $\text{ratio} = 0.5$, $\eta = 0.9 \cdot 0.25 = 0.225$ (loose)
+* outer residual goes $1 \to 10^{-3}$ (great progress): $\eta = 0.9 \cdot 10^{-6} = 9 \times 10^{-7}$ (very tight)
+* outer residual stagnates: $\text{ratio} = 1$, $\eta = 0.9$ (give up on precision)
+
+There's also a "safeguard": if $\eta_k$ is much smaller than the
 previous one, *don't* let it shrink too fast. The standard rule
 (used in PETSc):
 
-    η_k = max(η_k, γ · η_{k-1}^α)   if γ · η_{k-1}^α > 0.1
+$$
+\eta_k = \max\!\left(\eta_k,\, \gamma \cdot \eta_{k-1}^{\alpha}\right) \quad \text{if } \gamma \cdot \eta_{k-1}^{\alpha} > 0.1
+$$
 
 Prevents the "honeymoon" effect where one good iter
 over-tightens and subsequent iters can't keep up.
@@ -99,7 +110,7 @@ Three reasons specific to the Axion setup:
 ## Risks specific to FB-NR
 
 The classical convergence proofs assume smooth Newton on a smooth
-problem. FB has C¹ but non-C² behavior at the cone corner — the
+problem. FB has $C^1$ but non-$C^2$ behavior at the cone corner — the
 same regime that broke the iterate-seeding warm-start (see
 [`warm_start_iterate_seeding_issue.md`](warm_start_iterate_seeding_issue.md)).
 Three risks worth measuring:
@@ -107,31 +118,31 @@ Three risks worth measuring:
 1. **Loose linear solves near the corner could amplify
    FB-degeneracy.** When the FB Jacobian is nearly rank-deficient,
    sloppy linear solves might produce search directions that backtracking
-   can't redeem. If iter-0 of an impact step gets `η ≈ 0.9`, the Δλ
+   can't redeem. If iter-0 of an impact step gets $\eta \approx 0.9$, the $\Delta\lambda$
    is approximate — and the impact regime is exactly where Newton
    needs accurate steps.
 
-   *Mitigation*: lower-bound `η_max` more aggressively (e.g., 0.1
-   instead of 0.99) for the first few NR iters. Hybrid scheme.
+   *Mitigation*: lower-bound $\eta_{\max}$ more aggressively (e.g., $0.1$
+   instead of $0.99$) for the first few NR iters. Hybrid scheme.
 
 2. **Backtracking interaction.** Eisenstat-Walker assumes Newton
    converges monotonically. We don't — backtracking selects the
-   best of all NR iters post-hoc. A run of "loose-η" iters could
+   best of all NR iters post-hoc. A run of "loose-$\eta$" iters could
    produce candidates that don't include the eventual optimum,
    degrading picked-max residual.
 
-   *Mitigation*: start with a tighter `α` (e.g., 1.5 instead of 2)
+   *Mitigation*: start with a tighter $\alpha$ (e.g., $1.5$ instead of $2$)
    so loosening is more gradual; measure picked-max as primary
    acceptance criterion.
 
 3. **Friction warmup window.** Loose linear solves at iter 0-1
    might not produce an outer-residual reduction big enough for
-   `η` to tighten by iter 2-3. If `backtrack_min_iter = 2` and
-   `η` is still loose at iter 2, the picked iter could be one with
+   $\eta$ to tighten by iter 2-3. If `backtrack_min_iter = 2` and
+   $\eta$ is still loose at iter 2, the picked iter could be one with
    sloppy friction.
 
    *Mitigation*: don't apply the forcing term until iter
-   `backtrack_min_iter` (i.e., keep `η = linear_tol` for the
+   `backtrack_min_iter` (i.e., keep $\eta = \texttt{linear\_tol}$ for the
    warmup window). Only adapt afterwards.
 
 ## Implementation plan
@@ -196,7 +207,7 @@ A/B sweeps on:
 
 * **obstacle_benchmark** (impact-heavy) — primary risk scene. Look
   at picked-max residual; if it degrades vs forcing-term-off, the
-  FB-NR risk is real and we'd need the safer α/η_max bounds.
+  FB-NR risk is real and we'd need the safer $\alpha$ / $\eta_{\max}$ bounds.
 * **surface_drive_benchmark** (rolling) — primary win scene. Look
   at total PCR iters across the run (will be in the per-component
   profile output).
@@ -217,10 +228,10 @@ picked-max residual within 2× of baseline on impact scenes.
 
 If phase 3 looks good, sweep:
 
-* `α ∈ {1.5, 1.7, 2.0}`
-* `γ ∈ {0.7, 0.9}`
-* `eta_max ∈ {0.1, 0.3, 0.5, 0.99}`
-* `warmup_iters ∈ {1, 2, 3}`
+* $\alpha \in \{1.5,\, 1.7,\, 2.0\}$
+* $\gamma \in \{0.7,\, 0.9\}$
+* `eta_max` $\in \{0.1,\, 0.3,\, 0.5,\, 0.99\}$
+* `warmup_iters` $\in \{1,\, 2,\, 3\}$
 
 Pick the most aggressive setting that keeps picked-max
 non-regressed on all three eval scenes. That's the new default.
@@ -228,12 +239,12 @@ non-regressed on all three eval scenes. That's the new default.
 ## Expected outcome
 
 Published speedups on FB-style complementarity problems
-(SICONOS, IPOPT) range from 1.5× to 3× on the linear solver. We
+(SICONOS, IPOPT) range from $1.5\times$ to $3\times$ on the linear solver. We
 *should* see something in that range — our PCR cost is the same
 order of magnitude as those benchmarks.
 
 If we don't see at least 20% PCR-iter reduction at safe parameters,
-something is wrong (probably the FB corner ate it; safer α might
+something is wrong (probably the FB corner ate it; safer $\alpha$ might
 help) or the technique just doesn't fit our problem (try option 3
 from `pcr_warm_start_options.md` instead — preconditioner reuse).
 
@@ -261,31 +272,31 @@ Phase 1 (scaffolding) was implemented in `54cc1e7` and phase 2
 
 Three observations:
 
-1. **The "conservative" defaults I picked (α=1.5, η_max=0.5) are
+1. **The "conservative" defaults I picked ($\alpha=1.5$, $\eta_{\max}=0.5$) are
    catastrophic on BOTH scenes.** Including the supposed win
    scene (rolling). Bad steps in the 20–30 range, picked-max
    around 0.6–0.9 — solver is essentially broken. The doc's
-   framing of "α=1.5 is conservative because the textbook
-   α=2 is too aggressive" was wrong; even α=1.5 / η_max=0.5
+   framing of "$\alpha=1.5$ is conservative because the textbook
+   $\alpha=2$ is too aggressive" was wrong; even $\alpha=1.5$ / $\eta_{\max}=0.5$
    is far too loose.
 
-2. **No setting on the η_max sweep is a clear win.** The trade
-   is monotone: tighter η_max → fewer bad steps, less PCR
-   savings. On obstacle, the safest tested setting (η_max=0.005)
+2. **No setting on the $\eta_{\max}$ sweep is a clear win.** The trade
+   is monotone: tighter $\eta_{\max}$ → fewer bad steps, less PCR
+   savings. On obstacle, the safest tested setting ($\eta_{\max}=0.005$)
    gives 22% PCR reduction at the cost of +13% NR iters and a
-   slight regression in picked-max (1.2e-3 vs 6.7e-4). On
-   surface_drive (η_max=0.05), 11% PCR reduction with picked-max
-   degraded from 4.8e-6 to 4.0e-4 (still acceptable absolutely,
+   slight regression in picked-max ($1.2 \times 10^{-3}$ vs $6.7 \times 10^{-4}$). On
+   surface_drive ($\eta_{\max}=0.05$), 11% PCR reduction with picked-max
+   degraded from $4.8 \times 10^{-6}$ to $4.0 \times 10^{-4}$ (still acceptable absolutely,
    but a measurable regression).
 
 3. **The FB-NR risk in the "Risks" section above IS what
    happened.** Loose linear solves near the corner amplify
    FB-degeneracy. The doc warned about this but predicted that
-   tighter η_max bounds would mitigate; in practice, by the
-   time η_max is tight enough to stop breaking convergence,
+   tighter $\eta_{\max}$ bounds would mitigate; in practice, by the
+   time $\eta_{\max}$ is tight enough to stop breaking convergence,
    it's also tight enough that the PCR savings are modest.
 
-The literature's 1.5–3× wins assume smooth-Newton convergence
+The literature's $1.5$–$3\times$ wins assume smooth-Newton convergence
 proofs that don't hold for FB-NR. Our problem isn't a fit. PCR
 already runs with a fairly loose default `linear_tol = 1e-5`
 relative tolerance; there isn't much "wasted precision" left
