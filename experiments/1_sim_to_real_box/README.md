@@ -63,32 +63,38 @@ python experiments/1_sim_to_real_box/sweep_mujoco.py \
 python experiments/1_sim_to_real_box/plot_results.py --run 18_10_33
 ```
 
-## Current result (all 3 engines fully tuned, yaw-aware metric, scored on the
-## discriminator run `18_10_33`; 18_04_51 used as a sanity floor during
-## tuning but not reported — see "Per-run breakdown" below for why)
+## Current result (all 3 engines, yaw-aware metric, **mean over the two clean
+## runs** `18_04_51` + `18_10_33`, after the settled-baseline z fix). These are
+## the numbers the paper figure reports — see `Z_BASELINE_FINDINGS.md`.
 
-| Engine | combined (pos+yaw) | yaw RMSE | best params | dt |
+| Engine | combined (pos+yaw), 2-run mean | yaw RMSE | best params | dt |
 |---|---|---|---|---|
-| **MuJoCo** | **0.074 m** | **4.4°** | `μ=1.5, tor=10, condim=6, implicitfast` | 0.001 |
-| Axion | 0.092 m | 5.9° | `mu_rear=1.2, ke=150, compliance.contact=1e-7` | 0.05 |
-| Semi-Implicit | 0.189 m | 6.5° | `μ=0.05, ke=8e4, k_d_act=200, joint_attach_ke=1e6` | 0.0005 |
+| **Axion** | **0.062 m** | 3.4° | `mu_rear=1.5, compliance.contact=1e-7` | 0.05 |
+| MuJoCo | 0.065 m | 3.0° | `μ=1.2, tor=0.3, capsule, condim=6, implicitfast` | 0.002 |
+| Semi-Implicit | 0.110 m | 3.6° | `μ=0.05, ke=8e4, k_d_act=200, joint_attach_ke=1e6` | 0.0005 |
 
-MuJoCo wins by ~2 cm over Axion (at 50× different timesteps); SemiImplicit
-is ~2.5× behind MuJoCo on this discriminator.
+**Axion is the most accurate**, edging out MuJoCo by ~3 mm despite a
+~25× larger timestep; Semi-Implicit trails at 0.110 m. The decisive
+*practical* gap is the usable timestep range (see experiment 2).
 
-### Per-run breakdown — why we don't report on `18_04_51`
+> **Note on the MuJoCo config (read this).** MuJoCo here uses the **turning**
+> config (`tor=0.3` + capsule wheels), adopted as canonical after a finer
+> torsional sweep. The earlier `tor=10`/`tor=2`, cylinder configs over-suppressed
+> the real skid-steer yaw (near straight-line drive) and only "won" the old
+> position-L2-only metric. The historical `0.048 m` / `tor=10` numbers in the
+> tuning-journey tables below are kept as a **log, not current results**. Full
+> story (config + the z-baseline fix) in `Z_BASELINE_FINDINGS.md`.
 
-| Engine | `18_04_51` (easy, all engines tie) | `18_10_33` (discriminator) |
+### Per-run breakdown
+
+| Engine | `18_04_51` (easy) | `18_10_33` (discriminator) |
 |---|---|---|
 | Axion | 0.032 m | 0.092 m |
-| MuJoCo | 0.034 m | 0.074 m |
+| MuJoCo | 0.027 m | 0.102 m |
 | Semi-Implicit | 0.031 m | 0.189 m |
 
-All three engines land within **3 mm of each other** on the easy run — that
-run carries no signal between engines and dilutes the comparison when
-averaged in. We keep it in the sweeps as a cherry-pick guard (single-run
-tuning is fragile, see the SemiImplicit journey below), but the headline
-table and the plot report only the discriminating run's score.
+The headline averages both runs (cherry-pick guard). `18_04_51` is the easy run
+(engines close); `18_10_33` is the discriminator with the curved box-crossing.
 
 > ### Fixing a metric bias: dt-aware settle (commit TODO)
 >
@@ -107,7 +113,7 @@ table and the plot report only the discriminating run's score.
 > `tor=10`, which produced **literally 0° chassis yaw on every run** — a
 > degenerate "robot refuses to rotate" solution that wins position L2 by
 > hugging the average real path. With the yaw-aware metric the optimum
-> moves to `tor=2` and the chassis actually rotates. The 0.048 was a
+> moves to `tor=0.3` (with capsule wheels) and the chassis actually rotates. The 0.048 was a
 > metric artifact, not a real physics win.
 
 ### MuJoCo tuning journey

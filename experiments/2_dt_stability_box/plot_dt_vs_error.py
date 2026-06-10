@@ -228,7 +228,7 @@ def main():
             ax.text(
                 label_x,
                 label_y,
-                rf"$\sim{ratio:.0f}\times$ larger usable $\Delta t$",
+                rf"$\sim{ratio:.0f}\times$ larger usable $h$",
                 ha="center",
                 va="top",
                 fontsize=fontsize,
@@ -239,7 +239,7 @@ def main():
 
     ax.set_xscale("log")
     ax.set_yscale("log")
-    ax.set_xlabel(r"timestep $\Delta t$ (s)")
+    ax.set_xlabel(r"timestep $h$ (s)")
     ax.set_ylabel("Combined error (position + yaw) (m)")
     ax.xaxis.set_major_locator(ticker.LogLocator(base=10, numticks=10))
     ax.xaxis.set_major_formatter(ticker.LogFormatterMathtext())

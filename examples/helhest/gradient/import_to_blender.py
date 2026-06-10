@@ -19,16 +19,21 @@ import numpy as np
 from mathutils import Quaternion
 from mathutils import Vector
 
-GEO_PLANE = 0
-GEO_HFIELD = 1
-GEO_SPHERE = 2
-GEO_CAPSULE = 3
-GEO_ELLIPSOID = 4
-GEO_CYLINDER = 5
-GEO_BOX = 6
-GEO_MESH = 7
+# Must match newton.GeoType. Hardcoded (not imported) because this module runs
+# inside Blender's bundled Python, which has no `newton`. Keep in sync with the
+# enum in the newton version used to export the npz.
+GEO_NONE = 0
+GEO_PLANE = 1
+GEO_HFIELD = 2
+GEO_SPHERE = 3
+GEO_CAPSULE = 4
+GEO_ELLIPSOID = 5
+GEO_CYLINDER = 6
+GEO_BOX = 7
+GEO_MESH = 8
 GEO_CONE = 9
 GEO_CONVEX_MESH = 10
+GEO_GAUSSIAN = 11
 
 
 def parse_args() -> argparse.Namespace:

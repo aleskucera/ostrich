@@ -4,7 +4,7 @@ _target_: axion.AxionEngineConfig
 nr:
   max_iters: 16
   backtrack_min_iter: 4
-  atol: 1e-3
+  atol: 1e-5
 
 linear:
   max_iters: 26

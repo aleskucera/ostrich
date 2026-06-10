@@ -6,7 +6,7 @@ box` scene as `experiments/1_sim_to_real_box` with the real recorded wheel
 setpoints, sweeps `dt` for each engine at its yaw-tuned best params, and
 overlays the resulting accuracy-vs-dt curves.
 
-The headline result: **Axion stays usable at ~10× larger `dt` than MuJoCo for
+The headline result: **Axion stays usable at ~20× larger `dt` than MuJoCo for
 the same trajectory accuracy on this scene.**
 
 ## Pipeline (fully reproducible from data)
@@ -16,7 +16,7 @@ run_accuracy_vs_dt.py   --->   results/accuracy_vs_dt.json   --->   plot_dt_vs_e
 ```
 
 No hand-copied numbers anywhere — `plot_dt_vs_error.py` loads the JSON; the
-"~10× larger usable Δt" annotation is computed from the data, not typed in.
+"~20× larger usable Δt" annotation is computed from the data, not typed in.
 
 ```bash
 # regenerate everything from scratch (~5–6 min)
@@ -48,7 +48,7 @@ The plot then categorises each point as:
 
 ```python
 Axion:  mu_front=0.8, mu_rear=1.5, mu_rolling=0.7, compliance.contact=1e-7
-MuJoCo: μ=1.5, tor=2.0, kv=1000, solref0=0.005, condim=6, integrator=implicitfast
+MuJoCo: μ=1.2, tor=0.3, kv=1000, solref0=0.005, condim=6, integrator=implicitfast, wheel_geom=capsule
 ```
 
 These are exactly the per-engine tuned best params from the
@@ -56,25 +56,31 @@ These are exactly the per-engine tuned best params from the
 
 ## Reading the figure
 
-- **Semi-Implicit (orange)** — narrow stable range. Best mean error 0.10 m
-  at `dt = 5×10⁻⁴`; **NaN at `dt = 7×10⁻⁴`** and above (penalty contact
-  blows up). Usable wall: ~`5×10⁻⁴ s`.
-- **MuJoCo (pink)** — flat plateau of ~0.055 m from `dt = 10⁻⁴` to `10⁻²`
-  (5 orders of magnitude!), then a sharp wall: 0.118 m at `dt = 0.02`,
-  0.24 m at 0.03, 1.17 m at 0.05 (above threshold), NaN at 0.1.
-  Usable wall: ~`3×10⁻²ʼs`.
-- **Axion (blue)** — flat plateau of ~0.065–0.10 m across `dt = 5×10⁻³` to
-  `3×10⁻¹` (almost 2 orders of magnitude flat!), starts climbing at 0.4
-  (0.18 m), still under threshold at 0.5 (0.28 m), first instability at
-  `dt = 0.7 s`, NaN at 1.0. Usable wall: ~`5×10⁻¹ s`.
+The figure (`plot_dt_vs_error.py`) uses a **0.2 m** accuracy threshold (the red
+shaded band marks error above it). "Usable" = stable AND under that threshold.
+All MuJoCo numbers below are the current **turning config** (`tor=0.3`, capsule).
 
-Resulting usable-dt ratios at the 0.5 m threshold:
+- **Semi-Implicit (orange)** — narrowest range. Floor ~0.096 m at
+  `dt = 5×10⁻⁴`; diverges/NaNs at `dt ≥ 7×10⁻⁴` (penalty contact blows up).
+  Usable wall: ~`0.0005 s`.
+- **MuJoCo (pink)** — floor ~0.065 m, flat from `dt = 10⁻⁴` up to a few
+  ×10⁻³, then climbs through the 0.2 m threshold around `dt ≈ 0.02 s` and
+  degrades steeply (multi-metre error by `dt = 0.05` and up; the solver stays
+  finite but the trajectory is meaningless). Usable wall (0.2 m): ~`0.02 s`.
+- **Axion (blue)** — floor ~0.063 m, flat across almost two decades; stays
+  under threshold to `dt ≈ 0.4 s`, first instability/NaN at `dt = 0.7 s`.
+  Usable wall (0.2 m): ~`0.4 s`.
 
-| pair | ratio |
-|---|---|
-| **Axion / MuJoCo** | **~17×** |
-| MuJoCo / Semi-Implicit | ~60× |
-| **Axion / Semi-Implicit** | **~1000×** (three orders of magnitude) |
+Resulting usable-`dt` ratios (Axion vs MuJoCo) depend on the threshold:
+
+| threshold | Axion max | MuJoCo max | Axion / MuJoCo |
+|---|---|---|---|
+| 0.2 m (figure) | 0.4 s | 0.02 s | **~20×** |
+| 0.5 m | 0.5 s | 0.03 s | ~17× |
+
+Axion / Semi-Implicit is ~800× (≈ three orders of magnitude).
+The figure's headline annotation (computed from the data) is the **0.2 m**
+value, ~20×.
 
 ## Caveats
 

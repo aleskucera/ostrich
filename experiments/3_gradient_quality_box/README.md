@@ -7,6 +7,11 @@ real-robot trajectory while crossing the box. The figure overlays the
 loss-vs-iteration curves so the relative gradient quality is visible
 at a glance.
 
+> **For findings, see [`RESULTS.md`](RESULTS.md)** — headline numbers,
+> per-engine tuning journey, and what the comparison says about each
+> engine's gradient mechanism. This README covers the setup; `RESULTS.md`
+> covers what we learned.
+
 Calibrated physics params come from the yaw-aware best of
 `experiments/1_sim_to_real_box` so the optimizer isn't fighting a
 mis-tuned simulation — it's purely a gradient-quality test.

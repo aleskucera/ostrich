@@ -34,8 +34,11 @@ AXION_PARAMS = dict(
     compliance_contact=1e-7,
 )
 MUJOCO_PARAMS = dict(
-    mu=1.5, tor=2.0, kv=1000.0, solref0=0.005,
-    condim=6, integrator="implicitfast",
+    # Turning config adopted as canonical in experiments/1_sim_to_real_box
+    # (tor=0.3 + capsule wheels recover the real skid-steer yaw; the old
+    # tor=2.0/cylinder over-suppressed it). mu lowered 1.5->1.2 to match exp-1.
+    mu=1.2, tor=0.3, kv=1000.0, solref0=0.005,
+    condim=6, integrator="implicitfast", wheel_geom="capsule",
 )
 SEMI_IMPLICIT_PARAMS = dict(
     mu=0.05, ke=8e4, kd=2e3, kf=1500.0, k_d_act=200.0,
@@ -95,7 +98,8 @@ def mujoco_runner(gt, dt):
          "ground_torsional": MUJOCO_PARAMS["tor"], "front_torsional": MUJOCO_PARAMS["tor"],
          "rear_torsional": MUJOCO_PARAMS["tor"],
          "solref0": MUJOCO_PARAMS["solref0"], "condim": MUJOCO_PARAMS["condim"],
-         "integrator": MUJOCO_PARAMS["integrator"]}
+         "integrator": MUJOCO_PARAMS["integrator"],
+         "wheel_geom": MUJOCO_PARAMS.get("wheel_geom", "cylinder")}
     return simulate(p, gt)
 
 
