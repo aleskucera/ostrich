@@ -12,26 +12,26 @@ Headline figure: [`results/scalability_box.png`](results/scalability_box.png)
 
 | engine | max worlds | per-iter @ N=1 | per-iter @ N_max | memory @ N=1 | memory @ N_max | per-world memory slope |
 |---|---|---|---|---|---|---|
-| **Axion**         | **8 192** (OOM at 16 384) | **525 ms** | 23.6 s @ 8192 | 203 MB | 13.0 GB | ~1.56 GB/world (post-knee) |
+| **Ostrich**         | **8 192** (OOM at 16 384) | **525 ms** | 23.6 s @ 8192 | 203 MB | 13.0 GB | ~1.56 GB/world (post-knee) |
 | MJX-grad         | 2 (OOM at 4)              | 202 s | 204 s @ 2 | 7.0 GB | 14.0 GB | **~7.0 GB/world** |
 | **Semi-Implicit** | **512** (OOM at 1024)     | 4.4 s | 22.0 s @ 512 | 228 MB | 14.1 GB | **~27 MB/world** |
 
 ## Three-way ordering and what it means
 
-| dimension | Axion | MJX | SI |
+| dimension | Ostrich | MJX | SI |
 |---|---|---|---|
 | **per-iter speed (low N)** | 525 ms | 202 s | 4.4 s |
-| → Axion vs MJX | **386× faster** at N=1 | | |
-| → Axion vs SI | 8.4× faster at N=1 | | |
+| → Ostrich vs MJX | **386× faster** at N=1 | | |
+| → Ostrich vs SI | 8.4× faster at N=1 | | |
 | **max worlds on 24 GB** | 8 192 | 2 | 512 |
-| → Axion vs MJX | **4 096× more worlds** | | |
-| → Axion vs SI | 16× more worlds | | |
+| → Ostrich vs MJX | **4 096× more worlds** | | |
+| → Ostrich vs SI | 16× more worlds | | |
 | **per-world memory** | ~1.6 GB | ~7 GB | **~27 MB** |
 | → SI is the memory champion | | | |
 
 So the three engines occupy three distinct corners of the speed × memory trade-off:
 
-- **Axion**: fast *and* scales. Optimal on both axes.
+- **Ostrich**: fast *and* scales. Optimal on both axes.
 - **MJX**: slow *and* OOMs immediately. Worst on both axes.
 - **Semi-Implicit**: medium speed, but *unmatched memory efficiency* — only 27 MB
   per added world (vs MJX's 7 000 MB). The catch: SI's gradients on this scene
@@ -42,7 +42,7 @@ So the three engines occupy three distinct corners of the speed × memory trade-
 
 ## Per-engine result detail
 
-### Axion (implicit adjoint)
+### Ostrich (implicit adjoint)
 
 | N | time (ms) | memory (MB) |
 |---|---|---|
@@ -58,7 +58,7 @@ So the three engines occupy three distinct corners of the speed × memory trade-
 **Two-regime scaling**:
 1. **Pre-knee (N ≤ ~64)**: time and memory both essentially flat. The 3090
    has spare bandwidth and per-world replication overhead is absorbed by the
-   static base state. This is the "Axion runs equally fast on a laptop as
+   static base state. This is the "Ostrich runs equally fast on a laptop as
    on a workstation" regime we saw in `experiments/3_gradient_quality_box/RESULTS.md`.
 2. **Post-knee (N ≥ ~256)**: linear in both time and memory. GPU saturated.
    Per-iter cost ~2.9 ms/world; memory ~1.6 GB/world. Wall: 16 384.
@@ -99,7 +99,7 @@ world. Wall: 4 worlds.
 
 **Most memory-efficient scaling of the three.** SI's per-world overhead is
 just ~27 MB — two orders of magnitude smaller than MJX's 7 GB/world and an
-order of magnitude smaller than Axion's 1.6 GB/world. Why: SI's Warp tape
+order of magnitude smaller than Ostrich's 1.6 GB/world. Why: SI's Warp tape
 stores raw state buffers rather than complete operator activations, and
 since SI uses no Newton iteration, there's no per-step linear-system state
 to store per world.
@@ -111,27 +111,27 @@ is underused.
 **The catch** (paper-relevant): from
 `experiments/3_gradient_quality_box/RESULTS.md`, SI's gradient quality on
 this scene doesn't actually converge — best loss across 3 trials was 0.71
-vs Axion's 0.07. SI's memory efficiency is real, but it's only useful for
+vs Ostrich's 0.07. SI's memory efficiency is real, but it's only useful for
 non-gradient batched-forward workloads (e.g., RL, MPC) on this scene; for
 gradient-based optimization the noisy gradients dominate.
 
-## Why is MJX so much slower per-iter than Axion (386×)?
+## Why is MJX so much slower per-iter than Ostrich (386×)?
 
 Two compounding factors:
 
-1. **dt margin (~20×)**. Axion runs at dt=0.10 (60 sim steps per 6 s
+1. **dt margin (~20×)**. Ostrich runs at dt=0.10 (60 sim steps per 6 s
    rollout); MJX runs at dt=5e-3 (1 200 steps). Per `experiments/2_dt_stability_box`,
    that's each engine at the largest dt inside its accuracy plateau on this
    scene.
 2. **Per-step BPTT + jax.vmap+grad XLA overhead (~20×)**. MJX must materialise
-   gradient activations at every step (~200 ms each); Axion's adjoint
+   gradient activations at every step (~200 ms each); Ostrich's adjoint
    captures forward+backward into one CUDA graph that replays in ~9 ms per
    step warm.
 
 Either factor alone would account for a 20× gap — together they make 386×.
 
 The matching exp-3 box result (no vmap, just N=1) was 17 s/iter for MJX vs
-0.5 s for Axion — a 34× ratio. The 386× here adds another ~12× from vmap+grad
+0.5 s for Ostrich — a 34× ratio. The 386× here adds another ~12× from vmap+grad
 overhead at N=1. (XLA's batched-trace compilation for a batch of 1 is much
 less optimised than the unbatched path.)
 
@@ -139,7 +139,7 @@ less optimised than the unbatched path.)
 
 | | per-step state | per-world replicated |
 |---|---|---|
-| **Axion** | Newton-iter linear-system buffers + body state | yes, ~few MB each |
+| **Ostrich** | Newton-iter linear-system buffers + body state | yes, ~few MB each |
 | **MJX**   | full `mjx.Data` + per-call gradient activations | yes, ~6 MB per step × 1 200 steps ≈ 7 GB per world |
 | **SI**    | body state only (penalty contact, no Newton) | yes, but ~6 bytes per body per step × 12 000 steps ≈ tens of MB per world |
 
@@ -154,13 +154,13 @@ copy of the body-state arrays.
 bash experiments/4_scalability_box/run_sweep.sh
 
 # one engine only
-bash experiments/4_scalability_box/run_sweep.sh --axion
+bash experiments/4_scalability_box/run_sweep.sh --ostrich
 bash experiments/4_scalability_box/run_sweep.sh --mjx
 bash experiments/4_scalability_box/run_sweep.sh --semi-implicit
 
 # one (engine, N) data point
-python experiments/4_scalability_box/axion_sim.py --num-worlds 1024 \
-    --save experiments/4_scalability_box/results/axion_1024.json
+python experiments/4_scalability_box/ostrich_sim.py --num-worlds 1024 \
+    --save experiments/4_scalability_box/results/ostrich_1024.json
 
 # regenerate the figure
 python experiments/4_scalability_box/plot_results.py
@@ -170,7 +170,7 @@ python experiments/4_scalability_box/plot_results.py
 
 - **NVML peak memory** wasn't reported on dasenka (NVML poller returned `None`
   — `pynvml` not in the env). The figure uses the engine-native peak
-  (`warp.get_mempool_used_bytes` for Axion/SI, JAX's `peak_bytes_in_use` for
+  (`warp.get_mempool_used_bytes` for Ostrich/SI, JAX's `peak_bytes_in_use` for
   MJX). Native peaks are 1.5–2× smaller than NVML absolute on the flat-scene
   experiment; the OOM points observed here confirm the native numbers are
   *under*-estimates of true GPU footprint.

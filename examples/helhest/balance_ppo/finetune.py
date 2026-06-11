@@ -1,8 +1,8 @@
-"""Fine-tune a PPO-trained policy via Axion's exact gradients.
+"""Fine-tune a PPO-trained policy via Ostrich's exact gradients.
 
 Pipeline:
   PPO → policy with ~88% alive_frac → load weights here → run T-step rollouts
-  with the policy producing controls → Axion's adjoint backprops loss into
+  with the policy producing controls → Ostrich's adjoint backprops loss into
   ``joint_target_vel.grad`` → we chain that gradient through the saved policy
   graph at each timestep → Adam step on the policy parameters.
 
@@ -12,7 +12,7 @@ stochastic gradients are bad at the *last* refinement (chatter, edge-of-
 stable wobble) — exactly where smooth losses + exact gradients shine.
 
 Compared to ``helhest_balance_bundled.py``: same loss kernels (threshold
-orient + pos + smoothness + reg), same Axion ``diff_step`` adjoint, but the
+orient + pos + smoothness + reg), same Ostrich ``diff_step`` adjoint, but the
 optimization variable is the *MLP weights* instead of K spline knots. No
 bundled smoothing — pure exact gradient (so ``num_worlds=1`` is the default;
 worlds would be redundant when actions are deterministic).
@@ -34,9 +34,9 @@ import torch
 import warp as wp
 from newton import Model
 
-from axion import (
-    AxionDifferentiableSimulator,
-    AxionEngineConfig,
+from ostrich import (
+    OstrichDifferentiableSimulator,
+    OstrichEngineConfig,
     ComplianceConfig,
     ContactsConfig,
     LinearSolverConfig,
@@ -145,12 +145,12 @@ def diag_alive_kernel(
 # -----------------------------------------------------------------------------
 
 
-class HelhestBalanceFineTune(AxionDifferentiableSimulator):
+class HelhestBalanceFineTune(OstrichDifferentiableSimulator):
     """Replaces the spline-knot optimization variable with a full MLP, gradient
-    descended via Axion's exact adjoint.
+    descended via Ostrich's exact adjoint.
 
     Reuses HelhestBalancePPO's observation extraction and policy class without
-    inheriting (we want the AxionDifferentiableSimulator pipeline, not the PPO
+    inheriting (we want the OstrichDifferentiableSimulator pipeline, not the PPO
     pipeline). The helhest-specific helpers ``_state_features`` and the build
     are duplicated minimally below."""
 
@@ -158,7 +158,7 @@ class HelhestBalanceFineTune(AxionDifferentiableSimulator):
         self,
         sim_config: SimulationConfig,
         render_config: RenderingConfig,
-        engine_config: AxionEngineConfig,
+        engine_config: OstrichEngineConfig,
         logging_config: LoggingConfig,
         checkpoint_path: pathlib.Path,
         policy_hidden: int = 64,
@@ -208,7 +208,7 @@ class HelhestBalanceFineTune(AxionDifferentiableSimulator):
         self.total_iterations = 1   # filled in by train()
 
         # Saved policy outputs per timestep — kept in the autograd graph so we
-        # can backprop Axion's per-step grad on joint_target_vel back into the
+        # can backprop Ostrich's per-step grad on joint_target_vel back into the
         # MLP parameters in one shot.
         self.saved_actions: list[torch.Tensor] = []
 
@@ -226,7 +226,7 @@ class HelhestBalanceFineTune(AxionDifferentiableSimulator):
 
         self.track_body(body_idx=0, name="chassis", color=(0.0, 0.5, 1.0))
 
-    # --- Model build (must require_grad=True for Axion adjoint) -------------
+    # --- Model build (must require_grad=True for Ostrich adjoint) -------------
 
     def build_model(self) -> Model:
         self.builder.rigid_gap = 0.1
@@ -288,10 +288,10 @@ class HelhestBalanceFineTune(AxionDifferentiableSimulator):
     # --- Custom forward + backward — overrides parent's --------------------
 
     def _forward_backward(self):
-        """Replaces ``AxionDifferentiableSimulator._forward_backward``. The
+        """Replaces ``OstrichDifferentiableSimulator._forward_backward``. The
         parent's version assumes ``controls[t].joint_target_vel`` is set in
         advance; here we set it on-the-fly from the policy at each step,
-        keeping the (grad-tracked) policy output around so we can chain Axion's
+        keeping the (grad-tracked) policy output around so we can chain Ostrich's
         adjoint into the MLP after the backward pass."""
         self.trajectory.zero_grad()
         self.saved_actions = []
@@ -319,7 +319,7 @@ class HelhestBalanceFineTune(AxionDifferentiableSimulator):
                 contacts=self.contacts,
                 dt=self.clock.dt,
             )
-            self.trajectory.save_step(t, self.solver.data, self.solver.axion_contacts)
+            self.trajectory.save_step(t, self.solver.data, self.solver.ostrich_contacts)
 
         self.tape.zero()
         with self.tape:
@@ -327,7 +327,7 @@ class HelhestBalanceFineTune(AxionDifferentiableSimulator):
         self.tape.backward(self.loss)
 
         for t in range(self.T - 1, -1, -1):
-            self.trajectory.load_step(t, self.solver.data, self.solver.axion_contacts)
+            self.trajectory.load_step(t, self.solver.data, self.solver.ostrich_contacts)
             self.solver.data.zero_gradients()
             self.solver.step_backward()
             self.trajectory.save_gradients(t, self.solver.data)
@@ -368,7 +368,7 @@ class HelhestBalanceFineTune(AxionDifferentiableSimulator):
     # --- Backprop into policy params via the saved graph -------------------
 
     def _backprop_through_policy(self) -> float:
-        """Take Axion's per-step ``joint_target_vel.grad`` and chain it back
+        """Take Ostrich's per-step ``joint_target_vel.grad`` and chain it back
         into the MLP using the saved (still-attached) policy outputs.
 
         Mathematically: the surrogate ``Σ_t (saved_action[t] · grad_target_vel[t]).sum()``
@@ -552,7 +552,7 @@ def main():
     parser.add_argument("--alive-threshold", type=float, default=0.85)
 
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--wandb-project", type=str, default="axion-helhest-balance")
+    parser.add_argument("--wandb-project", type=str, default="ostrich-helhest-balance")
     parser.add_argument("--wandb-entity", type=str, default=None)
     parser.add_argument("--wandb-mode", type=str, default="online",
                         choices=["online", "offline", "disabled"])

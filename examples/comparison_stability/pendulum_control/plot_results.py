@@ -43,7 +43,7 @@ THRESHOLD_STYLES = {
     "MuJoCo":        {"color": "#E91E63"},
     "TinyDiffSim":   {"color": "#9C27B0"},
     "Dojo":          {"color": "#FF9800"},
-    "Axion":         {"color": "#2196F3"},
+    "Ostrich":         {"color": "#2196F3"},
 }
 THRESHOLD_SIM_ORDER = list(THRESHOLD_STYLES.keys())
 
@@ -54,14 +54,14 @@ THRESHOLD_LABELS = {
     "MuJoCo":        "MuJoCo",
     "TinyDiffSim":   "TinyDiffSim",
     "Dojo":          "Dojo",
-    "Axion":         r"\textbf{Axion}",
+    "Ostrich":         r"\textbf{Ostrich}",
 }
 
-AXION_COLOR = "#2196F3"
+OSTRICH_COLOR = "#2196F3"
 
 _NAME_MAP = {
-    "Axion-Implicit": "Axion",
-    "Axion":          "Axion",
+    "Ostrich-Implicit": "Ostrich",
+    "Ostrich":          "Ostrich",
     "MuJoCo":         "MuJoCo",
     "MJX":            "MJX",
     "Genesis":        "Genesis",
@@ -70,7 +70,7 @@ _NAME_MAP = {
     "Dojo":           "Dojo",
 }
 _FILE_MAP = {
-    "axion":          "Axion",
+    "ostrich":          "Ostrich",
     "mujoco":         "MuJoCo",
     "mjx":            "MJX",
     "genesis":        "Genesis",
@@ -82,14 +82,14 @@ _FILE_MAP = {
 # ─── trajectory mode style ───────────────────────────────────────────────────
 
 TRAJ_STYLES = {
-    "Axion-Implicit": {"color": "#2196F3", "marker": "o", "lw": 2.5, "zorder": 5},
+    "Ostrich-Implicit": {"color": "#2196F3", "marker": "o", "lw": 2.5, "zorder": 5},
     "MuJoCo":         {"color": "#E91E63", "marker": "x", "lw": 1.8, "zorder": 3},
 }
 TRAJ_SIM_ORDER = list(TRAJ_STYLES.keys())
 
 _TRAJ_FILE_MAP = {
-    "axion_implicit_dt":   ("Axion-Implicit", "dt_sweep"),
-    "axion_implicit_gain": ("Axion-Implicit", "gain_sweep"),
+    "ostrich_implicit_dt":   ("Ostrich-Implicit", "dt_sweep"),
+    "ostrich_implicit_gain": ("Ostrich-Implicit", "gain_sweep"),
     "mujoco_dt":           ("MuJoCo",         "dt_sweep"),
     "mujoco_gain":         ("MuJoCo",         "gain_sweep"),
 }
@@ -146,18 +146,18 @@ def plot_threshold(show: bool):
         print("No threshold results found. Run each simulator with --experiment binary_search first.")
         return
 
-    if "Axion" not in thresholds:
-        print("Axion results not found — cannot compute ×N ratios.")
+    if "Ostrich" not in thresholds:
+        print("Ostrich results not found — cannot compute ×N ratios.")
         return
 
     sims = [s for s in THRESHOLD_SIM_ORDER if s in thresholds]
     if not sims:
         sims = sorted(thresholds.keys())
 
-    # Sort ascending so the strongest simulator (Axion) is at the top
+    # Sort ascending so the strongest simulator (Ostrich) is at the top
     sims = sorted(sims, key=lambda s: thresholds[s]["max_stable_dt"])
 
-    axion_dt = thresholds["Axion"]["max_stable_dt"]
+    ostrich_dt = thresholds["Ostrich"]["max_stable_dt"]
     colors   = [THRESHOLD_STYLES.get(s, {"color": "gray"})["color"] for s in sims]
     values   = [thresholds[s]["max_stable_dt"] for s in sims]
     hit_max  = [thresholds[s].get("hit_max", False) for s in sims]
@@ -187,20 +187,20 @@ def plot_threshold(show: bool):
         val_label = f"${_fmt(val)}$" + (r"$^+$" if hm else "")
         ax.text(val * 1.5, cy, val_label, va="center", ha="left", fontsize=7)
 
-        if sim != "Axion":
-            ratio = axion_dt / val
+        if sim != "Ostrich":
+            ratio = ostrich_dt / val
             ratio_str = (
                 f"$\\times{ratio:.0f}$" if ratio >= 10 else f"$\\times{ratio:.1f}$"
             )
             ax.text(
                 1.04, cy, ratio_str,
                 va="center", ha="left", fontsize=7,
-                color=AXION_COLOR, fontweight="bold",
+                color=OSTRICH_COLOR, fontweight="bold",
                 transform=right_xfm, clip_on=False,
             )
 
     ax.text(
-        1.04, 1.01, r"vs \textbf{Axion}",
+        1.04, 1.01, r"vs \textbf{Ostrich}",
         va="bottom", ha="left", fontsize=6,
         color="gray", transform=ax.transAxes, clip_on=False,
     )
@@ -306,7 +306,7 @@ def plot_trajectory(show: bool):
 
     fig, axes = plt.subplots(1, 2, figsize=(13, 5))
     fig.suptitle(
-        "Control Stability: Axion Implicit Servo vs MuJoCo Explicit PD\n"
+        "Control Stability: Ostrich Implicit Servo vs MuJoCo Explicit PD\n"
         "(single pendulum, 1 kg, 1 m, displaced 60°, $\\Delta t = 0.05$ s)",
         fontsize=12, fontweight="bold",
     )

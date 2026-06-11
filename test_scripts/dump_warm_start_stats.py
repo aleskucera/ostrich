@@ -15,13 +15,13 @@ CONFIG_PATH = "../examples/conf"
 @hydra.main(config_path=CONFIG_PATH, config_name="helhest_obstacle_benchmark", version_base=None)
 def main(cfg: DictConfig):
     import warp as wp
-    from axion import (
+    from ostrich import (
         EngineConfig,
         LoggingConfig,
         RenderingConfig,
         SimulationConfig,
     )
-    from axion.collision.warm_start import ContactWarmStarter
+    from ostrich.collision.warm_start import ContactWarmStarter
 
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "examples", "helhest"))
     from obstacle_benchmark import HelhestObstacleBenchmark  # noqa: E402

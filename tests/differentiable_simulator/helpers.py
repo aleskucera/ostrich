@@ -2,11 +2,11 @@
 import numpy as np
 import warp as wp
 import newton
-from axion.core.engine import AxionEngine
-from axion.core.engine_config import AxionEngineConfig, LinearSolverConfig, NewtonRaphsonConfig
-from axion.core.logging_config import LoggingConfig
-from axion.core.model_builder import AxionModelBuilder
-from axion.simulation.trajectory_buffer import TrajectoryBuffer
+from ostrich.core.engine import OstrichEngine
+from ostrich.core.engine_config import OstrichEngineConfig, LinearSolverConfig, NewtonRaphsonConfig
+from ostrich.core.logging_config import LoggingConfig
+from ostrich.core.model_builder import OstrichModelBuilder
+from ostrich.simulation.trajectory_buffer import TrajectoryBuffer
 
 
 # =============================================================================
@@ -16,7 +16,7 @@ from axion.simulation.trajectory_buffer import TrajectoryBuffer
 
 def build_box_on_ground(num_worlds=1, height=0.6):
     """Single box near a ground plane (contacts active)."""
-    builder = AxionModelBuilder()
+    builder = OstrichModelBuilder()
     builder.rigid_gap = 0.05
     builder.add_ground_plane()
     body = builder.add_body(
@@ -34,7 +34,7 @@ def build_box_on_ground(num_worlds=1, height=0.6):
 
 def build_free_box(num_worlds=1):
     """Single box high above a ground plane (no active contacts)."""
-    builder = AxionModelBuilder()
+    builder = OstrichModelBuilder()
     builder.rigid_gap = 0.05
     builder.add_ground_plane()
     body = builder.add_body(
@@ -52,7 +52,7 @@ def build_free_box(num_worlds=1):
 
 def build_revolute_pendulum(num_worlds=1):
     """Single-link pendulum with revolute joint (for control gradient tests)."""
-    builder = AxionModelBuilder()
+    builder = OstrichModelBuilder()
 
     builder.rigid_gap = 0.05
     builder.add_ground_plane()
@@ -91,7 +91,7 @@ def build_revolute_pendulum(num_worlds=1):
 
 def build_two_boxes_symmetric(num_worlds=1):
     """Two identical boxes placed symmetrically about x=0 on a ground plane."""
-    builder = AxionModelBuilder()
+    builder = OstrichModelBuilder()
     builder.rigid_gap = 0.05
     builder.add_ground_plane()
 
@@ -116,11 +116,11 @@ def build_two_boxes_symmetric(num_worlds=1):
 
 def make_engine(model, config=None, sim_steps=5):
     if config is None:
-        config = AxionEngineConfig(
+        config = OstrichEngineConfig(
             nr=NewtonRaphsonConfig(max_iters=20),
             linear=LinearSolverConfig(max_iters=200, tol=1e-8, atol=1e-8),
         )
-    return AxionEngine(
+    return OstrichEngine(
         model=model,
         sim_steps=sim_steps,
         config=config,

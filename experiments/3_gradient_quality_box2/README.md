@@ -80,7 +80,7 @@ These show up in the figure as box plots per engine.
 
 | script | engine | gradient mechanism | key knobs |
 |---|---|---|---|
-| `optimize_axion.py` | Axion | implicit adjoint | dt=0.10, lr=0.1 |
+| `optimize_ostrich.py` | Ostrich | implicit adjoint | dt=0.10, lr=0.1 |
 | `optimize_mjx.py`   | MJX   | JAX BPTT + capsule wheels | dt=5e-3, lr=0.05, clip=1.0, β1=0.9 |
 | `optimize_semi_implicit.py` | Newton SemiImplicit | Warp tape BPTT | dt=5e-4, lr=0.02, clip=1.0 |
 
@@ -91,7 +91,7 @@ physics + `3_gradient_quality_box` optimizer tuning. No re-tuning needed.
 
 | engine | per trial | 25 trials | bottleneck |
 |---|---|---|---|
-| Axion | ~70 s    | ~30 min | warm iter @ ~0.5 s, 100 iters |
+| Ostrich | ~70 s    | ~30 min | warm iter @ ~0.5 s, 100 iters |
 | MJX   | ~30 min  | ~12 hr  | 200 s/iter (BPTT through box) × 100 |
 | SI    | ~60 min  | ~25 hr  | ~20 min cold capture + 100 warm @ ~4 s |
 
@@ -104,7 +104,7 @@ For a quick smoke check use `--iterations 30 --num-trials 5` first.
 bash experiments/3_gradient_quality_box2/run_experiment.sh
 
 # one engine only
-bash experiments/3_gradient_quality_box2/run_experiment.sh --axion
+bash experiments/3_gradient_quality_box2/run_experiment.sh --ostrich
 bash experiments/3_gradient_quality_box2/run_experiment.sh --mjx
 bash experiments/3_gradient_quality_box2/run_experiment.sh --semi-implicit
 

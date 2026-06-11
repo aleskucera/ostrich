@@ -19,10 +19,10 @@ import time
 import newton
 import numpy as np
 import warp as wp
-from axion.core.engine import AxionEngine
-from axion.core.engine_config import AxionEngineConfig
-from axion.core.logging_config import LoggingConfig
-from axion.core.model_builder import AxionModelBuilder
+from ostrich.core.engine import OstrichEngine
+from ostrich.core.engine_config import OstrichEngineConfig
+from ostrich.core.logging_config import LoggingConfig
+from ostrich.core.model_builder import OstrichModelBuilder
 
 from examples.terrain_traversal.helhest_model import create_helhest_model
 from examples.terrain_traversal.helhest_model import HelhestConfig
@@ -41,7 +41,7 @@ os.environ["PYOPENGL_PLATFORM"] = "glx"
 
 def build_model(num_worlds, terrain_seed, roughness=1.0, terrain_freq=1.0):
     """Build helhest + terrain mesh with num_worlds replicas."""
-    builder = AxionModelBuilder()
+    builder = OstrichModelBuilder()
     builder.rigid_gap = 0.2
 
     surface_mesh, terrain_h = generate_terrain_mesh(
@@ -234,7 +234,7 @@ def train_rs(
 
     # --- First: run target trajectory with 1 world to get target poses ---
     model_target = build_model(1, terrain_seed, roughness, terrain_freq)
-    engine_config = AxionEngineConfig(
+    engine_config = OstrichEngineConfig(
         max_newton_iters=14, max_linear_iters=16, backtrack_min_iter=10,
         newton_atol=1e-3, linear_atol=1e-3, linear_tol=1e-3,
         enable_linesearch=False, joint_compliance=6e-8,
@@ -243,7 +243,7 @@ def train_rs(
         friction_fb_alpha=1.0, friction_fb_beta=1.0,
         max_contacts_per_world=256,
     )
-    engine_target = AxionEngine(
+    engine_target = OstrichEngine(
         model=model_target, sim_steps=T, config=engine_config,
         logging_config=LoggingConfig(), differentiable_simulation=False,
     )
@@ -289,7 +289,7 @@ def train_rs(
 
     # --- Build RS model with 2N worlds ---
     model = build_model(num_worlds_rs, terrain_seed, roughness, terrain_freq)
-    engine = AxionEngine(
+    engine = OstrichEngine(
         model=model, sim_steps=T, config=engine_config,
         logging_config=LoggingConfig(), differentiable_simulation=False,
     )

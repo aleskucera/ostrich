@@ -1,6 +1,6 @@
 # Linear Solver
 
-At each Newton iteration, the core computational task is solving the Schur complement system for the constraint force update \(\Delta\boldsymbol{\lambda}\). This page describes the structure of that system and how Axion solves it efficiently on the GPU.
+At each Newton iteration, the core computational task is solving the Schur complement system for the constraint force update \(\Delta\boldsymbol{\lambda}\). This page describes the structure of that system and how Ostrich solves it efficiently on the GPU.
 
 ---
 
@@ -35,7 +35,7 @@ This SPSD structure is what enables the use of Krylov solvers designed for symme
 
 ## Preconditioned Conjugate Residual (PCR)
 
-Axion solves the Schur complement system using the **Preconditioned Conjugate Residual (PCR)** method — the symmetric counterpart of GMRES, designed specifically for SPSD systems.
+Ostrich solves the Schur complement system using the **Preconditioned Conjugate Residual (PCR)** method — the symmetric counterpart of GMRES, designed specifically for SPSD systems.
 
 The Conjugate Residual method exploits the symmetry of \(\mathbf{A}\) to build an orthogonal basis for the Krylov subspace \(\mathcal{K}_k(\mathbf{A}, \mathbf{b})\) using short recurrences, requiring only two matrix-vector products per iteration rather than a full Gram-Schmidt process. This makes it highly efficient for large, sparse systems.
 

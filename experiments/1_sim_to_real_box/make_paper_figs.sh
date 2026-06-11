@@ -21,8 +21,8 @@ set -euo pipefail
 EXP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 EXP2_DIR="$(cd "$EXP_DIR/../2_dt_stability_box" && pwd)"
 SRC_DIR="$EXP_DIR/results/paper_panels"
-# axion_paper is a SIBLING of the axion repo (../../../axion_paper from here).
-PAPER_FIG_DIR="$(cd "$EXP_DIR/../../.." && pwd)/axion_paper/figures"
+# ostrich_paper is a SIBLING of the ostrich repo (../../../ostrich_paper from here).
+PAPER_FIG_DIR="$(cd "$EXP_DIR/../../.." && pwd)/ostrich_paper/figures"
 
 if [[ ! -d "$PAPER_FIG_DIR" ]]; then
   echo "ERROR: paper figures dir not found: $PAPER_FIG_DIR" >&2

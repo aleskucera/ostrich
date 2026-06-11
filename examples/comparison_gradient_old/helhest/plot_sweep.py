@@ -6,7 +6,7 @@ XY trajectory + X(t) + Y(t) comparison.
 Usage:
     python examples/comparison_gradient/helhest/plot_sweep.py \
         --ground-truth results/helhest_chrono.json \
-        --axion results/sweep_axion.json \
+        --ostrich results/sweep_ostrich.json \
         --mujoco results/sweep_mujoco.json \
         --dojo results/sweep_dojo.json \
         --tinydiffsim results/sweep_tinydiffsim.json \
@@ -54,22 +54,22 @@ def simulate_tinydiffsim(params):
     return np.array(simulate(**params))
 
 
-def simulate_axion(params):
+def simulate_ostrich(params):
     """Run in subprocess to isolate GPU memory."""
     tmp = tempfile.mktemp(suffix=".json")
     worker = f'''
 import os, json, sys, numpy as np
 os.environ["PYOPENGL_PLATFORM"] = "glx"
 import newton, warp as wp
-from axion import (
-    AxionDifferentiableSimulator, AxionEngineConfig, ComplianceConfig,
+from ostrich import (
+    OstrichDifferentiableSimulator, OstrichEngineConfig, ComplianceConfig,
     ContactsConfig, LinearSolverConfig, LinesearchConfig,
     LoggingConfig, NewtonRaphsonConfig, RenderingConfig, SimulationConfig,
 )
-from axion.simulation.sim_config import SyncMode
+from ostrich.simulation.sim_config import SyncMode
 from examples.helhest.common import create_helhest_model, HelhestConfig
 
-class Sim(AxionDifferentiableSimulator):
+class Sim(OstrichDifferentiableSimulator):
     def build_model(self):
         self.builder.rigid_gap = 0.1
         self.builder.add_ground_plane(cfg=newton.ModelBuilder.ShapeConfig(mu=0.7, ke=50.0, kd=50.0, kf=50.0))
@@ -87,7 +87,7 @@ sim = Sim(
     SimulationConfig(duration_seconds=3.0, target_timestep_seconds={params["dt"]},
                      num_worlds=1, sync_mode=SyncMode.ALIGN_FPS_TO_DT, use_cuda_graph=False),
     RenderingConfig(vis_type="null", target_fps=30, usd_file=None, start_paused=False),
-    AxionEngineConfig(
+    OstrichEngineConfig(
         nr=NewtonRaphsonConfig(max_iters=12, backtrack_min_iter=8, atol=1e-1),
         linear=LinearSolverConfig(max_iters=12, tol=1e-3, atol=1e-3, regularization=1e-6),
         compliance=ComplianceConfig(joint=6e-8, contact=1e-6, friction=1e-6),
@@ -117,7 +117,7 @@ pathlib.Path("{tmp}").write_text(json.dumps(traj))
     result = subprocess.run([sys.executable, "-c", worker],
                             capture_output=True, text=True, timeout=120)
     if result.returncode != 0:
-        raise RuntimeError(f"Axion subprocess failed: {result.stderr[-500:]}")
+        raise RuntimeError(f"Ostrich subprocess failed: {result.stderr[-500:]}")
     with open(tmp) as f:
         traj = json.load(f)
     os.unlink(tmp)
@@ -220,7 +220,7 @@ def load_trajectory_json(path):
 def main():
     parser = argparse.ArgumentParser(description="Plot sweep trajectories vs ground truth")
     parser.add_argument("--ground-truth", required=True, help="Chrono ground truth JSON")
-    parser.add_argument("--axion", help="Axion sweep result JSON (or helhest_*.json with trajectory)")
+    parser.add_argument("--ostrich", help="Ostrich sweep result JSON (or helhest_*.json with trajectory)")
     parser.add_argument("--mujoco", help="MuJoCo sweep result JSON (or helhest_*.json with trajectory)")
     parser.add_argument("--dojo", help="Dojo sweep result JSON (or helhest_*.json with trajectory)")
     parser.add_argument("--tinydiffsim", help="TinyDiffSim sweep result JSON (or helhest_*.json with trajectory)")
@@ -239,7 +239,7 @@ def main():
     sims = [("Chrono (GT)", chrono_traj, None, gt["dt"], "k", "-", 2.0)]
 
     simulator_args = [
-        ("Axion", args.axion, simulate_axion, "#2196F3", "-", 1.5),
+        ("Ostrich", args.ostrich, simulate_ostrich, "#2196F3", "-", 1.5),
         ("Dojo", args.dojo, simulate_dojo, "#FF9800", "--", 1.5),
         ("MuJoCo", args.mujoco, simulate_mujoco, "#E91E63", "--", 1.3),
         ("TinyDiffSim", args.tinydiffsim, simulate_tinydiffsim, "#9C27B0", ":", 1.3),
@@ -298,15 +298,15 @@ def main():
         "ytick.major.width": 0.6,
     })
 
-    AXION_COLOR = "#2196F3"
+    OSTRICH_COLOR = "#2196F3"
     BAR_STYLES = {
-        "Axion":       {"color": AXION_COLOR},
+        "Ostrich":       {"color": OSTRICH_COLOR},
         "Dojo":        {"color": "#FF9800"},
         "MuJoCo":      {"color": "#E91E63"},
         "TinyDiffSim": {"color": "#9C27B0"},
     }
     BAR_LABELS = {
-        "Axion":       r"\textbf{Axion}",
+        "Ostrich":       r"\textbf{Ostrich}",
         "Dojo":        "Dojo",
         "MuJoCo":      "MuJoCo",
         "TinyDiffSim": "TinyDiffSim",
@@ -339,7 +339,7 @@ def main():
     bar_errs = [s[1] for s in bar_sims]
     bar_colors = [s[2] for s in bar_sims]
 
-    axion_err = next(e for n, e, _ in bar_sims if n == "Axion")
+    ostrich_err = next(e for n, e, _ in bar_sims if n == "Ostrich")
 
     y_pos = np.arange(len(bar_sims))
     bars = ax_bar.barh(y_pos, bar_errs, color=bar_colors, height=0.5, zorder=3)
@@ -361,18 +361,18 @@ def main():
         cy = y_pos[i]
         ax_bar.text(val + 0.01, cy, f"{val:.2f}", va="center", ha="left", fontsize=10)
 
-        if sim_name != "Axion":
-            ratio = val / axion_err
+        if sim_name != "Ostrich":
+            ratio = val / ostrich_err
             ratio_str = f"${ratio:.1f}\\times$"
             ax_bar.text(
                 1.04, cy, ratio_str,
                 va="center", ha="left", fontsize=10,
-                color=AXION_COLOR, fontweight="bold",
+                color=OSTRICH_COLOR, fontweight="bold",
                 transform=right_xfm, clip_on=False,
             )
 
     ax_bar.text(
-        1.04, 1.01, r"vs \textbf{Axion}",
+        1.04, 1.01, r"vs \textbf{Ostrich}",
         va="bottom", ha="left", fontsize=9,
         color="gray", transform=ax_bar.transAxes, clip_on=False,
     )

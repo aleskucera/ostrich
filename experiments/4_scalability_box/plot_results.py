@@ -1,10 +1,10 @@
 """Scalability of helhest_junior box optimization vs number of worlds.
 
 Two-panel figure: median time per iteration + peak GPU memory, log-log,
-across Axion / MJX / Semi-Implicit. Same style as
+across Ostrich / MJX / Semi-Implicit. Same style as
 experiments/4_scalability/plot_results.py (paper LaTeX serif).
 
-Reads results/<engine>_<N>.json files (axion_<N>.json, mjx_grad_<N>.json,
+Reads results/<engine>_<N>.json files (ostrich_<N>.json, mjx_grad_<N>.json,
 semi_implicit_<N>.json) and only powers-of-two N for a clean log-scale grid.
 
 Usage:
@@ -20,7 +20,7 @@ import numpy as np
 from matplotlib.transforms import blended_transform_factory
 
 RESULTS_DIR = pathlib.Path(__file__).parent / "results"
-PAPER_DIR = pathlib.Path(__file__).resolve().parents[2] / ".." / "axion_paper" / "figures"
+PAPER_DIR = pathlib.Path(__file__).resolve().parents[2] / ".." / "ostrich_paper" / "figures"
 
 plt.rcParams.update(
     {
@@ -38,12 +38,12 @@ plt.rcParams.update(
 )
 
 STYLES = {
-    "Axion": {"color": "#2196F3", "marker": "o", "lw": 2.0, "zorder": 5},
+    "Ostrich": {"color": "#2196F3", "marker": "o", "lw": 2.0, "zorder": 5},
     "MJX-grad": {"color": "#E91E63", "marker": "s", "lw": 1.8, "zorder": 4},
     "Semi-Implicit": {"color": "#FF9800", "marker": "^", "lw": 1.8, "zorder": 3},
 }
 LABELS = {
-    "Axion": r"\textbf{Ostrich}",
+    "Ostrich": r"\textbf{Ostrich}",
     "MJX-grad": "MJX",
     "Semi-Implicit": "Semi-Impl.",
 }
@@ -62,7 +62,7 @@ GPU_MEM_LIMIT_MB = 24 * 1024  # 24 GB (RTX 3090 on dasenka)
 SLOPE_LABEL_POSITIONS: dict[str, dict] = {
     "MJX-grad": {"x": 3.6, "y": 9000, "rotation": 57},
     "Semi-Implicit": {"x": 340, "y": 4000, "rotation": 55},
-    "Axion": {"x": 5000, "y": 3300, "rotation": 55},
+    "Ostrich": {"x": 5000, "y": 3300, "rotation": 55},
 }
 HIDE_SLOPE_LABEL: set[str] = set()  # add engine names here to suppress label
 
@@ -214,7 +214,7 @@ def main():
     # 24 GB GPU limit line + OOM shading
     ax_mem.axhline(GPU_MEM_LIMIT_MB, color="red", linestyle="-", linewidth=0.8, alpha=0.6, zorder=1)
 
-    # OOM extrapolation + memory-panel markers per engine. Axion's memory
+    # OOM extrapolation + memory-panel markers per engine. Ostrich's memory
     # curve is flat below ~512 worlds (GPU underutilised), so we fit slope
     # only on N>=512 — otherwise the flat-region pre-knee points pull the
     # per-world slope down by ~50x.
@@ -223,7 +223,7 @@ def main():
     oom_info = {}
     oom_info["MJX-grad"] = _add_oom_extrapolation(ax_mem, sim_data, "MJX-grad")
     oom_info["Semi-Implicit"] = _add_oom_extrapolation(ax_mem, sim_data, "Semi-Implicit")
-    oom_info["Axion"] = _add_oom_extrapolation(ax_mem, sim_data, "Axion", slope_fit_min_n=512)
+    oom_info["Ostrich"] = _add_oom_extrapolation(ax_mem, sim_data, "Ostrich", slope_fit_min_n=512)
 
     # Time-panel OOM markers: place X at the y-value where each engine's
     # time curve last had data, then extend with a short dashed segment to

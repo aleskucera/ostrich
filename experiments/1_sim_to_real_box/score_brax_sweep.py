@@ -7,7 +7,7 @@ Writes:
                                           including downsampled trajectories
                                           (and per-pipeline best trajectories for plotting)
 
-Run in the main axion venv:
+Run in the main ostrich venv:
     .venv/bin/python experiments/1_sim_to_real_box/score_brax_sweep.py
 """
 import glob, json, pathlib, re

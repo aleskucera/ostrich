@@ -6,7 +6,7 @@ Cross-step contact warm start populates `data._constr_force_prev_iter`
 with the previous step's converged λ (matched contacts) plus α/β/γ
 heuristics (cold-start contacts) so that the FB-friction kernel sees a
 non-zero `f_n_prev` at NR iter 0. This works — phase 2.5 of warm-start
-ships in `axion/collision/warm_start.py`.
+ships in `ostrich/collision/warm_start.py`.
 
 The natural next step is "true" warm-start: also seed `data._constr_force`
 itself, so the NR iterate at iter 0 starts from the same heuristic guess
@@ -190,7 +190,7 @@ ever changes.
 
 ## See also
 
-* `axion/collision/warm_start.py` — phase-2.5 implementation
+* `ostrich/collision/warm_start.py` — phase-2.5 implementation
 * [`friction_sticking_issue.md`](friction_sticking_issue.md) — a related
   active-arm degeneracy in the friction NCP, documents the same
   Jacobian-rank-deficiency family of failures

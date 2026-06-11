@@ -5,7 +5,7 @@ Re-simulates the best config for each simulator to get full trajectories.
 Usage:
     python examples/comparison_accuracy/helhest/plot_sweep.py \
         --ground-truth results/helhest_2026_04_10-14_46_18.json \
-        --sweep results/sweep_mujoco_14_46_18.json results/sweep_axion_14_46_18.json
+        --sweep results/sweep_mujoco_14_46_18.json results/sweep_ostrich_14_46_18.json
 """
 import argparse
 import json
@@ -109,11 +109,11 @@ def simulate_mujoco(params, target_ctrl, duration):
     return np.array(traj), dt
 
 
-def simulate_axion(sweep_data, target_ctrl, duration):
-    """Re-simulate Axion best config to get full trajectory."""
+def simulate_ostrich(sweep_data, target_ctrl, duration):
+    """Re-simulate Ostrich best config to get full trajectory."""
     import warp as wp
-    from sweep_axion_fast import HelhestSweepSim
-    from axion import AxionEngineConfig, ExecutionConfig, LoggingConfig, RenderingConfig, SimulationConfig
+    from sweep_ostrich_fast import HelhestSweepSim
+    from ostrich import OstrichEngineConfig, ExecutionConfig, LoggingConfig, RenderingConfig, SimulationConfig
 
     fixed = sweep_data["fixed_params"]
     best = sweep_data["best_params"]
@@ -127,7 +127,7 @@ def simulate_axion(sweep_data, target_ctrl, duration):
     )
     render_config = RenderingConfig(vis_type="null", target_fps=30, usd_file=None, start_paused=False)
     exec_config = ExecutionConfig(use_cuda_graph=False, headless_steps_per_segment=1)
-    engine_config = AxionEngineConfig(
+    engine_config = OstrichEngineConfig(
         max_newton_iters=16, max_linear_iters=16, backtrack_min_iter=12,
         newton_atol=1e-5, linear_atol=1e-5, linear_tol=1e-5,
         enable_linesearch=False,
@@ -166,7 +166,7 @@ def main():
     # Load and re-simulate each sweep
     SIM_COLORS = {
         "MuJoCo": "#E91E63",
-        "Axion": "#2196F3",
+        "Ostrich": "#2196F3",
         "Dojo": "#4CAF50",
     }
 
@@ -189,9 +189,9 @@ def main():
                 best_params = sweep_data["best_params"]
             print(f"Re-simulating {sim_name} (err={best_error:.4f})...")
             sim_traj, sim_dt = simulate_mujoco(best_params, target_ctrl, duration)
-        elif sim_name == "Axion":
+        elif sim_name == "Ostrich":
             print(f"Re-simulating {sim_name} (err={best_error:.4f})...")
-            sim_traj, sim_dt = simulate_axion(sweep_data, target_ctrl, duration)
+            sim_traj, sim_dt = simulate_ostrich(sweep_data, target_ctrl, duration)
         else:
             print(f"  Skipping {sim_name} (re-simulation not implemented)")
             continue

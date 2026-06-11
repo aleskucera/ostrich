@@ -2,7 +2,7 @@
 
 Mirrors `surface_drive.py` but with constant velocity targets and no viewer
 input, so the workload is reproducible across optimization branches. Intended
-to be run with `engine=axion_profile_per_iter` so the per-component profiler
+to be run with `engine=ostrich_profile_per_iter` so the per-component profiler
 prints `linear_system / preconditioner / cr_solve / step_or_linesearch /
 convergence_check` timings at the end of the run.
 """
@@ -15,11 +15,11 @@ import newton
 import numpy as np
 import openmesh
 import warp as wp
-from axion import EngineConfig
-from axion import InteractiveSimulator
-from axion import LoggingConfig
-from axion import RenderingConfig
-from axion import SimulationConfig
+from ostrich import EngineConfig
+from ostrich import InteractiveSimulator
+from ostrich import LoggingConfig
+from ostrich import RenderingConfig
+from ostrich import SimulationConfig
 from omegaconf import DictConfig
 
 try:

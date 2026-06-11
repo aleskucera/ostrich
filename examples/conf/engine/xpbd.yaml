@@ -1,5 +1,5 @@
 # @package engine
-_target_: axion.XPBDEngineConfig
+_target_: ostrich.XPBDEngineConfig
 iterations: 30
 soft_body_relaxation: 0.9
 soft_contact_relaxation: 0.8

@@ -10,12 +10,12 @@ import hydra
 import newton
 import numpy as np
 import warp as wp
-from axion import EngineConfig
-from axion import InteractiveSimulator
-from axion import LoggingConfig
-from axion import RenderingConfig
-from axion import SimulationConfig
-from axion.core.types import JointMode
+from ostrich import EngineConfig
+from ostrich import InteractiveSimulator
+from ostrich import LoggingConfig
+from ostrich import RenderingConfig
+from ostrich import SimulationConfig
+from ostrich.core.types import JointMode
 from newton import Model
 from omegaconf import DictConfig
 
@@ -56,7 +56,7 @@ class CartPoleInteractive(InteractiveSimulator):
         j_cart = self.builder.add_joint_prismatic(
             parent=-1,
             child=link_cart,
-            axis=wp.vec3(1.0, 0.0, 0.0),  # Hardcoded X (Axion/Newton sync)
+            axis=wp.vec3(1.0, 0.0, 0.0),  # Hardcoded X (Ostrich/Newton sync)
             parent_xform=wp.transform(p=wp.vec3(0.0, 0.0, 0.0), q=rot_z_90),
             child_xform=wp.transform(p=wp.vec3(0.0, 0.0, 0.0), q=rot_z_90),
             target_ke=1000.0,

@@ -1,5 +1,5 @@
 name: 💡 Feature Request
-description: Suggest an idea for Axion
+description: Suggest an idea for Ostrich
 title: 'feat: '
 body:
 
@@ -23,7 +23,7 @@ body:
     id: proposed-solution
     attributes:
       label: Describe Preferred Solution
-      description: A clear and concise description of what you how you want this feature to be added to Axion.
+      description: A clear and concise description of what you how you want this feature to be added to Ostrich.
 
   - type: textarea
     id: alternatives-considered

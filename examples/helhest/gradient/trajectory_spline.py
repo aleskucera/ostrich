@@ -6,11 +6,11 @@ import hydra
 import newton
 import numpy as np
 import warp as wp
-from axion import AxionDifferentiableSimulator
-from axion import EngineConfig
-from axion import LoggingConfig
-from axion import RenderingConfig
-from axion import SimulationConfig
+from ostrich import OstrichDifferentiableSimulator
+from ostrich import EngineConfig
+from ostrich import LoggingConfig
+from ostrich import RenderingConfig
+from ostrich import SimulationConfig
 from newton import Model
 from omegaconf import DictConfig
 
@@ -111,7 +111,7 @@ def regularization_kernel(
     wp.atomic_add(loss, 0, weight * v * v)
 
 
-class HelhestTrajectorySplineOptimizer(AxionDifferentiableSimulator):
+class HelhestTrajectorySplineOptimizer(OstrichDifferentiableSimulator):
     def __init__(
         self,
         sim_config: SimulationConfig,

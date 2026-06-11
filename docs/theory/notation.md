@@ -1,6 +1,6 @@
 # Notation and Symbols
 
-This page serves as a central glossary for the mathematical notation used throughout the Axion documentation. It defines the state variables, system parameters, and derivative matrices that form the foundation of the physics engine.
+This page serves as a central glossary for the mathematical notation used throughout the Ostrich documentation. It defines the state variables, system parameters, and derivative matrices that form the foundation of the physics engine.
 
 ---
 

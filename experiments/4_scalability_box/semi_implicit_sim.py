@@ -1,6 +1,6 @@
 """Helhest_junior box scalability benchmark — Semi-Implicit, variable num_worlds.
 
-SI counterpart of axion_sim.py / mjx_sim.py for the box scene. Uses Newton's
+SI counterpart of ostrich_sim.py / mjx_sim.py for the box scene. Uses Newton's
 SemiImplicit solver with replicated worlds via builder.finalize_replicated.
 Same physics + spline + GT setup as experiments/3_gradient_quality_box.
 
@@ -25,9 +25,9 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
 import newton
 import numpy as np
 import warp as wp
-from axion import (LoggingConfig, RenderingConfig, SemiImplicitEngineConfig,
+from ostrich import (LoggingConfig, RenderingConfig, SemiImplicitEngineConfig,
                    SimulationConfig)
-from axion.simulation.differentiable_simulator import NewtonDifferentiableSimulator
+from ostrich.simulation.differentiable_simulator import NewtonDifferentiableSimulator
 
 from examples.helhest_junior.common import create_helhest_junior_model
 from examples.helhest_junior.replay_real import BOX_CENTER, BOX_HALF_EXTENTS

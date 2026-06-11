@@ -15,7 +15,7 @@ Tested at PR #2742 head `d6036bd` with `quadrants==0.7.7` on Linux + CUDA 12.8 +
 | Per-step velocity → **same-DOF** position (e.g. chassis linear vel → chassis pos) | ✅ Works — `O(1e-2)`, all steps contribute, contacts present or absent |
 | **Per-step velocity → coupled-DOF position** (e.g. **wheel** rotation vel → chassis pos via articulation/friction) | ❌ `O(1e-5)` noise, **last-step exactly zero**, contacts present or absent |
 
-The cell that's broken is exactly the gradient path used by every gradient experiment in the axion paper.
+The cell that's broken is exactly the gradient path used by every gradient experiment in the ostrich paper.
 
 ---
 
@@ -75,7 +75,7 @@ last step:  [-3.00e-03, 0.00, 3.95e-03]  ← non-zero, all steps contribute equa
 
 Setup: Helhest chassis + 3 hinge-jointed wheels, dt=0.005, T=20. CPU. Per-step `set_dofs_velocity` to **wheel** DOFs (6, 7, 8) — i.e. wheel rotation rates. Loss is `(chassis_pos - target)²`. Chassis position only changes via the mass-matrix coupling from wheel rotation (no contacts) or wheel-ground friction (with contacts).
 
-This is exactly the pattern of `experiments/3_gradient_quality/optimize_axion.py`: spline → per-step wheel velocity trajectory → chassis pose.
+This is exactly the pattern of `experiments/3_gradient_quality/optimize_ostrich.py`: spline → per-step wheel velocity trajectory → chassis pose.
 
 ```
 === A: No ground (wheel rotation → chassis pos via mass coupling only) ===
@@ -132,7 +132,7 @@ Tasks that *do* work:
 - Forward simulation at any complexity (already used as `sweep_genesis_blender.py` in Experiment 2)
 - Trajectory optimization where the parameter and the loss DOF coincide (e.g. push a free body to a target)
 
-### For our paper (`axion`)
+### For our paper (`ostrich`)
 
 Every gradient experiment optimizes a per-step wheel-velocity trajectory and reads chassis pose — exactly the broken cell. Genesis cannot be a fair baseline for:
 

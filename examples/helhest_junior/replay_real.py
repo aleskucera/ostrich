@@ -36,24 +36,24 @@ import h5py
 import newton
 import numpy as np
 import warp as wp
-from axion import AdjointConfig
-from axion import AdjointLoggingConfig
-from axion import AxionEngineConfig
-from axion import ComplianceConfig
-from axion import ContactsConfig
-from axion import DatasetLoggingConfig
-from axion import HDF5LoggingConfig
-from axion import InteractiveSimulator
-from axion import LinearSolverConfig
-from axion import LinesearchConfig
-from axion import LoggingConfig
-from axion import NewtonRaphsonConfig
-from axion import ProfilingConfig
-from axion import RenderingConfig
-from axion import SimulationConfig
-from axion import WarmStartConfig
-from axion.collision import ContactReductionConfig
-from axion.simulation.sim_config import SyncMode
+from ostrich import AdjointConfig
+from ostrich import AdjointLoggingConfig
+from ostrich import OstrichEngineConfig
+from ostrich import ComplianceConfig
+from ostrich import ContactsConfig
+from ostrich import DatasetLoggingConfig
+from ostrich import HDF5LoggingConfig
+from ostrich import InteractiveSimulator
+from ostrich import LinearSolverConfig
+from ostrich import LinesearchConfig
+from ostrich import LoggingConfig
+from ostrich import NewtonRaphsonConfig
+from ostrich import ProfilingConfig
+from ostrich import RenderingConfig
+from ostrich import SimulationConfig
+from ostrich import WarmStartConfig
+from ostrich.collision import ContactReductionConfig
+from ostrich.simulation.sim_config import SyncMode
 
 try:
     from examples.helhest_junior.common import create_helhest_junior_model
@@ -191,7 +191,7 @@ class HelhestJuniorReplaySimulator(InteractiveSimulator):
                  **kwargs):
         self.control_mode = control_mode
         # Wheel actuator gains. With TARGET_VELOCITY mode, different solvers
-        # consume these differently: Axion drives well from k_p alone, while
+        # consume these differently: Ostrich drives well from k_p alone, while
         # SemiImplicit needs a non-zero k_d (velocity-feedback gain) to apply
         # torque at all — leaving k_d=0 yields a robot that barely spins.
         self.k_p = k_p
@@ -203,11 +203,11 @@ class HelhestJuniorReplaySimulator(InteractiveSimulator):
         self.mu_front = mu_front
         self.mu_rear = mu_rear
         # mu_rolling is the wheel's resistance to free spin / sideways torsion.
-        # It's the closest Axion analog to MuJoCo's torsional friction.
+        # It's the closest Ostrich analog to MuJoCo's torsional friction.
         self.mu_rolling = mu_rolling
         self.ground_cfg_kwargs = dict(ke=ground_ke, kd=ground_kd, kf=ground_kf)
         self.box_cfg_kwargs = dict(ke=box_ke, kd=box_kd, kf=box_kf)
-        # Wheel contact stiffness. Axion solver ignores ShapeConfig.ke/kd/kf;
+        # Wheel contact stiffness. Ostrich solver ignores ShapeConfig.ke/kd/kf;
         # SemiImplicit and other Newton solvers consume them.
         self.wheel_ke = wheel_ke
         self.wheel_kd = wheel_kd
@@ -642,7 +642,7 @@ def main():
         world_offset_x=20.0,
         world_offset_y=20.0,
     )
-    engine_config = AxionEngineConfig(
+    engine_config = OstrichEngineConfig(
         differentiable=False,
         nr=NewtonRaphsonConfig(
             max_iters=16,

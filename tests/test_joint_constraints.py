@@ -2,9 +2,9 @@ import newton
 import numpy as np
 import pytest
 import warp as wp
-from axion.core.engine import AxionEngine
-from axion.core.engine_config import AxionEngineConfig, ComplianceConfig, LinearSolverConfig, NewtonRaphsonConfig
-from axion.core.model_builder import AxionModelBuilder
+from ostrich.core.engine import OstrichEngine
+from ostrich.core.engine_config import OstrichEngineConfig, ComplianceConfig, LinearSolverConfig, NewtonRaphsonConfig
+from ostrich.core.model_builder import OstrichModelBuilder
 
 wp.init()
 
@@ -141,7 +141,7 @@ def run_joint_test(joint_type, joint_axis=wp.vec3(0.0, 1.0, 0.0)):
     print(f"\n=== Testing {joint_type} Joint ===")
 
     # 1. Setup Model
-    builder = AxionModelBuilder()
+    builder = OstrichModelBuilder()
 
     link_1 = builder.add_link()
     builder.add_shape_box(link_1, hx=0.5, hy=0.5, hz=0.5)
@@ -188,13 +188,13 @@ def run_joint_test(joint_type, joint_axis=wp.vec3(0.0, 1.0, 0.0)):
     model = builder.finalize_replicated(num_worlds=1, gravity=-9.81)
 
     # 2. Setup Engine
-    config = AxionEngineConfig(
+    config = OstrichEngineConfig(
         nr=NewtonRaphsonConfig(max_iters=10),
         linear=LinearSolverConfig(max_iters=10),
         compliance=ComplianceConfig(joint=1e-8),
     )
 
-    engine = AxionEngine(model=model, sim_steps=30, config=config)
+    engine = OstrichEngine(model=model, sim_steps=30, config=config)
 
     state_in = model.state()
     state_out = model.state()

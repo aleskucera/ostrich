@@ -1,6 +1,6 @@
 """Run Semi-Implicit over a fixed list of dt values and dump trajectories for Blender.
 
-Mirrors sweep_axion_blender.py / sweep_mujoco_blender.py — same DT_LIST so the
+Mirrors sweep_ostrich_blender.py / sweep_mujoco_blender.py — same DT_LIST so the
 three sweeps line up frame-by-frame in compare_to_blender.py.
 
 Usage:
@@ -22,11 +22,11 @@ warp.config.quiet = True
 import newton  # noqa: E402
 import numpy as np  # noqa: E402
 import warp as wp  # noqa: E402
-from axion import ExecutionConfig  # noqa: E402
-from axion import LoggingConfig  # noqa: E402
-from axion import RenderingConfig  # noqa: E402
-from axion import SemiImplicitEngineConfig  # noqa: E402
-from axion import SimulationConfig  # noqa: E402
+from ostrich import ExecutionConfig  # noqa: E402
+from ostrich import LoggingConfig  # noqa: E402
+from ostrich import RenderingConfig  # noqa: E402
+from ostrich import SemiImplicitEngineConfig  # noqa: E402
+from ostrich import SimulationConfig  # noqa: E402
 
 os.environ["PYOPENGL_PLATFORM"] = "glx"
 
@@ -48,7 +48,7 @@ from sweep_semi_implicit import (  # noqa: E402
 # Shorter duration than the headless dt sweep (8 s).
 DURATION = 4.0
 
-# Shared with sweep_axion_blender.py and sweep_mujoco_blender.py so the three
+# Shared with sweep_ostrich_blender.py and sweep_mujoco_blender.py so the three
 # runs line up frame-by-frame in compare_to_blender.py.
 # Semi-implicit's nominal max stable dt is ~0.65 ms; only the 0.5 ms entry
 # should stay stable, everything above blows up.
@@ -157,7 +157,7 @@ def _build_configs(dt: float):
 
 
 # ---------------------------------------------------------------------------
-# Shape extraction (same logic as the axion sweep blender exporter)
+# Shape extraction (same logic as the ostrich sweep blender exporter)
 # ---------------------------------------------------------------------------
 
 def extract_shapes(model) -> list[dict]:

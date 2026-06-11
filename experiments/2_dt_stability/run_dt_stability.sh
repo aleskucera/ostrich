@@ -4,20 +4,20 @@
 #
 # Usage:
 #   ./run_dt_stability.sh                   # run all
-#   ./run_dt_stability.sh --axion           # run only Axion
-#   ./run_dt_stability.sh --axion --mujoco  # run Axion and MuJoCo
+#   ./run_dt_stability.sh --ostrich           # run only Ostrich
+#   ./run_dt_stability.sh --ostrich --mujoco  # run Ostrich and MuJoCo
 set -e
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RESULTS="$DIR/results"
 mkdir -p "$RESULTS"
 
-RUN_AXION=false; RUN_MUJOCO=false; RUN_SEMI=false
+RUN_OSTRICH=false; RUN_MUJOCO=false; RUN_SEMI=false
 RUN_ALL=true
 NUM_TRIALS=""
 SEED=""
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --axion) RUN_AXION=true; RUN_ALL=false; shift;;
+        --ostrich) RUN_OSTRICH=true; RUN_ALL=false; shift;;
         --mujoco) RUN_MUJOCO=true; RUN_ALL=false; shift;;
         --semi-implicit) RUN_SEMI=true; RUN_ALL=false; shift;;
         --num-trials) NUM_TRIALS="$2"; shift 2;;
@@ -30,9 +30,9 @@ EXTRA=()
 [[ -n "$NUM_TRIALS" ]] && EXTRA+=(--num-trials "$NUM_TRIALS")
 [[ -n "$SEED" ]] && EXTRA+=(--seed "$SEED")
 
-if $RUN_ALL || $RUN_AXION; then
-    echo "=== Axion ==="
-    python "$DIR/sweep_axion.py" --save "$RESULTS/sweep_axion.json" "${EXTRA[@]}"
+if $RUN_ALL || $RUN_OSTRICH; then
+    echo "=== Ostrich ==="
+    python "$DIR/sweep_ostrich.py" --save "$RESULTS/sweep_ostrich.json" "${EXTRA[@]}"
     echo ""
 fi
 

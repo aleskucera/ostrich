@@ -1,16 +1,16 @@
 # Core Concepts
 
-This section provides a high-level mathematical overview of how Axion formulates and solves the physics simulation problem. Understanding these concepts is essential for grasping the theoretical foundation underlying the simulator's robust and unified approach.
+This section provides a high-level mathematical overview of how Ostrich formulates and solves the physics simulation problem. Understanding these concepts is essential for grasping the theoretical foundation underlying the simulator's robust and unified approach.
 
 ---
 
 ## Mathematical Foundation
 
-Axion's physics engine is built on a unified mathematical framework that treats all physical phenomena—articulated body dynamics, contact interactions, and joint constraints—as a single, coupled system of equations. This approach provides superior stability and accuracy compared to traditional methods that handle these phenomena separately.
+Ostrich's physics engine is built on a unified mathematical framework that treats all physical phenomena—articulated body dynamics, contact interactions, and joint constraints—as a single, coupled system of equations. This approach provides superior stability and accuracy compared to traditional methods that handle these phenomena separately.
 
 ### Articulated Bodies
 
-Axion represents articulated body systems using generalized coordinates and velocities that describe the system's configuration and motion. The dynamics are governed by:
+Ostrich represents articulated body systems using generalized coordinates and velocities that describe the system's configuration and motion. The dynamics are governed by:
 
 \[
 \mathbf{\tilde{M}}(\mathbf{q}) \Delta\mathbf{u} = h \mathbf{f}_{\text{ext}} + h \mathbf{J}^T(\mathbf{q}) \boldsymbol{\lambda}
@@ -35,7 +35,7 @@ These constraints create a system mixing equalities and inequalities, requiring 
 
 ## Solution Approach
 
-Axion's approach follows a four-step mathematical progression:
+Ostrich's approach follows a four-step mathematical progression:
 
 ### 1. Constraint Formulation
 
@@ -77,7 +77,7 @@ Traditional physics engines handle dynamics, contacts, and joints in separate ph
 * **Drift** and constraint violation accumulation  
 * **Artificial softness** in joints and contacts
 
-Axion's unified mathematical formulation addresses these issues by:
+Ostrich's unified mathematical formulation addresses these issues by:
 
 * **Solving everything simultaneously** — no artificial sequencing
 * **Position-level constraint enforcement** — eliminates drift by design

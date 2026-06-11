@@ -25,7 +25,7 @@ import optax
 
 from config import DURATION, K, NUM_WORLDS, TARGET_CTRL, INIT_CTRL
 
-# MJX uses explicit integration — requires a much smaller timestep than Axion
+# MJX uses explicit integration — requires a much smaller timestep than Ostrich
 DT = 2e-3
 
 T = int(DURATION / DT)

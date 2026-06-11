@@ -18,10 +18,10 @@ No differentiation through solver iterations (that would be Option A).
 
 ## Code
 
-- `src/axion/learning/torch_residual.py` -- `AxionResidual`: differentiable residual with approximate `A_full^T` backward
-- `src/axion/learning/torch_residual_ad.py` -- `AxionResidualAD`: differentiable residual with exact gradients via `wp.Tape`
-- `src/axion/learning/warm_start_net.py` -- `WarmStartNet`: configurable MLP, `WarmStartTrainer`: training loop
-- `src/axion/optim/full_system_operator.py` -- `FullSystemOperator`: full KKT system operator and its transpose
+- `src/ostrich/learning/torch_residual.py` -- `OstrichResidual`: differentiable residual with approximate `A_full^T` backward
+- `src/ostrich/learning/torch_residual_ad.py` -- `OstrichResidualAD`: differentiable residual with exact gradients via `wp.Tape`
+- `src/ostrich/learning/warm_start_net.py` -- `WarmStartNet`: configurable MLP, `WarmStartTrainer`: training loop
+- `src/ostrich/optim/full_system_operator.py` -- `FullSystemOperator`: full KKT system operator and its transpose
 - `examples/train_warm_start.py` -- training and evaluation script
 
 ## Findings

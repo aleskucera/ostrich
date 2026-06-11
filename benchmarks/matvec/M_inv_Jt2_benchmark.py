@@ -1,7 +1,7 @@
 import gc
 import time
 
-import axion.optim.M_inv_Jt2 as kernels
+import ostrich.optim.M_inv_Jt2 as kernels
 import numpy as np
 import warp as wp
 

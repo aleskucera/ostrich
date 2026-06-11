@@ -1,13 +1,13 @@
 # Recovered-control investigation (§4.3 inverse problem)
 
-Side investigation of `experiments/3_gradient_quality_box`: can Axion's
+Side investigation of `experiments/3_gradient_quality_box`: can Ostrich's
 optimizer recover the real wheel-velocity setpoints from the recorded XY
 trajectory? The goal was (a) a possible §4.3 supplementary plot, and
 (b) a foundation for the §4.6 open-loop hardware experiment.
 
 ## TL;DR
 
-At K=10 with light smoothness + yaw + skid-steer coupling, Axion recovers
+At K=10 with light smoothness + yaw + skid-steer coupling, Ostrich recovers
 a smooth, bounded, cross-seed-consistent wheel-velocity profile — but
 **~0.5–1.5 rad/s magnitude rather than real's peak ~2 rad/s at t≈4 s**.
 The gap is the sim-to-real model mismatch from §4.1 (~6 cm residual at
@@ -80,12 +80,12 @@ That deviation is the model-gap floor for open-loop transfer.
 
 ## Code state
 
-- `optimize_axion.py` — modified to:
+- `optimize_ostrich.py` — modified to:
   - log `init_params` + `final_params` per trial
   - add `chassis_yaw_loss_kernel` and yaw target wiring
   - add Python-side L²-smoothness reg on spline knots
   - couple rear wheel to (L+R)/2 (NUM_OPT_DOFS = 2)
-- `plot_recovered_control.py` — new; loads axion.json, overlays
+- `plot_recovered_control.py` — new; loads ostrich.json, overlays
   recovered vs real per wheel.
 - `results/recovered_control.png` — current rendering.
 

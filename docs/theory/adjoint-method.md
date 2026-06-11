@@ -1,6 +1,6 @@
 # Implicit Gradient and Adjoint Method
 
-Axion is a **differentiable simulator**: it can compute exact gradients of any scalar loss \(\mathcal{L}\) with respect to initial conditions, control inputs, or physical parameters. This enables gradient-based optimisation of robot behaviour directly through the physics engine.
+Ostrich is a **differentiable simulator**: it can compute exact gradients of any scalar loss \(\mathcal{L}\) with respect to initial conditions, control inputs, or physical parameters. This enables gradient-based optimisation of robot behaviour directly through the physics engine.
 
 This section explains the mathematical foundation of how these gradients are computed efficiently using the **implicit function theorem** and the **adjoint method**.
 
@@ -39,7 +39,7 @@ To optimise \(\mathcal{L}\), we need to backpropagate through the computational 
 
 Computing this Jacobian directly is problematic: there is no explicit formula for \(\mathbf{s}^+(\mathbf{s}^-)\), and automatic differentiation through the Newton solver iterations would be extremely expensive and memory-intensive.
 
-Instead, Axion uses the **implicit function theorem** to compute the Jacobian exactly without unrolling the solver.
+Instead, Ostrich uses the **implicit function theorem** to compute the Jacobian exactly without unrolling the solver.
 
 ---
 
@@ -139,7 +139,7 @@ Applying the same Schur complement strategy as the forward solve (eliminating \(
 \mathbf{w}_u = \mathbf{\tilde{M}}^{-1}\!\left(\nabla_{u^+}\mathcal{L} + h\mathbf{G}\,\nabla_{q^+}\mathcal{L} - \mathbf{J}^\top \mathbf{w}_\lambda\right)
 \]
 
-This is **the same Schur complement system** as the forward solve, with a different right-hand side. Axion therefore reuses the same PCR solver and Jacobi preconditioner (already computed during the forward pass) to solve the adjoint system at negligible additional cost.
+This is **the same Schur complement system** as the forward solve, with a different right-hand side. Ostrich therefore reuses the same PCR solver and Jacobi preconditioner (already computed during the forward pass) to solve the adjoint system at negligible additional cost.
 
 ---
 

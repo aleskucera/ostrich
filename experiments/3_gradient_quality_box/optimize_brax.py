@@ -1,6 +1,6 @@
 """Helhest_junior box trajectory optimization using Brax (jax.grad).
 
-Brax counterpart of optimize_mjx.py / optimize_axion.py. Optimizes a K-knot
+Brax counterpart of optimize_mjx.py / optimize_ostrich.py. Optimizes a K-knot
 wheel-velocity spline so the junior matches a recorded real trajectory while
 crossing the box. Runs one of Brax's three differentiable pipelines
 (positional / generalized / spring) and logs the per-iteration loss curve and
@@ -19,7 +19,7 @@ Outputs results/brax_<pipeline>.json with the same per-trial schema as
 optimize_mjx.py (losses, grad_norms, wall_s, best_loss).
 
 Run inside the Brax venv:
-    /home/kuceral4/projects/axion/.venv-brax/bin/python \
+    /home/kuceral4/projects/ostrich/.venv-brax/bin/python \
         experiments/3_gradient_quality_box/optimize_brax.py --pipeline positional
 """
 import argparse

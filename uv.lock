@@ -16,7 +16,7 @@ conflicts = [[
 
 [manifest]
 members = [
-    "axion",
+    "ostrich",
     "newton",
 ]
 
@@ -268,7 +268,7 @@ wheels = [
 ]
 
 [[package]]
-name = "axion"
+name = "ostrich"
 version = "0.1.0"
 source = { editable = "." }
 
@@ -342,8 +342,8 @@ sim = [
 
 [package.metadata]
 requires-dist = [
-    { name = "axion", extras = ["docs"], marker = "extra == 'dev'" },
-    { name = "axion", extras = ["sim"], marker = "extra == 'dev'" },
+    { name = "ostrich", extras = ["docs"], marker = "extra == 'dev'" },
+    { name = "ostrich", extras = ["sim"], marker = "extra == 'dev'" },
     { name = "brax", marker = "extra == 'brax'" },
     { name = "genesis-world", marker = "extra == 'genesis'" },
     { name = "h5py", marker = "extra == 'sim'", specifier = "==3.14.0" },

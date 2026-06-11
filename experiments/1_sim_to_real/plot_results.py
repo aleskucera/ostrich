@@ -14,7 +14,7 @@ import numpy as np
 
 RESULTS_DIR = pathlib.Path(__file__).parent / "results"
 DATA_DIR = pathlib.Path(__file__).parent.parent / "data"
-PAPER_DIR = pathlib.Path(__file__).resolve().parents[2] / ".." / "axion_paper" / "figures"
+PAPER_DIR = pathlib.Path(__file__).resolve().parents[2] / ".." / "ostrich_paper" / "figures"
 
 plt.rcParams.update(
     {
@@ -33,14 +33,14 @@ plt.rcParams.update(
 )
 
 SIM_COLORS = {
-    "Axion": "#2196F3",
+    "Ostrich": "#2196F3",
     "MuJoCo": "#E91E63",
     "Semi-Implicit": "#FF9800",
     "TinyDiffSim": "#607D8B",
     "Dojo": "#4CAF50",
 }
 
-SIM_ORDER = ["Axion", "MuJoCo", "Semi-Implicit", "TinyDiffSim", "Dojo"]
+SIM_ORDER = ["Ostrich", "MuJoCo", "Semi-Implicit", "TinyDiffSim", "Dojo"]
 
 # Simulators above this error are considered failed (excluded from Experiment 2+)
 ACCURACY_THRESHOLD = 1.0  # meters
@@ -152,7 +152,7 @@ def main():
                 excluded_from_plot.append(sim_name)
             continue
         color = SIM_COLORS[sim_name]
-        ax_turn.plot(traj[:, 1], traj[:, 0], color=color, linewidth=1.1, label=(r"\textbf{Axion}" if sim_name == "Axion" else sim_name))
+        ax_turn.plot(traj[:, 1], traj[:, 0], color=color, linewidth=1.1, label=(r"\textbf{Ostrich}" if sim_name == "Ostrich" else sim_name))
         for frac in (0.25, 0.5, 0.75):
             idx = int(frac * (len(traj) - 1))
             ax_turn.annotate(
@@ -171,7 +171,7 @@ def main():
             color=SIM_COLORS[sim_name],
             linewidth=1.1,
             alpha=0.4,
-            label=(r"\textbf{Axion}" if sim_name == "Axion" else sim_name) + " (excluded)",
+            label=(r"\textbf{Ostrich}" if sim_name == "Ostrich" else sim_name) + " (excluded)",
         )
 
     ax_turn.set_xlabel("y (m)")
@@ -202,7 +202,7 @@ def main():
         fp = sweeps[sim_name].get("fixed_params", {})
         dt = bp.get("dt", fp.get("dt", 0.01))
         traj_t = np.arange(len(traj)) * dt
-        ax_accel.plot(traj_t, traj[:, 0], color=color, linewidth=1.1, label=(r"\textbf{Axion}" if sim_name == "Axion" else sim_name))
+        ax_accel.plot(traj_t, traj[:, 0], color=color, linewidth=1.1, label=(r"\textbf{Ostrich}" if sim_name == "Ostrich" else sim_name))
 
     for sim_name in excluded_accel:
         ax_accel.plot(
@@ -247,7 +247,7 @@ def main():
         bar_colors.append(SIM_COLORS[sim_name])
 
     # Reorder bars per requested display order (best first at the top)
-    BAR_ORDER = ["Axion", "MuJoCo", "TinyDiffSim", "Semi-Implicit", "Dojo"]
+    BAR_ORDER = ["Ostrich", "MuJoCo", "TinyDiffSim", "Semi-Implicit", "Dojo"]
     rank = {n: i for i, n in enumerate(BAR_ORDER)}
     order = sorted(range(len(sim_names)), key=lambda i: rank.get(sim_names[i], 99),
                    reverse=True)  # reverse: barh draws bottom-up, so first becomes top
@@ -263,7 +263,7 @@ def main():
     # Mark excluded simulators with "(excluded)" suffix
     def _fmt(n, failed):
         suf = " (excluded)" if failed else ""
-        return rf"\textbf{{Axion}}{suf}" if n == "Axion" else n + suf
+        return rf"\textbf{{Ostrich}}{suf}" if n == "Ostrich" else n + suf
     display_names = [_fmt(n, f) for n, f in zip(sim_names, fail_mask)]
     hatches = ["///" if failed else "" for failed in fail_mask]
     alphas = [0.4 if failed else 1.0 for failed in fail_mask]

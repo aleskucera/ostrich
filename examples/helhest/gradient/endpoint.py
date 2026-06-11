@@ -6,12 +6,12 @@ import hydra
 import newton
 import numpy as np
 import warp as wp
-from axion import AxionDifferentiableSimulator
-from axion import EngineConfig
-from axion import LoggingConfig
-from axion import RenderingConfig
-from axion import SimulationConfig
-from axion.optim.trajectory_adam import TrajectoryAdam
+from ostrich import OstrichDifferentiableSimulator
+from ostrich import EngineConfig
+from ostrich import LoggingConfig
+from ostrich import RenderingConfig
+from ostrich import SimulationConfig
+from ostrich.optim.trajectory_adam import TrajectoryAdam
 from newton import Model
 from omegaconf import DictConfig
 
@@ -116,7 +116,7 @@ def update_wheel_vel_kernel(
     wp.atomic_add(target_vel, sim_step, world_idx, dof_idx, -alpha * grad_clamped)
 
 
-class HelhestEndpointOptimizer(AxionDifferentiableSimulator):
+class HelhestEndpointOptimizer(OstrichDifferentiableSimulator):
     def __init__(
         self,
         sim_config: SimulationConfig,

@@ -57,7 +57,7 @@ it is out of scope for the batched GPU comparison regardless. The earlier
 "planar surfaces only" claim was too strong and has been corrected in the paper.
 
 ## Files
-- optimize_axion.py / optimize_mjx.py / optimize_semi_implicit.py / optimize_xpbd.py
+- optimize_ostrich.py / optimize_mjx.py / optimize_semi_implicit.py / optimize_xpbd.py
   / optimize_brax.py (--pipeline positional|spring|generalized, --wheel sphere|capsule)
 - run_ramp.sh — full matrix for dasenka
 - plot_ramp.py — converged-loss-vs-horizon figure

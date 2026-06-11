@@ -1,6 +1,6 @@
 # The Guiding Rule: Gauss's Principle of Least Constraint
 
-At the core of Axion's dynamics engine is a beautifully simple and powerful idea from classical mechanics: **Gauss's Principle of Least Constraint**. This principle provides a single, elegant rule for determining how a system of bodies should move when subjected to constraints (like joints or contacts).
+At the core of Ostrich's dynamics engine is a beautifully simple and powerful idea from classical mechanics: **Gauss's Principle of Least Constraint**. This principle provides a single, elegant rule for determining how a system of bodies should move when subjected to constraints (like joints or contacts).
 
 ### The Core Idea in Simple Terms
 
@@ -54,7 +54,7 @@ Using a simple backward Euler integration scheme, we can approximate the acceler
     \mathbf{a} \approx \frac{\mathbf{u}^+ - \mathbf{u}^-}{h}
 \]
 
-By substituting this and similar terms into the objective function and re-arranging, we can rewrite the entire minimization problem in terms of \(\mathbf{u}^+\). This yields the final objective function that Axion solves:
+By substituting this and similar terms into the objective function and re-arranging, we can rewrite the entire minimization problem in terms of \(\mathbf{u}^+\). This yields the final objective function that Ostrich solves:
 
 \[
 \min_{\mathbf{u}^+} \quad (\mathbf{u}^+ - \tilde{\mathbf{u}})^\top \mathbf{\tilde{M}} (\mathbf{u}^+ - \tilde{\mathbf{u}}) \quad(2)

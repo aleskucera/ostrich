@@ -1,15 +1,15 @@
 import newton
 import numpy as np
 import warp as wp
-from axion import JointMode
-from axion.core.engine import AxionEngine
-from axion.core.engine_config import AxionEngineConfig, ComplianceConfig, LinearSolverConfig, NewtonRaphsonConfig
-from axion.core.model_builder import AxionModelBuilder
+from ostrich import JointMode
+from ostrich.core.engine import OstrichEngine
+from ostrich.core.engine_config import OstrichEngineConfig, ComplianceConfig, LinearSolverConfig, NewtonRaphsonConfig
+from ostrich.core.model_builder import OstrichModelBuilder
 
 wp.init()
 
 def setup_test_engine():
-    config = AxionEngineConfig(
+    config = OstrichEngineConfig(
         nr=NewtonRaphsonConfig(max_iters=20),
         linear=LinearSolverConfig(max_iters=50),
         compliance=ComplianceConfig(joint=0.0),
@@ -17,7 +17,7 @@ def setup_test_engine():
     return config
 
 def create_prismatic_model():
-    builder = AxionModelBuilder()
+    builder = OstrichModelBuilder()
 
     link_1 = builder.add_link()
     builder.add_shape_box(
@@ -73,7 +73,7 @@ def test_prismatic_position_control():
         wp.array(np.array([50.0], dtype=np.float32), dtype=wp.float32, device=model.device),
     )
 
-    engine = AxionEngine(model=model, sim_steps=100, config=config)
+    engine = OstrichEngine(model=model, sim_steps=100, config=config)
     newton.eval_fk(model, model.joint_q, model.joint_qd, state_in)
 
     target_pos = 1.0 # 1 meter
@@ -128,7 +128,7 @@ def test_prismatic_velocity_control():
         wp.array(np.array([100.0], dtype=np.float32), dtype=wp.float32, device=model.device),
     )
 
-    engine = AxionEngine(model=model, sim_steps=100, config=config)
+    engine = OstrichEngine(model=model, sim_steps=100, config=config)
     newton.eval_fk(model, model.joint_q, model.joint_qd, state_in)
 
     target_vel = 0.5 # 0.5 m/s

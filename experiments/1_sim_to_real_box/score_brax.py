@@ -2,7 +2,7 @@
 metric (common_box.score), so the combined position+yaw error is directly
 comparable to Ostrich 0.062 / MuJoCo 0.054 / Semi-Implicit 0.110 m.
 
-Run in the main axion venv:
+Run in the main ostrich venv:
     .venv/bin/python experiments/1_sim_to_real_box/score_brax.py
 """
 import pathlib

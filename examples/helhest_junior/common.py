@@ -4,7 +4,7 @@ import newton
 import numpy as np
 import openmesh
 import warp as wp
-from axion import JointMode
+from ostrich import JointMode
 
 # Reuses the shared examples/assets directory (same wheel mesh asset as helhest).
 ASSETS_DIR = pathlib.Path(__file__).parent.parent.joinpath("assets")

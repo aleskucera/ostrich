@@ -1,5 +1,5 @@
 # @package engine
-_target_: axion.SemiImplicitEngineConfig
+_target_: ostrich.SemiImplicitEngineConfig
 angular_damping: 0.05
 friction_smoothing: 1.0
 joint_attach_ke: 1.0e4

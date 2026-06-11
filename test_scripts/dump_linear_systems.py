@@ -3,7 +3,7 @@ obstacle-benchmark scene, for offline learned-preconditioner experiments.
 
 Strategy
 --------
-We drive `AxionEngine.step()` directly in a plain Python loop (no
+We drive `OstrichEngine.step()` directly in a plain Python loop (no
 simulator / hydra / viewer and crucially no surrounding `wp.capture`).
 With `device.is_capturing == False` and the profiler disabled,
 `base_engine._solve()` takes the eager while-loop NR path
@@ -42,9 +42,9 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
 import newton  # noqa: E402
-from axion import AxionEngineConfig  # noqa: E402
-from axion import LoggingConfig  # noqa: E402
-from axion.core.model_builder import AxionModelBuilder  # noqa: E402
+from ostrich import OstrichEngineConfig  # noqa: E402
+from ostrich import LoggingConfig  # noqa: E402
+from ostrich.core.model_builder import OstrichModelBuilder  # noqa: E402
 
 from examples.helhest.common import create_helhest_model  # noqa: E402
 
@@ -53,7 +53,7 @@ os.environ.setdefault("PYOPENGL_PLATFORM", "glx")
 
 def build_helhest_obstacle_model(friction: float = 0.5):
     """Mirror HelhestObstacleBenchmark.build_model (obstacle_benchmark.py)."""
-    builder = AxionModelBuilder()
+    builder = OstrichModelBuilder()
     builder.rigid_gap = 1.0
 
     create_helhest_model(
@@ -91,7 +91,7 @@ def build_helhest_surface_model(friction: float = 0.5):
     Helhest driving over the surface.obj triangle-mesh terrain."""
     import openmesh
 
-    builder = AxionModelBuilder()
+    builder = OstrichModelBuilder()
     builder.rigid_gap = 0.5
 
     create_helhest_model(
@@ -197,7 +197,7 @@ def main():
         model = (build_helhest_surface_model() if args.scene == "surface"
                  else build_helhest_obstacle_model())
 
-        cfg = AxionEngineConfig()
+        cfg = OstrichEngineConfig()
         engine = cfg.create_engine(
             model=model, sim_steps=args.steps, logging_config=LoggingConfig(),
             differentiable_simulation=False,

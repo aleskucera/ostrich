@@ -28,7 +28,7 @@ plt.rcParams.update({
     "axes.spines.right": False,
 })
 
-AXION_COLOR = "#2196F3"
+OSTRICH_COLOR = "#2196F3"
 TARGET_COLOR = "#E91E63"
 
 
@@ -56,7 +56,7 @@ def plot_seed(data, out_path):
     best_rmse = rmse[best_iter]
     t_best = trajs.get(str(best_iter))
     if t_best:
-        ax.plot(t_best["x"], t_best["y"], color=AXION_COLOR, linewidth=2.5,
+        ax.plot(t_best["x"], t_best["y"], color=OSTRICH_COLOR, linewidth=2.5,
                 label=f"iter {best_iter} ({best_rmse:.2f}\\,m)")
 
     # Target

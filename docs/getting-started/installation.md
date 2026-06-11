@@ -1,10 +1,10 @@
 # Installation
 
-This guide will walk you through installing Axion and its dependencies. The recommended method uses `uv`, a modern Python packaging tool that simplifies the entire process.
+This guide will walk you through installing Ostrich and its dependencies. The recommended method uses `uv`, a modern Python packaging tool that simplifies the entire process.
 
 ## Prerequisites
 
-Before installing Axion, please ensure your system meets the following requirements.
+Before installing Ostrich, please ensure your system meets the following requirements.
 
 ### System and Software
 
@@ -14,7 +14,7 @@ Before installing Axion, please ensure your system meets the following requireme
 - **CUDA** (Optional): Version 11.8 or higher is strongly recommended for significant performance gains on NVIDIA GPUs.
 
 !!! tip "Windows Users: Use WSL2"
-    While Axion can run on various systems, many core scientific computing libraries (including some used by Axion) have the best support and performance on Linux. We strongly recommend using the [Windows Subsystem for Linux (WSL2)](https://learn.microsoft.com/en-us/windows/wsl/install) to create a Linux environment on your Windows machine.
+    While Ostrich can run on various systems, many core scientific computing libraries (including some used by Ostrich) have the best support and performance on Linux. We strongly recommend using the [Windows Subsystem for Linux (WSL2)](https://learn.microsoft.com/en-us/windows/wsl/install) to create a Linux environment on your Windows machine.
 
 ### Environment Checks
 
@@ -74,13 +74,13 @@ If you don't have `uv` installed, choose the appropriate method for your OS. It'
     powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
     ```
 
-### Step 2: Clone the Axion Repository
+### Step 2: Clone the Ostrich Repository
 
 Get the source code from GitHub:
 
 ```bash
-git clone https://github.com/aleskucera/axion.git
-cd axion
+git clone https://github.com/aleskucera/ostrich.git
+cd ostrich
 ```
 
 ### Step 3: Initialize Submodules
@@ -131,7 +131,7 @@ The `uv run` command executes a command *inside* the virtual environment managed
 
 ## Dependency Overview
 
-Axion relies on a set of high-performance libraries for physics, computation, and configuration. `uv sync` installs all of these for you.
+Ostrich relies on a set of high-performance libraries for physics, computation, and configuration. `uv sync` installs all of these for you.
 
 | Package | Purpose |
 | :--- | :--- |
@@ -146,8 +146,8 @@ Axion relies on a set of high-performance libraries for physics, computation, an
 ---
 
 !!! success "Installation Complete!"
-    You are now ready to build and run your first simulation with Axion.
+    You are now ready to build and run your first simulation with Ostrich.
 
     -   Continue to the [**First Simulation Tutorial**](first-simulation.md) to build a simple physics scene.
     -   Explore the [**User Guide**](../user-guide/concepts.md) for in-depth explanations of advanced features.
-    -   If you encounter any issues, please check the [**GitHub Issues**](https://github.com/aleskucera/axion/issues) page.
+    -   If you encounter any issues, please check the [**GitHub Issues**](https://github.com/aleskucera/ostrich/issues) page.

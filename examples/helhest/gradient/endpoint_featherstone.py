@@ -6,11 +6,11 @@ import hydra
 import newton
 import numpy as np
 import warp as wp
-from axion import EngineConfig
-from axion import LoggingConfig
-from axion import RenderingConfig
-from axion import SimulationConfig
-from axion.simulation.differentiable_simulator import NewtonDifferentiableSimulator
+from ostrich import EngineConfig
+from ostrich import LoggingConfig
+from ostrich import RenderingConfig
+from ostrich import SimulationConfig
+from ostrich.simulation.differentiable_simulator import NewtonDifferentiableSimulator
 from newton import Model
 from omegaconf import DictConfig
 

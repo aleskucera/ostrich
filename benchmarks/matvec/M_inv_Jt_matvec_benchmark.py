@@ -3,10 +3,10 @@ import time
 import matplotlib.pyplot as plt
 import numpy as np
 import warp as wp
-from axion.optim.M_inv_Jt import create_M_inv_Jct_matvec_tiled
-from axion.optim.M_inv_Jt import kernel_M_inv_Jct_matvec_scatter
-from axion.optim.M_inv_Jt import kernel_M_inv_Jjt_matvec_scatter
-from axion.optim.M_inv_Jt import kernel_M_inv_Jt_matvec_scatter
+from ostrich.optim.M_inv_Jt import create_M_inv_Jct_matvec_tiled
+from ostrich.optim.M_inv_Jt import kernel_M_inv_Jct_matvec_scatter
+from ostrich.optim.M_inv_Jt import kernel_M_inv_Jjt_matvec_scatter
+from ostrich.optim.M_inv_Jt import kernel_M_inv_Jt_matvec_scatter
 
 # Imports from your specific module structure
 

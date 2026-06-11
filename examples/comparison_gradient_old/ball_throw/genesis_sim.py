@@ -1,6 +1,6 @@
 """Ball throw optimization using Genesis (Taichi-based differentiable physics).
 
-Comparable to examples/comparison/ball_throw/ball_throw_axion.py.
+Comparable to examples/comparison/ball_throw/ball_throw_ostrich.py.
 
 Optimizes the initial velocity of a free-floating ball to reach a target
 position after T steps of ballistic flight.

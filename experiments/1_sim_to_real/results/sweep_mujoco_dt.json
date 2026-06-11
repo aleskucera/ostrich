@@ -1,8 +1,8 @@
 {
   "simulator": "MuJoCo",
   "ground_truth": [
-    "/home/kuceral4/projects/axion/experiments/1_sim_to_real/../data/right_turn_b.json",
-    "/home/kuceral4/projects/axion/experiments/1_sim_to_real/../data/acceleration.json"
+    "/home/kuceral4/projects/ostrich/experiments/1_sim_to_real/../data/right_turn_b.json",
+    "/home/kuceral4/projects/ostrich/experiments/1_sim_to_real/../data/acceleration.json"
   ],
   "ground_truth_source": "real_robot",
   "best_params": {

@@ -1,5 +1,5 @@
 [project]
-name = "axion"
+name = "ostrich"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -38,8 +38,8 @@ nimble = [
   "nimblephysics",
 ]
 dev = [
-  "axion[sim]",
-  "axion[docs]",
+  "ostrich[sim]",
+  "ostrich[docs]",
 ]
 docs = [
   "mkdocs-gen-files==0.5.0",
@@ -54,7 +54,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/axion", "examples"]
+packages = ["src/ostrich", "examples"]
 
 [tool.uv.workspace]
 members = ["third_party/newton"]

@@ -20,7 +20,7 @@ import matplotlib.ticker as ticker
 import numpy as np
 
 RESULTS_DIR = pathlib.Path(__file__).parent / "results"
-PAPER_DIR = pathlib.Path(__file__).resolve().parents[2] / ".." / "axion_paper" / "figures"
+PAPER_DIR = pathlib.Path(__file__).resolve().parents[2] / ".." / "ostrich_paper" / "figures"
 
 plt.rcParams.update({
     "text.usetex": True,
@@ -36,12 +36,12 @@ plt.rcParams.update({
 })
 
 STYLES = {
-    "Axion":         {"color": "#2196F3", "marker": "o"},
+    "Ostrich":         {"color": "#2196F3", "marker": "o"},
     "MJX":           {"color": "#E91E63", "marker": "s"},
     "Semi-Implicit": {"color": "#FF9800", "marker": "^"},
 }
 LABELS = {
-    "Axion":         r"\textbf{Axion}",
+    "Ostrich":         r"\textbf{Ostrich}",
     "MJX":           "MJX",
     "Semi-Implicit": "Semi-Impl.",
 }

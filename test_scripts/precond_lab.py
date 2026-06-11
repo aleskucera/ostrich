@@ -8,7 +8,7 @@ dense is trivially cheap). Provides:
 
   * `load_systems` / `System`        — data access + dense reconstruction
   * `pcr`                            — PyTorch PCR, faithfully mirroring
-                                       `axion/optim/pcr_solver.py`
+                                       `ostrich/optim/pcr_solver.py`
   * `jacobi_apply`                   — 1/diag(A) preconditioner
   * `per_body_pair_apply`            — block-Cholesky per body-pair,
                                        mirroring per_body_pair_preconditioner.py
@@ -172,7 +172,7 @@ def per_body_pair_apply(A: torch.Tensor, pair_id: np.ndarray):
 
 
 # --------------------------------------------------------------------------
-# PCR — faithful port of axion/optim/pcr_solver.py (the CR recurrence in
+# PCR — faithful port of ostrich/optim/pcr_solver.py (the CR recurrence in
 # solver_step + the init block).  Differentiable in the preconditioner.
 # --------------------------------------------------------------------------
 

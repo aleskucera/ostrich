@@ -1,0 +1,19 @@
+{
+  "simulator": "Ostrich",
+  "num_worlds": 256,
+  "median_time_ms": 1203.8289929914754,
+  "peak_gpu_mb": 594.7758054733276,
+  "peak_gpu_mb_nvml_absolute": null,
+  "peak_gpu_mb_nvml": null,
+  "time_ms": [
+    2224.0500670159236,
+    1189.7406750358641,
+    1201.2226759688929,
+    1201.6256880015135,
+    1206.0322979814373
+  ],
+  "K": 10,
+  "dt": 0.1,
+  "duration_s": 6.0,
+  "iterations": 5
+}

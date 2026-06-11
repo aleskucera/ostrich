@@ -3,7 +3,7 @@
 Mirrors experiments/3_gradient_quality/plot_results.py: single panel of
 running-best loss vs wall-clock seconds (log-log), median line + IQR band
 across N trials per engine. Reads results/<engine>.json files saved by
-optimize_axion.py / optimize_mjx.py / optimize_semi_implicit.py.
+optimize_ostrich.py / optimize_mjx.py / optimize_semi_implicit.py.
 
 Engines with fewer than --min-iters iterations are skipped (treats stale
 sanity-test JSONs as not-yet-rerun for production).
@@ -15,7 +15,7 @@ JIT compile or CUDA-graph capture that the *first* trial pays once per
 process). Within an engine all trials use the same per-iter estimate so the
 loss IQR band reflects only loss-curve variance, not wall-clock variance.
 Absolute x-axis times therefore *exclude* the one-time compile (78 s MJX,
-~60 s Axion, ~20 min SI cold capture) — read them as "amortised warm cost".
+~60 s Ostrich, ~20 min SI cold capture) — read them as "amortised warm cost".
 For exact per-iter timings the runner scripts would need to save time_ms
 per iter like ``experiments/3_gradient_quality/optimize_*.py`` already do.
 
@@ -32,7 +32,7 @@ import matplotlib.ticker as ticker
 import numpy as np
 
 RESULTS_DIR = pathlib.Path(__file__).parent / "results"
-PAPER_DIR = pathlib.Path(__file__).resolve().parents[2] / ".." / "axion_paper" / "figures"
+PAPER_DIR = pathlib.Path(__file__).resolve().parents[2] / ".." / "ostrich_paper" / "figures"
 
 plt.rcParams.update({
     "text.usetex": True,
@@ -48,20 +48,20 @@ plt.rcParams.update({
 })
 
 STYLES = {
-    "Axion":         {"color": "#2196F3", "marker": "o", "lw": 2.0, "zorder": 5},
+    "Ostrich":         {"color": "#2196F3", "marker": "o", "lw": 2.0, "zorder": 5},
     "MJX":           {"color": "#E91E63", "marker": "s", "lw": 1.8, "zorder": 4},
     "Semi-Implicit": {"color": "#FF9800", "marker": "^", "lw": 1.8, "zorder": 3},
     "MuJoCo":        {"color": "#E91E63", "marker": "s", "lw": 1.8, "zorder": 4},
     "TinyDiffSim":   {"color": "#607D8B", "marker": "D", "lw": 1.8, "zorder": 2},
 }
 LABELS = {
-    "Axion":         r"\textbf{Ostrich}",
+    "Ostrich":         r"\textbf{Ostrich}",
     "MJX":           "MJX",
     "MuJoCo":        "MuJoCo",
     "Semi-Implicit": "Semi-Impl.",
     "TinyDiffSim":   "TinyDiffSim",
 }
-SIM_ORDER = ["Axion", "MJX", "MuJoCo", "Semi-Implicit", "TinyDiffSim"]
+SIM_ORDER = ["Ostrich", "MJX", "MuJoCo", "Semi-Implicit", "TinyDiffSim"]
 
 N_GRID = 80
 
@@ -117,7 +117,7 @@ def main():
             continue
         # Use the warmest trial's per-iter time as the uniform x-axis estimate
         # for every trial of this engine. Otherwise a single cold-compile trial
-        # (e.g. Axion trial 1 on dasenka pays ~66s for axion module compilation
+        # (e.g. Ostrich trial 1 on dasenka pays ~66s for ostrich module compilation
         # before its first warm iter at ~0.5s) stretches its curve far to the
         # right while warm trials sit at the left — interpolating those onto a
         # common log grid fans the loss band out into an inflated wedge.

@@ -20,15 +20,15 @@ import numpy as np
 import warp as wp
 import newton
 
-from axion.core.engine import AxionEngine
-from axion.core.engine_config import AxionEngineConfig
-from axion.core.logging_config import LoggingConfig
-from axion.core.model_builder import AxionModelBuilder
-from axion.core.types import JointMode
-from axion import AdjointConfig
-from axion import LinearSolverConfig
-from axion import LinesearchConfig
-from axion import NewtonRaphsonConfig
+from ostrich.core.engine import OstrichEngine
+from ostrich.core.engine_config import OstrichEngineConfig
+from ostrich.core.logging_config import LoggingConfig
+from ostrich.core.model_builder import OstrichModelBuilder
+from ostrich.core.types import JointMode
+from ostrich import AdjointConfig
+from ostrich import LinearSolverConfig
+from ostrich import LinesearchConfig
+from ostrich import NewtonRaphsonConfig
 
 # Reuse all tangent-space machinery from the A_t test (committed earlier).
 from test_ilqr_jacobian import (
@@ -63,7 +63,7 @@ TARGET_KD = 20.0              # D gain
 def build_pendulum(num_worlds: int):
     """Single revolute joint to world, with TARGET_POSITION control."""
     no_collision = newton.ModelBuilder.ShapeConfig(has_shape_collision=False, density=10.0)
-    builder = AxionModelBuilder()
+    builder = OstrichModelBuilder()
     link = builder.add_link()
     builder.add_shape_box(link, hx=0.05, hy=0.05, hz=0.4, cfg=no_collision)
     j = builder.add_joint_revolute(
@@ -82,13 +82,13 @@ def build_pendulum(num_worlds: int):
 
 
 def make_engine(model, differentiable: bool):
-    config = AxionEngineConfig(
+    config = OstrichEngineConfig(
         nr=NewtonRaphsonConfig(max_iters=NEWTON_ITERS, atol=NEWTON_ATOL),
         linear=LinearSolverConfig(max_iters=LINEAR_ITERS, tol=LINEAR_TOL, atol=LINEAR_TOL),
         linesearch=LinesearchConfig(enabled=False),
         adjoint=AdjointConfig(soft_blending=False, regularization=0.0),
     )
-    return AxionEngine(
+    return OstrichEngine(
         model=model,
         sim_steps=1,
         config=config,

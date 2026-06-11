@@ -1,5 +1,5 @@
 # @package logging
-_target_: axion.LoggingConfig
+_target_: ostrich.LoggingConfig
 dataset:
   enabled: true
   file: "data/logs/${project_name}.h5"

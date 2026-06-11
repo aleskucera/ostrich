@@ -5,12 +5,12 @@ import random
 import hydra
 import newton
 import warp as wp
-from axion import DatasetSimulator
-from axion import EngineConfig
-from axion import LoggingConfig
-from axion import RenderingConfig
-from axion import SimulationConfig
-from axion.generation import RandomSceneGenerator
+from ostrich import DatasetSimulator
+from ostrich import EngineConfig
+from ostrich import LoggingConfig
+from ostrich import RenderingConfig
+from ostrich import SimulationConfig
+from ostrich.generation import RandomSceneGenerator
 from omegaconf import DictConfig
 
 os.environ["PYOPENGL_PLATFORM"] = "glx"

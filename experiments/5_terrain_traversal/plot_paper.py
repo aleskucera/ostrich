@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 RESULTS_DIR = pathlib.Path(__file__).parent / "results"
-PAPER_DIR = pathlib.Path(__file__).resolve().parents[2] / ".." / "axion_paper" / "figures"
+PAPER_DIR = pathlib.Path(__file__).resolve().parents[2] / ".." / "ostrich_paper" / "figures"
 
 plt.rcParams.update({
     "text.usetex": True,
@@ -31,8 +31,8 @@ plt.rcParams.update({
     "axes.spines.right": False,
 })
 
-AXION_COLOR = "#2196F3"
-AXION_LIGHT = "#90CAF9"
+OSTRICH_COLOR = "#2196F3"
+OSTRICH_LIGHT = "#90CAF9"
 TARGET_COLOR = "#E91E63"
 
 
@@ -109,7 +109,7 @@ def main():
     # Best
     t_best = trajs.get(str(best_iter))
     if t_best:
-        ax_traj.plot(t_best["x"], t_best["y"], color=AXION_COLOR, linewidth=2.0,
+        ax_traj.plot(t_best["x"], t_best["y"], color=OSTRICH_COLOR, linewidth=2.0,
                      label=f"iter {best_iter} ({best_rmse:.2f}\\,m)")
 
     # Target
@@ -117,7 +117,7 @@ def main():
                  linestyle="--", label="target")
     ax_traj.plot(target["x"][0], target["y"][0], "o", color=TARGET_COLOR, markersize=5, zorder=5)
     if t_best:
-        ax_traj.plot(t_best["x"][0], t_best["y"][0], "o", color=AXION_COLOR, markersize=5, zorder=5)
+        ax_traj.plot(t_best["x"][0], t_best["y"][0], "o", color=OSTRICH_COLOR, markersize=5, zorder=5)
 
     ax_traj.set_xlabel("$x$ (m)")
     ax_traj.set_ylabel("$y$ (m)")
@@ -135,8 +135,8 @@ def main():
     p25 = np.percentile(all_rmse, 25, axis=0)
     p75 = np.percentile(all_rmse, 75, axis=0)
 
-    ax_conv.fill_between(iters, p25, p75, color=AXION_LIGHT, alpha=0.5, label="IQR")
-    ax_conv.plot(iters, median_rmse, color=AXION_COLOR, linewidth=2.0, label="median")
+    ax_conv.fill_between(iters, p25, p75, color=OSTRICH_LIGHT, alpha=0.5, label="IQR")
+    ax_conv.plot(iters, median_rmse, color=OSTRICH_COLOR, linewidth=2.0, label="median")
 
     # Running best median
     running_best = np.minimum.accumulate(median_rmse)

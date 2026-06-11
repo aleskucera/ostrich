@@ -1,7 +1,7 @@
 import gc
 import time
 
-import axion.optim.A_matvec as kernels
+import ostrich.optim.A_matvec as kernels
 import matplotlib.pyplot as plt
 import numpy as np
 import warp as wp

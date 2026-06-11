@@ -5,10 +5,10 @@ import newton
 import numpy as np
 import pytest
 import warp as wp
-from axion.core.engine import AxionEngine
-from axion.core.engine_config import AxionEngineConfig
-from axion.core.logging_config import LoggingConfig
-from axion.core.model_builder import AxionModelBuilder
+from ostrich.core.engine import OstrichEngine
+from ostrich.core.engine_config import OstrichEngineConfig
+from ostrich.core.logging_config import LoggingConfig
+from ostrich.core.model_builder import OstrichModelBuilder
 
 wp.init()
 
@@ -31,7 +31,7 @@ def _build_box_on_ground(mu_lat: float, mu_long: float, ground_mu: float, box_ma
     with the ground's scalar mu, so resolved mu_x = (mu_lat + ground_mu)/2
     and mu_y = (mu_long + ground_mu)/2.
     """
-    builder = AxionModelBuilder()
+    builder = OstrichModelBuilder()
     builder.rigid_gap = 0.01
     builder.add_ground_plane(cfg=newton.ModelBuilder.ShapeConfig(mu=ground_mu))
     body = builder.add_body(
@@ -54,9 +54,9 @@ def _build_box_on_ground(mu_lat: float, mu_long: float, ground_mu: float, box_ma
 
 def _simulate_under_force(model, force_world: wp.vec3, dt: float, n_steps: int):
     """Run the engine for n_steps with a constant body force. Returns final body xy."""
-    engine = AxionEngine(
+    engine = OstrichEngine(
         model=model, sim_steps=n_steps,
-        config=AxionEngineConfig(), logging_config=LoggingConfig(),
+        config=OstrichEngineConfig(), logging_config=LoggingConfig(),
     )
     state_in = model.state()
     state_out = model.state()
@@ -142,7 +142,7 @@ def test_anisotropic_box_slides_along_low_friction_axis():
 def test_isotropic_fallback_matches_default():
     """A shape with no custom_attributes should still simulate cleanly through
     the isotropic fallback path of resolve_friction_frame."""
-    builder = AxionModelBuilder()
+    builder = OstrichModelBuilder()
     builder.rigid_gap = 0.01
     builder.add_ground_plane()
     body = builder.add_body(mass=1.0, xform=wp.transform(wp.vec3(0, 0, 0.11), wp.quat_identity()))

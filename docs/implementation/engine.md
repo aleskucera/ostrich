@@ -1,19 +1,19 @@
 # Engine API
 
-The `AxionEngine` is the low-level physics solver at the core of the simulation. Most users will interact with it indirectly through the `InteractiveSimulator` class, but understanding its API and configuration is key to tuning performance and achieving specific physical behaviors.
+The `OstrichEngine` is the low-level physics solver at the core of the simulation. Most users will interact with it indirectly through the `InteractiveSimulator` class, but understanding its API and configuration is key to tuning performance and achieving specific physical behaviors.
 
 The engine implements a **Non-Smooth Newton Method** to solve the entire physics state—including dynamics, contacts, and joints—as a single, unified problem at each time step. This monolithic approach provides exceptional stability, especially for complex, highly-constrained systems like articulated robots.
 
 ---
 
-## The `AxionEngine` Class
+## The `OstrichEngine` Class
 
 This is the main backend simulation class. It takes a static `warp.sim.Model`, configuration parameters, and an optional logger. The engine creates and manages all necessary GPU data structures and executes the simulation loop. The data are then outputted via the `state_out` argument in the `simulate` and `simulate_scipy` methods.
 
 ```python
-from axion.core import AxionEngine
+from ostrich.core import OstrichEngine
 
-class AxionEngine(Integrator):
+class OstrichEngine(Integrator):
     def __init__(
         self,
         model: Model,
@@ -30,7 +30,7 @@ class AxionEngine(Integrator):
 
 ### Key Methods
 
-#### [`simulate()`](https://github.com/aleskucera/axion/blob/main/src/axion/core/engine.py#L123-L176){:target="_blank"}
+#### [`simulate()`](https://github.com/aleskucera/ostrich/blob/main/src/ostrich/core/engine.py#L123-L176){:target="_blank"}
 
 The primary method for running the physics simulation for a single time step.
 
@@ -47,7 +47,7 @@ def simulate(
 This method executes the core solver loop on the GPU, applying control inputs and calculating the resulting state after `dt` seconds. The method returns a list of events used for logging and analysis. The main output of the method is the updated `state_out` object, which contains the new positions and velocities of all bodies.
 More details on the solving process are provided in the [next section](#the-solving-process).
 
-#### [`simulate_scipy()`](https://github.com/aleskucera/axion/blob/main/src/axion/core/engine.py#L178-L238){:target="_blank"}
+#### [`simulate_scipy()`](https://github.com/aleskucera/ostrich/blob/main/src/ostrich/core/engine.py#L178-L238){:target="_blank"}
 
 An alternative solver implementation that uses SciPy's numerical root-finding algorithms.
 
@@ -68,7 +68,7 @@ def simulate_scipy(
 
 # The Solving Process
 
-The `AxionEngine.simulate` method orchestrates a multi-stage process for each time step, executed entirely either on the GPU (for `simulate`) or CPU (for `simulate_scipy`). Below is a high-level overview of the key stages in the simulation loop.
+The `OstrichEngine.simulate` method orchestrates a multi-stage process for each time step, executed entirely either on the GPU (for `simulate`) or CPU (for `simulate_scipy`). Below is a high-level overview of the key stages in the simulation loop.
 
 ## 1. Apply Controls & Integrate
 
@@ -99,7 +99,7 @@ def compute_linear_system(
     dt: float
 )
 ```
-The engine evaluates all constraints and linearizes them, forming a large linear system of equations as described in the [theory section](../theory/linear-system.md). Since we know the structure of the system, we can construct the system efficiently without explicitly forming large matrices, which would consist of many zero elements. This is done in [`compute_linear_system`](https://github.com/aleskucera/axion/blob/main/src/axion/core/linear_utils.py#L82-L186){:target="_blank"} method, which updates the `self.data` attribute, resulting in the following simplified matrix-free representation:
+The engine evaluates all constraints and linearizes them, forming a large linear system of equations as described in the [theory section](../theory/linear-system.md). Since we know the structure of the system, we can construct the system efficiently without explicitly forming large matrices, which would consist of many zero elements. This is done in [`compute_linear_system`](https://github.com/aleskucera/ostrich/blob/main/src/ostrich/core/linear_utils.py#L82-L186){:target="_blank"} method, which updates the `self.data` attribute, resulting in the following simplified matrix-free representation:
 
 - **Dynamic Matrix (H)** is a block diagonal matrix. It can be represented via one float for mass and 3x3 matrix for inertia per body.
 - **Compliance (C)** is a diagonal matrix, represented as a vector of its diagonal elements.
@@ -116,7 +116,7 @@ def cr_solver(
     logger: Optional[HDF5Logger | NullLogger] = NullLogger,
 )
 ```
-The [`cr_solver`](https://github.com/aleskucera/axion/blob/main/src/axion/optim/cr.py#L62-L158){:target="_blank"} method is the core of the iteration. It solves the linear system and updates the `self.data.delta_lambda` (the change in constraint impulses) using a **Conjugate Residual (CR)** iterative solver. This step runs for `linear_iters`. Since the system is represented in a matrix-free form, the solver uses matrix-free operator to compute required quantities efficiently.
+The [`cr_solver`](https://github.com/aleskucera/ostrich/blob/main/src/ostrich/optim/cr.py#L62-L158){:target="_blank"} method is the core of the iteration. It solves the linear system and updates the `self.data.delta_lambda` (the change in constraint impulses) using a **Conjugate Residual (CR)** iterative solver. This step runs for `linear_iters`. Since the system is represented in a matrix-free form, the solver uses matrix-free operator to compute required quantities efficiently.
 
 
 ```python
@@ -126,7 +126,7 @@ def compute_delta_body_qd_from_delta_lambda(
     dims: EngineDimensions,
 )
 ```
-Given the change in constraint impulses `Δλ`, the corresponding change in body velocities `Δu` is computed using the [`compute_delta_body_qd_from_delta_lambda`](https://github.com/aleskucera/axion/blob/main/src/axion/core/linear_utils.py#L189-L218){:target="_blank"} method.
+Given the change in constraint impulses `Δλ`, the corresponding change in body velocities `Δu` is computed using the [`compute_delta_body_qd_from_delta_lambda`](https://github.com/aleskucera/ostrich/blob/main/src/ostrich/core/linear_utils.py#L189-L218){:target="_blank"} method.
 
 ### d) Update
 ```python
@@ -138,7 +138,7 @@ def update_variables(
     dt: float,
 )
 ```
-The body velocities (`self.data.body_qd`) and constraint impulses (`self.data._lambda`) are updated with [`update_variables`](https://github.com/aleskucera/axion/blob/main/src/axion/core/general_utils.py#L82-L111){:target="_blank"}.
+The body velocities (`self.data.body_qd`) and constraint impulses (`self.data._lambda`) are updated with [`update_variables`](https://github.com/aleskucera/ostrich/blob/main/src/ostrich/core/general_utils.py#L82-L111){:target="_blank"}.
 
 ## 3. Finalize State
 After the Newton loop completes, the final velocities (`self.data.body_qd`) and integrated positions (`self.data.body_q`) are copied to the `state_out`.
@@ -147,4 +147,4 @@ After the Newton loop completes, the final velocities (`self.data.body_qd`) and 
 
 ## GPU Acceleration with Warp Kernels
 
-All major computations in the `AxionEngine`, including constraint evaluation, system linearization, and iterative solving, are implemented as custom GPU kernels using the `wp.launch` from the [Warp](https://github.com/NVIDIA/warp) framework. Warp kernels enable highly parallel execution of physics operations, allowing the engine to efficiently process thousands of bodies and constraints in real time. Each stage of the simulation loop, from applying controls to solving the linear system and updating state variables, is mapped to specialized GPU kernels. This approach ensures that even complex, highly-constrained systems can be simulated with high performance and scalability.
+All major computations in the `OstrichEngine`, including constraint evaluation, system linearization, and iterative solving, are implemented as custom GPU kernels using the `wp.launch` from the [Warp](https://github.com/NVIDIA/warp) framework. Warp kernels enable highly parallel execution of physics operations, allowing the engine to efficiently process thousands of bodies and constraints in real time. Each stage of the simulation loop, from applying controls to solving the linear system and updating state variables, is mapped to specialized GPU kernels. This approach ensures that even complex, highly-constrained systems can be simulated with high performance and scalability.

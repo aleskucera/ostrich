@@ -16,7 +16,7 @@ import warp as wp
 wp.init()
 
 import numpy as np
-from axion.simulation.trajectory_buffer import TrajectoryBuffer
+from ostrich.simulation.trajectory_buffer import TrajectoryBuffer
 
 sys.path.insert(0, str(Path(__file__).parent))
 from helpers import build_box_on_ground, make_engine, forward_one_step, scalar_loss_vel
@@ -44,12 +44,12 @@ def test_velocity_gradient_single_step():
 
     buffer = TrajectoryBuffer(
         data=engine.data,
-        contacts=engine.axion_contacts,
+        contacts=engine.ostrich_contacts,
         dims=engine.dims,
         num_steps=1,
         device=model.device,
     )
-    buffer.save_step(0, engine.data, engine.axion_contacts)
+    buffer.save_step(0, engine.data, engine.ostrich_contacts)
     buffer.zero_grad()
 
     w_reshaped = w.reshape(engine.data.body_vel_grad.numpy().shape)
@@ -58,7 +58,7 @@ def test_velocity_gradient_single_step():
         wp.array(w_reshaped, dtype=wp.spatial_vector, device=model.device),
     )
 
-    buffer.load_step(0, engine.data, engine.axion_contacts)
+    buffer.load_step(0, engine.data, engine.ostrich_contacts)
     engine.data.zero_gradients()
     engine.step_backward()
 

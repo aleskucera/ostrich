@@ -14,7 +14,7 @@ import warp as wp
 
 wp.init()
 
-from axion.simulation.trajectory_buffer import TrajectoryBuffer
+from ostrich.simulation.trajectory_buffer import TrajectoryBuffer
 
 import sys
 from pathlib import Path
@@ -38,12 +38,12 @@ def test_symmetry():
 
     buffer = TrajectoryBuffer(
         data=engine.data,
-        contacts=engine.axion_contacts,
+        contacts=engine.ostrich_contacts,
         dims=engine.dims,
         num_steps=1,
         device=model.device,
     )
-    buffer.save_step(0, engine.data, engine.axion_contacts)
+    buffer.save_step(0, engine.data, engine.ostrich_contacts)
     buffer.zero_grad()
 
     # Inject symmetric loss gradient: dL/d(vz) = 1.0 for all bodies
@@ -57,7 +57,7 @@ def test_symmetry():
                  dtype=wp.spatial_vector, device=model.device),
     )
 
-    buffer.load_step(0, engine.data, engine.axion_contacts)
+    buffer.load_step(0, engine.data, engine.ostrich_contacts)
     engine.data.zero_gradients()
     engine.step_backward()
 

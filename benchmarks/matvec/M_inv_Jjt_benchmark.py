@@ -2,11 +2,11 @@ import time
 
 import numpy as np
 import warp as wp
-from axion.optim.M_inv_Jjt import build_tiled_graph_data
-from axion.optim.M_inv_Jjt import create_M_inv_Jjt_matvec_tiled
-from axion.optim.M_inv_Jjt import generate_constr_to_body
-from axion.optim.M_inv_Jjt import generate_M_inv
-from axion.optim.M_inv_Jjt import kernel_M_inv_Jjt_matvec_scatter
+from ostrich.optim.M_inv_Jjt import build_tiled_graph_data
+from ostrich.optim.M_inv_Jjt import create_M_inv_Jjt_matvec_tiled
+from ostrich.optim.M_inv_Jjt import generate_constr_to_body
+from ostrich.optim.M_inv_Jjt import generate_M_inv
+from ostrich.optim.M_inv_Jjt import kernel_M_inv_Jjt_matvec_scatter
 
 wp.init()
 

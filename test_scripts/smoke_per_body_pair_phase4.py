@@ -33,16 +33,16 @@ CONFIG_PATH = "../examples/conf"
 )
 def main(cfg: DictConfig):
     import warp as wp
-    from axion import (
+    from ostrich import (
         EngineConfig,
         LoggingConfig,
         RenderingConfig,
         SimulationConfig,
     )
-    from axion.optim.per_body_pair_preconditioner import (
+    from ostrich.optim.per_body_pair_preconditioner import (
         PerBodyPairPreconditioner,
     )
-    from axion.optim.preconditioner import JacobiPreconditioner
+    from ostrich.optim.preconditioner import JacobiPreconditioner
 
     sys.path.insert(
         0, os.path.join(os.path.dirname(__file__), "..", "examples", "helhest")

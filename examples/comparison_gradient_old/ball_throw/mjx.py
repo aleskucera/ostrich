@@ -1,6 +1,6 @@
 """Ball throw optimization using MuJoCo MJX (JAX-based differentiable physics).
 
-Comparable to examples/comparison/ball_throw/ball_throw_axion.py.
+Comparable to examples/comparison/ball_throw/ball_throw_ostrich.py.
 
 Optimizes the initial 3D linear velocity of a ball to match a target trajectory.
 Uses gradient descent on the 3D initial velocity via jax.jacfwd (3 forward passes).

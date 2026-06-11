@@ -3,8 +3,8 @@
 #
 # Usage:
 #   ./run_dt_sweeps.sh                    # run all
-#   ./run_dt_sweeps.sh --axion            # run only Axion
-#   ./run_dt_sweeps.sh --axion --mujoco   # run Axion and MuJoCo
+#   ./run_dt_sweeps.sh --ostrich            # run only Ostrich
+#   ./run_dt_sweeps.sh --ostrich --mujoco   # run Ostrich and MuJoCo
 #
 # Update the fixed param values below after running the full sweep.
 set -e
@@ -16,27 +16,27 @@ mkdir -p "$RESULTS"
 GT="$DATA/right_turn_b.json $DATA/acceleration.json"
 
 # Parse args
-RUN_AXION=false; RUN_MUJOCO=false; RUN_SEMI=false; RUN_TINY=false
+RUN_OSTRICH=false; RUN_MUJOCO=false; RUN_SEMI=false; RUN_TINY=false
 RUN_ALL=true
 for arg in "$@"; do
     case $arg in
-        --axion) RUN_AXION=true; RUN_ALL=false;;
+        --ostrich) RUN_OSTRICH=true; RUN_ALL=false;;
         --mujoco) RUN_MUJOCO=true; RUN_ALL=false;;
         --tinydiffsim) RUN_TINY=true; RUN_ALL=false;;
         --semi-implicit) RUN_SEMI=true; RUN_ALL=false;;
     esac
 done
 
-if $RUN_ALL || $RUN_AXION; then
-    # Axion: calibrated mu=0.1, fc=0.02, cc=0.1 — sweep dt only
-    echo "=== Axion dt sweep ==="
-    python "$DIR/sweep_axion.py" \
+if $RUN_ALL || $RUN_OSTRICH; then
+    # Ostrich: calibrated mu=0.1, fc=0.02, cc=0.1 — sweep dt only
+    echo "=== Ostrich dt sweep ==="
+    python "$DIR/sweep_ostrich.py" \
         --ground-truth $GT \
         --dt 0.02 0.05 0.08 0.1 0.125 0.15 0.2 \
         --mu 0.1 \
         --fc 2e-2 \
         --cc 1e-1 \
-        --save "$RESULTS/sweep_axion_dt.json"
+        --save "$RESULTS/sweep_ostrich_dt.json"
     echo ""
 fi
 

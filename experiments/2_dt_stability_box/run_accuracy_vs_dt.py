@@ -1,6 +1,6 @@
 """Reproducible accuracy-vs-dt sweep for the box scene.
 
-For each engine (Axion, MuJoCo) at its yaw-tuned best params from
+For each engine (Ostrich, MuJoCo) at its yaw-tuned best params from
 experiments/1_sim_to_real_box, runs a dt grid and records per-(engine, dt)
 results into results/accuracy_vs_dt.json. plot_dt_vs_error.py loads that
 JSON and produces the headline figure; no hand-copied numbers anywhere.
@@ -29,7 +29,7 @@ RESULTS_DIR = pathlib.Path(__file__).parent / "results"
 # ----------------------------- engine configs --------------------------------
 # These are the yaw-aware-tuned bests from 1_sim_to_real_box/README.md.
 
-AXION_PARAMS = dict(
+OSTRICH_PARAMS = dict(
     mu_front=0.8, mu_rear=1.5, mu_rolling=0.7,
     compliance_contact=1e-7,
 )
@@ -48,7 +48,7 @@ SEMI_IMPLICIT_PARAMS = dict(
 # dt grids — chosen to span each engine's full "interesting" range AND
 # to push past the wall on each side (so the figure shows where each
 # engine actually crashes, not just where its accuracy plateau ends).
-AXION_DT_GRID  = [0.005, 0.01, 0.015, 0.02, 0.03, 0.05, 0.07, 0.10,
+OSTRICH_DT_GRID  = [0.005, 0.01, 0.015, 0.02, 0.03, 0.05, 0.07, 0.10,
                   0.15, 0.20, 0.30, 0.40, 0.50, 0.70, 1.00]
 MUJOCO_DT_GRID = [1e-4, 2e-4, 5e-4, 1e-3, 2e-3, 5e-3, 1e-2, 1.5e-2,
                   2e-2, 3e-2, 5e-2, 7e-2, 1e-1]
@@ -58,8 +58,8 @@ SI_DT_GRID = [2e-4, 3e-4, 5e-4, 7e-4, 1e-3, 2e-3]
 
 
 # ------------------------------- runners -------------------------------------
-def axion_runner(gt, dt):
-    from axion import (AxionEngineConfig, ComplianceConfig, ContactsConfig, LinearSolverConfig,
+def ostrich_runner(gt, dt):
+    from ostrich import (OstrichEngineConfig, ComplianceConfig, ContactsConfig, LinearSolverConfig,
                        LinesearchConfig, LoggingConfig, NewtonRaphsonConfig, RenderingConfig,
                        SimulationConfig)
     from examples.helhest_junior.replay_real import HelhestJuniorReplaySimulator
@@ -69,16 +69,16 @@ def axion_runner(gt, dt):
                          num_worlds=1, use_cuda_graph=False),
         RenderingConfig(vis_type="null", target_fps=max(1, int(round(1 / dt))),
                         start_paused=False),
-        AxionEngineConfig(
+        OstrichEngineConfig(
             nr=NewtonRaphsonConfig(max_iters=16, backtrack_min_iter=12, atol=1e-3),
             linear=LinearSolverConfig(max_iters=16, tol=1e-3, atol=1e-3, regularization=1e-6),
-            compliance=ComplianceConfig(joint=6e-8, contact=AXION_PARAMS["compliance_contact"],
+            compliance=ComplianceConfig(joint=6e-8, contact=OSTRICH_PARAMS["compliance_contact"],
                                         friction=1e-6),
             linesearch=LinesearchConfig(enabled=False),
             contacts=ContactsConfig(max_per_world=256)),
         LoggingConfig(), control_mode="velocity",
-        mu_front=AXION_PARAMS["mu_front"], mu_rear=AXION_PARAMS["mu_rear"],
-        mu_rolling=AXION_PARAMS["mu_rolling"])
+        mu_front=OSTRICH_PARAMS["mu_front"], mu_rear=OSTRICH_PARAMS["mu_rear"],
+        mu_rolling=OSTRICH_PARAMS["mu_rolling"])
     sp = resample_setpoints(gt, dt, DURATION)
     sim.reset_state()
     pose, _ = sim.replay_graph(sp)
@@ -104,7 +104,7 @@ def mujoco_runner(gt, dt):
 
 
 def semi_implicit_runner(gt, dt):
-    from axion import (LoggingConfig, RenderingConfig, SemiImplicitEngineConfig,
+    from ostrich import (LoggingConfig, RenderingConfig, SemiImplicitEngineConfig,
                        SimulationConfig)
     from examples.helhest_junior.replay_real import HelhestJuniorReplaySimulator
 
@@ -131,7 +131,7 @@ def semi_implicit_runner(gt, dt):
 
 
 ENGINES = {
-    "Axion":         {"runner": axion_runner,         "dt_grid": AXION_DT_GRID,  "params": AXION_PARAMS},
+    "Ostrich":         {"runner": ostrich_runner,         "dt_grid": OSTRICH_DT_GRID,  "params": OSTRICH_PARAMS},
     "MuJoCo":        {"runner": mujoco_runner,        "dt_grid": MUJOCO_DT_GRID, "params": MUJOCO_PARAMS},
     "Semi-Implicit": {"runner": semi_implicit_runner, "dt_grid": SI_DT_GRID,     "params": SEMI_IMPLICIT_PARAMS},
 }

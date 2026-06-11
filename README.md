@@ -1,11 +1,11 @@
 <div align="center">
-    <h1>Axion</h1>
+    <h1>Ostrich</h1>
     <p>A GPU-accelerated physics simulator with non-smooth contact and exact friction</p>
 </div>
 
 ---
 
-Axion is a rigid body simulator built for robotics research where contact accuracy matters. Unlike simulators that smooth or approximate the friction cone, Axion solves the **non-penetration contact constraints exactly** and handles **non-smooth friction** — making it particularly well-suited for skid-steer locomotion, flipper robots, and any scenario where slip behavior drives the dynamics.
+Ostrich is a rigid body simulator built for robotics research where contact accuracy matters. Unlike simulators that smooth or approximate the friction cone, Ostrich solves the **non-penetration contact constraints exactly** and handles **non-smooth friction** — making it particularly well-suited for skid-steer locomotion, flipper robots, and any scenario where slip behavior drives the dynamics.
 
 Key properties:
 
@@ -110,8 +110,8 @@ tar -xzf /tmp/cmake-3.27.0-linux-x86_64.tar.gz -C ~/.local/opt
 
 ```bash
 # Clone and enter the repo
-git clone https://github.com/aleskucera/axion.git
-cd axion
+git clone https://github.com/aleskucera/ostrich.git
+cd ostrich
 
 # Pull the newton submodule
 git submodule update --init --recursive

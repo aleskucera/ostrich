@@ -32,7 +32,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
 
 import numpy as np
 import warp as wp
-from axion import (LoggingConfig, RenderingConfig, SemiImplicitEngineConfig,
+from ostrich import (LoggingConfig, RenderingConfig, SemiImplicitEngineConfig,
                    SimulationConfig)
 
 from common_box import DATA_DIR, load_gt, resample_setpoints, score

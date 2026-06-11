@@ -7,16 +7,16 @@ import newton
 import numpy as np
 import openmesh
 import warp as wp
-from axion import AxionDifferentiableSimulator
-from axion import AxionEngineConfig
-from axion import LoggingConfig
-from axion import RenderingConfig
-from axion import SimulationConfig
-from axion import ComplianceConfig
-from axion import ContactsConfig
-from axion import LinearSolverConfig
-from axion import LinesearchConfig
-from axion import NewtonRaphsonConfig
+from ostrich import OstrichDifferentiableSimulator
+from ostrich import OstrichEngineConfig
+from ostrich import LoggingConfig
+from ostrich import RenderingConfig
+from ostrich import SimulationConfig
+from ostrich import ComplianceConfig
+from ostrich import ContactsConfig
+from ostrich import LinearSolverConfig
+from ostrich import LinesearchConfig
+from ostrich import NewtonRaphsonConfig
 from newton import Model
 
 from examples.helhest.common import create_helhest_model
@@ -132,12 +132,12 @@ def regularization_kernel(
     wp.atomic_add(loss, 0, weight * v * v)
 
 
-class HelhestTrajectorySplineSurfaceOptimizer(AxionDifferentiableSimulator):
+class HelhestTrajectorySplineSurfaceOptimizer(OstrichDifferentiableSimulator):
     def __init__(
         self,
         sim_config: SimulationConfig,
         render_config: RenderingConfig,
-        engine_config: AxionEngineConfig,
+        engine_config: OstrichEngineConfig,
         logging_config: LoggingConfig,
         num_control_points: int = 10,
     ):
@@ -550,7 +550,7 @@ def main():
         world_offset_x=20.0,
         world_offset_y=20.0,
     )
-    engine_config = AxionEngineConfig(
+    engine_config = OstrichEngineConfig(
         nr=NewtonRaphsonConfig(max_iters=16, backtrack_min_iter=12, atol=0.001),
         linear=LinearSolverConfig(max_iters=16, atol=0.001, tol=0.001, regularization=1e-06),
         compliance=ComplianceConfig(joint=6e-08, contact=0.1, friction=1e-06),

@@ -1,7 +1,7 @@
 """
 Ball throw optimization using Dojo (Julia differentiable physics).
 
-Comparable to examples/comparison/ball_throw/ball_throw_axion.py.
+Comparable to examples/comparison/ball_throw/ball_throw_ostrich.py.
 
 Optimizes the initial 3D linear velocity of a ball to match a target trajectory.
 Gradients flow through BPTT via get_maximal_gradients!.

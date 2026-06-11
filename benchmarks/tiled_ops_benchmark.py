@@ -4,7 +4,7 @@ import numpy as np
 import time
 from matplotlib import pyplot as plt
 
-import axion.tiled as tu
+import ostrich.tiled as tu
 
 np.random.seed(0)
 

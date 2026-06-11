@@ -15,14 +15,14 @@ import newton
 import numpy as np
 import torch
 import warp as wp
-from axion import AxionEngine
-from axion import EngineConfig
-from axion import LoggingConfig
-from axion import SimulationConfig
-from axion.core.model_builder import AxionModelBuilder
-from axion.generation import RandomSceneGenerator
-from axion.learning.torch_residual_ad import AxionResidualAD
-from axion.learning.warm_start_net import WarmStartNet
+from ostrich import OstrichEngine
+from ostrich import EngineConfig
+from ostrich import LoggingConfig
+from ostrich import SimulationConfig
+from ostrich.core.model_builder import OstrichModelBuilder
+from ostrich.generation import RandomSceneGenerator
+from ostrich.learning.torch_residual_ad import OstrichResidualAD
+from ostrich.learning.warm_start_net import WarmStartNet
 from omegaconf import DictConfig
 
 CONFIG_PATH = pathlib.Path(__file__).parent.joinpath("conf")
@@ -39,7 +39,7 @@ SEED = 42
 
 
 def build_random_model(num_worlds: int = 1, seed: int = SEED) -> newton.Model:
-    builder = AxionModelBuilder()
+    builder = OstrichModelBuilder()
     builder.rigid_gap = 0.2
     builder.add_ground_plane()
 
@@ -56,7 +56,7 @@ def build_random_model(num_worlds: int = 1, seed: int = SEED) -> newton.Model:
     return builder.finalize_replicated(num_worlds=num_worlds)
 
 
-def get_state_tensor(engine: AxionEngine) -> torch.Tensor:
+def get_state_tensor(engine: OstrichEngine) -> torch.Tensor:
     """Extract (body_pose_prev, body_vel_prev) as a flat torch tensor."""
     pose = wp.to_torch(engine.data.body_pose_prev).clone()
     vel = wp.to_torch(engine.data.body_vel_prev).clone()
@@ -67,9 +67,9 @@ def get_state_tensor(engine: AxionEngine) -> torch.Tensor:
 
 def compute_residual_loss(engine, body_vel, constr_force):
     """Compute ||residual||^2 with exact autodiff gradients."""
-    residual = AxionResidualAD.apply(
-        engine.axion_model,
-        engine.axion_contacts,
+    residual = OstrichResidualAD.apply(
+        engine.ostrich_model,
+        engine.ostrich_contacts,
         engine.data,
         engine.config,
         engine.dims,

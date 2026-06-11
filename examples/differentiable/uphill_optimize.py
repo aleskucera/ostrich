@@ -13,18 +13,18 @@ import time
 import newton
 import numpy as np
 import warp as wp
-from axion import AxionDifferentiableSimulator
-from axion import ComplianceConfig
-from axion import ContactsConfig
-from axion import LinearSolverConfig
-from axion import LinesearchConfig
-from axion import LoggingConfig
-from axion import NewtonRaphsonConfig
-from axion import RenderingConfig
-from axion import SimulationConfig
-from axion.collision import ContactReductionConfig
-from axion.core.engine_config import AxionEngineConfig
-from axion.core.types import JointMode
+from ostrich import OstrichDifferentiableSimulator
+from ostrich import ComplianceConfig
+from ostrich import ContactsConfig
+from ostrich import LinearSolverConfig
+from ostrich import LinesearchConfig
+from ostrich import LoggingConfig
+from ostrich import NewtonRaphsonConfig
+from ostrich import RenderingConfig
+from ostrich import SimulationConfig
+from ostrich.collision import ContactReductionConfig
+from ostrich.core.engine_config import OstrichEngineConfig
+from ostrich.core.types import JointMode
 from newton import Model
 
 os.environ["PYOPENGL_PLATFORM"] = "glx"
@@ -161,7 +161,7 @@ def final_velocity_loss_kernel(
 # ─── Simulator ─────────────────────────────────────────────────────────────
 
 
-class UphillOptimizer(AxionDifferentiableSimulator):
+class UphillOptimizer(OstrichDifferentiableSimulator):
     def __init__(
         self,
         sim_config,
@@ -488,7 +488,7 @@ def main():
         num_worlds=1,
     )
     render_config = RenderingConfig(vis_type="gl")
-    engine_config = AxionEngineConfig(
+    engine_config = OstrichEngineConfig(
         nr=NewtonRaphsonConfig(max_iters=24, backtrack_min_iter=12, atol=1e-3),
         linear=LinearSolverConfig(max_iters=24, tol=1e-05, atol=1e-05, regularization=1e-06),
         compliance=ComplianceConfig(joint=5e-10, contact=1e-10, friction=1e-8),

@@ -1,8 +1,8 @@
 # Numerical Solution
 
-The previous section established a large, non-smooth system of nonlinear equations, \(\mathbf{h}(\mathbf{x}) = \mathbf{0}\), that captures the complete physics of the simulation at each time step. This system cannot be solved analytically and requires a powerful iterative approach. This section describes the numerical strategy Axion uses to find the solution.
+The previous section established a large, non-smooth system of nonlinear equations, \(\mathbf{h}(\mathbf{x}) = \mathbf{0}\), that captures the complete physics of the simulation at each time step. This system cannot be solved analytically and requires a powerful iterative approach. This section describes the numerical strategy Ostrich uses to find the solution.
 
-Axion employs an **inexact non-smooth Newton-type method**. The core idea is to start with a guess for the solution \(\mathbf{x}\) and iteratively refine it. In each iteration \(k\), we linearize the nonlinear function \(\mathbf{h}(\mathbf{x})\) at the current guess \(\mathbf{x_k}\) and solve the resulting linear system for a step \(\Delta \mathbf{x}\).
+Ostrich employs an **inexact non-smooth Newton-type method**. The core idea is to start with a guess for the solution \(\mathbf{x}\) and iteratively refine it. In each iteration \(k\), we linearize the nonlinear function \(\mathbf{h}(\mathbf{x})\) at the current guess \(\mathbf{x_k}\) and solve the resulting linear system for a step \(\Delta \mathbf{x}\).
 
 The linear system to be solved at each iteration is:
 
@@ -64,7 +64,7 @@ By applying this substitution to the whole system, we eliminate \(\Delta\mathbf{
 
 ## Schur Complement: A Strategy for Efficiency
 
-Solving the full KKT system directly is still inefficient. The matrix is large, sparse, and indefinite. Axion employs the **Schur complement method** to create an even smaller, better-behaved system to solve. The strategy is to algebraically eliminate the velocity update \(\Delta \mathbf{u}\) and form a system that solves *only* for the constraint force update \(\Delta \boldsymbol{\lambda}\).
+Solving the full KKT system directly is still inefficient. The matrix is large, sparse, and indefinite. Ostrich employs the **Schur complement method** to create an even smaller, better-behaved system to solve. The strategy is to algebraically eliminate the velocity update \(\Delta \mathbf{u}\) and form a system that solves *only* for the constraint force update \(\Delta \boldsymbol{\lambda}\).
 
 From the first block row of the KKT system, we express \(\Delta\mathbf{u}\) in terms of \(\Delta\boldsymbol{\lambda}\):
 
@@ -120,7 +120,7 @@ This vector represents the complete, linearized search direction for the entire 
 ---
 **Step 5 (Optional): Parallel Step-Size Selection**
 
-At each Newton iteration, an optional parallel step-size search can be used to select a better update magnitude than the standard full step. Rather than a sequential backtracking rule, Axion evaluates a discrete set of \(N\) candidate step sizes \(\{\alpha_0, \ldots, \alpha_{N-1}\}\) **simultaneously** in a single GPU pass. For each candidate \(\alpha_i\), a trial state is formed:
+At each Newton iteration, an optional parallel step-size search can be used to select a better update magnitude than the standard full step. Rather than a sequential backtracking rule, Ostrich evaluates a discrete set of \(N\) candidate step sizes \(\{\alpha_0, \ldots, \alpha_{N-1}\}\) **simultaneously** in a single GPU pass. For each candidate \(\alpha_i\), a trial state is formed:
 
 \[
 \mathbf{x}_{\text{trial},i} = \mathbf{x_k} + \alpha_i \, \Delta\mathbf{x}
@@ -157,7 +157,7 @@ This brings us to the end of one Newton iteration. The process repeats from Step
 
 ## Best-Iterate Backtracking
 
-Newton's method is not monotone — the residual can temporarily increase during intermediate iterations before converging. To guard against accepting a poor final iterate, Axion uses a **best-iterate backtracking** strategy.
+Newton's method is not monotone — the residual can temporarily increase during intermediate iterations before converging. To guard against accepting a poor final iterate, Ostrich uses a **best-iterate backtracking** strategy.
 
 After each Newton iteration \(k\), the full state \(\mathbf{x_k}\) and its residual norm \(\|\mathbf{h}(\mathbf{x_k})\|^2\) are saved as candidates. Once the Newton loop finishes, the solver does **not** necessarily keep the final iterate. Instead, it selects the candidate with the **minimum residual norm** from a minimum iteration index \(k_\text{min}\) onwards:
 

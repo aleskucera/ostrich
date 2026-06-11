@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Sweep Axion and MuJoCo on the turn bag using /cmd_vel-derived wheel targets
+# Sweep Ostrich and MuJoCo on the turn bag using /cmd_vel-derived wheel targets
 # (diff-drive kinematic) instead of /joint_states. Only the turn bag has
 # cmd_vel populated, so we restrict to it.
 #
 # Usage:
 #   ./run_cmd_vel_sweeps.sh              # both
-#   ./run_cmd_vel_sweeps.sh --axion      # axion only
+#   ./run_cmd_vel_sweeps.sh --ostrich      # ostrich only
 #   ./run_cmd_vel_sweeps.sh --mujoco     # mujoco only
 set -e
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -17,24 +17,24 @@ mkdir -p "$RESULTS"
 GT="$DATA/right_turn_b.json"
 BAG="$BAGS/helhest_2026_04_10-14_46_18"
 
-RUN_AXION=false; RUN_MUJOCO=false; RUN_ALL=true
+RUN_OSTRICH=false; RUN_MUJOCO=false; RUN_ALL=true
 for arg in "$@"; do
     case $arg in
-        --axion) RUN_AXION=true; RUN_ALL=false;;
+        --ostrich) RUN_OSTRICH=true; RUN_ALL=false;;
         --mujoco) RUN_MUJOCO=true; RUN_ALL=false;;
     esac
 done
 
-if $RUN_ALL || $RUN_AXION; then
-    echo "=== Axion (cmd_vel kinematic target) ==="
-    python "$DIR/sweep_axion.py" \
+if $RUN_ALL || $RUN_OSTRICH; then
+    echo "=== Ostrich (cmd_vel kinematic target) ==="
+    python "$DIR/sweep_ostrich.py" \
         --ground-truth "$GT" \
         --cmd-vel-bag "$BAG" \
         --dt 0.05 0.08 \
         --mu 0.1 0.15 0.2 0.3 0.5 \
         --fc 1e-3 5e-3 1.2e-2 2e-2 5e-2 \
         --cc 1e-1 \
-        --save "$RESULTS/sweep_axion_cmdvel.json"
+        --save "$RESULTS/sweep_ostrich_cmdvel.json"
     echo ""
 fi
 
@@ -51,5 +51,5 @@ if $RUN_ALL || $RUN_MUJOCO; then
 fi
 
 echo "Done. Results:"
-echo "  $RESULTS/sweep_axion_cmdvel.json"
+echo "  $RESULTS/sweep_ostrich_cmdvel.json"
 echo "  $RESULTS/sweep_mujoco_cmdvel.json"

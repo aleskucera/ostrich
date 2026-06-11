@@ -4,7 +4,7 @@ Optimizes initial ball velocity via backpropagation through time on Warp's tape.
 The semi-implicit solver uses penalty-based joint forces and symplectic Euler
 integration, operating in body space (body_q, body_qd).
 
-Uses DT=5e-3 (T=300) — smaller than Axion's DT=3e-2 for stability with
+Uses DT=5e-3 (T=300) — smaller than Ostrich's DT=3e-2 for stability with
 penalty-contact dynamics.
 """
 import argparse
@@ -16,12 +16,12 @@ import time
 import newton
 import numpy as np
 import warp as wp
-from axion import LoggingConfig
-from axion import RenderingConfig
-from axion import SemiImplicitEngineConfig
-from axion import SimulationConfig
-from axion.simulation.differentiable_simulator import NewtonDifferentiableSimulator
-from axion.simulation.sim_config import SyncMode
+from ostrich import LoggingConfig
+from ostrich import RenderingConfig
+from ostrich import SemiImplicitEngineConfig
+from ostrich import SimulationConfig
+from ostrich.simulation.differentiable_simulator import NewtonDifferentiableSimulator
+from ostrich.simulation.sim_config import SyncMode
 from newton import Model
 
 os.environ["PYOPENGL_PLATFORM"] = "glx"

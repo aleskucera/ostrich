@@ -13,10 +13,10 @@ wp.init()
 
 import numpy as np
 import newton
-from axion.core.engine import AxionEngine
-from axion.core.engine_config import AxionEngineConfig, LinearSolverConfig, NewtonRaphsonConfig
-from axion.core.logging_config import LoggingConfig
-from axion.core.model_builder import AxionModelBuilder
+from ostrich.core.engine import OstrichEngine
+from ostrich.core.engine_config import OstrichEngineConfig, LinearSolverConfig, NewtonRaphsonConfig
+from ostrich.core.logging_config import LoggingConfig
+from ostrich.core.model_builder import OstrichModelBuilder
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "examples"))
 from taros_4.common import create_taros4_model
@@ -24,7 +24,7 @@ from taros_4.common import create_taros4_model
 
 def run_drive(dt, drive_time=1.0, settle_time=0.5, wheel_speed=5.0,
               k_p=1000.0, newton_iters=16, linear_iters=16):
-    builder = AxionModelBuilder()
+    builder = OstrichModelBuilder()
     builder.rigid_gap = 0.05
     builder.add_ground_plane()
     create_taros4_model(
@@ -39,11 +39,11 @@ def run_drive(dt, drive_time=1.0, settle_time=0.5, wheel_speed=5.0,
     drive_steps = max(1, int(drive_time / dt))
     total_steps = settle_steps + drive_steps
 
-    config = AxionEngineConfig(
+    config = OstrichEngineConfig(
         nr=NewtonRaphsonConfig(max_iters=newton_iters),
         linear=LinearSolverConfig(max_iters=linear_iters),
     )
-    engine = AxionEngine(
+    engine = OstrichEngine(
         model=model, sim_steps=total_steps, config=config,
         logging_config=LoggingConfig(),
     )
@@ -115,7 +115,7 @@ def run_drive_on_slope(dt, slope_deg=20.0, drive_time=1.0, settle_time=0.5,
     """Drive Taros-4 uphill on a tilted surface."""
     slope_rad = np.radians(slope_deg)
 
-    builder = AxionModelBuilder()
+    builder = OstrichModelBuilder()
     builder.rigid_gap = 0.05
 
     if use_heightfield:
@@ -163,11 +163,11 @@ def run_drive_on_slope(dt, slope_deg=20.0, drive_time=1.0, settle_time=0.5,
     drive_steps = max(1, int(drive_time / dt))
     total_steps = settle_steps + drive_steps
 
-    config = AxionEngineConfig(
+    config = OstrichEngineConfig(
         nr=NewtonRaphsonConfig(max_iters=newton_iters),
         linear=LinearSolverConfig(max_iters=linear_iters),
     )
-    engine = AxionEngine(
+    engine = OstrichEngine(
         model=model, sim_steps=total_steps, config=config,
         logging_config=LoggingConfig(),
     )

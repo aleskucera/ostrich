@@ -21,12 +21,12 @@ import pathlib
 from config import DURATION, DENSITY, HX1, HX2, HX3, Z1, Z2, Z3, STABILITY_TOL, KE, KD, KF, MU, BSEARCH_TOL, BSEARCH_MAX
 import numpy as np
 import warp as wp
-from axion import InteractiveSimulator
-from axion import LoggingConfig
-from axion import RenderingConfig
-from axion import SimulationConfig
-from axion import SemiImplicitEngineConfig
-from axion.simulation.sim_config import SyncMode
+from ostrich import InteractiveSimulator
+from ostrich import LoggingConfig
+from ostrich import RenderingConfig
+from ostrich import SimulationConfig
+from ostrich import SemiImplicitEngineConfig
+from ostrich.simulation.sim_config import SyncMode
 from newton import Model
 from newton import ModelBuilder as NewtonModelBuilder
 

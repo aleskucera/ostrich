@@ -1,6 +1,6 @@
 """Bundled-gradient balance optimization for the Helhest robot.
 
-Resurrects the original ``helhest_balance_axion.py`` (lost in fe18754
+Resurrects the original ``helhest_balance_ostrich.py`` (lost in fe18754
 and the subsequent file deletion), modernizes for the current API,
 parameterizes wheel-velocity controls as a spline (K knots × 3 wheels
 instead of T × 3 per-step), and adds the bundled-gradient path
@@ -33,9 +33,9 @@ import warp as wp
 import newton
 from newton import Model
 
-from axion import (
-    AxionDifferentiableSimulator,
-    AxionEngineConfig,
+from ostrich import (
+    OstrichDifferentiableSimulator,
+    OstrichEngineConfig,
     LoggingConfig,
     RenderingConfig,
     SimulationConfig,
@@ -298,7 +298,7 @@ def diag_reg_kernel(
 # -----------------------------------------------------------------------------
 
 
-class HelhestBalanceBundledOptimizer(AxionDifferentiableSimulator):
+class HelhestBalanceBundledOptimizer(OstrichDifferentiableSimulator):
     """Spline-parameterized balance with optional bundled-gradient smoothing.
 
     With ``num_worlds=1`` and ``sigma=0`` this is equivalent to the original
@@ -310,7 +310,7 @@ class HelhestBalanceBundledOptimizer(AxionDifferentiableSimulator):
         self,
         sim_config: SimulationConfig,
         render_config: RenderingConfig,
-        engine_config: AxionEngineConfig,
+        engine_config: OstrichEngineConfig,
         logging_config: LoggingConfig,
         num_control_points: int = 10,
         sigma: float = 0.5,
@@ -559,7 +559,7 @@ class HelhestBalanceBundledOptimizer(AxionDifferentiableSimulator):
     def _build_target_episode(self):
         """Run a target rollout where wheels are stationary — that's our 'reference'.
         Not actually used by the loss (target is BALANCE_PITCH/origin), but the
-        AxionDifferentiableSimulator base expects target trajectories to exist.
+        OstrichDifferentiableSimulator base expects target trajectories to exist.
         """
         num_dofs = self.trajectory.joint_target_vel.shape[-1]
         T = self.clock.total_sim_steps
@@ -625,8 +625,8 @@ class HelhestBalanceBundledOptimizer(AxionDifferentiableSimulator):
 # -----------------------------------------------------------------------------
 
 
-def _make_default_engine_config() -> AxionEngineConfig:
-    return AxionEngineConfig(
+def _make_default_engine_config() -> OstrichEngineConfig:
+    return OstrichEngineConfig(
         nr=NewtonRaphsonConfig(max_iters=16, backtrack_min_iter=12, atol=1e-3),
         linear=LinearSolverConfig(max_iters=16, atol=1e-3, tol=1e-3, regularization=1e-6),
         compliance=ComplianceConfig(joint=6e-8, contact=1e-10, friction=1e-6),

@@ -32,15 +32,15 @@ import warp
 warp.config.quiet = True
 import newton
 import warp as wp
-from axion.core.engine import AxionEngine
-from axion.core.engine_config import AxionEngineConfig
-from axion.core.logging_config import LoggingConfig
-from axion.core.model_builder import AxionModelBuilder
-from axion.logging.hdf5_reader import HDF5Reader
+from ostrich.core.engine import OstrichEngine
+from ostrich.core.engine_config import OstrichEngineConfig
+from ostrich.core.logging_config import LoggingConfig
+from ostrich.core.model_builder import OstrichModelBuilder
+from ostrich.logging.hdf5_reader import HDF5Reader
 
 RESULTS_DIR = pathlib.Path(__file__).parent / "results"
 
-# Defaults match AxionEngineConfig defaults — the no-flag run exercises
+# Defaults match OstrichEngineConfig defaults — the no-flag run exercises
 # the "shipped" behavior. Override --compliance to A/B against alternatives.
 SIM_DURATION = 0.3
 MAX_NEWTON_ITERS = 16
@@ -56,7 +56,7 @@ def apply_horizontal_force_kernel(
 ):
     body_idx = wp.tid()
     if body_idx == 0:
-        # axion spatial vector layout: (f_x, f_y, f_z, tau_x, tau_y, tau_z)
+        # ostrich spatial vector layout: (f_x, f_y, f_z, tau_x, tau_y, tau_z)
         body_f[body_idx] = body_f[body_idx] + wp.spatial_vector(
             fx, 0.0, 0.0, 0.0, 0.0, 0.0
         )
@@ -64,7 +64,7 @@ def apply_horizontal_force_kernel(
 
 def build_model(mu: float = 0.0) -> newton.Model:
     """1 kg sphere of radius 0.1 m on a ground plane with friction mu."""
-    builder = AxionModelBuilder()
+    builder = OstrichModelBuilder()
 
     builder.add_ground_plane(
         cfg=newton.ModelBuilder.ShapeConfig(mu=mu, restitution=0.0)
@@ -103,7 +103,7 @@ def run(
     model = build_model(mu=mu)
     num_steps = int(round(SIM_DURATION / dt))
 
-    config = AxionEngineConfig(
+    config = OstrichEngineConfig(
         max_newton_iters=MAX_NEWTON_ITERS,
         newton_atol=NEWTON_ATOL,
         contact_compliance=contact_compliance,
@@ -116,7 +116,7 @@ def run(
         max_simulation_steps=num_steps,
     )
 
-    engine = AxionEngine(
+    engine = OstrichEngine(
         model=model, sim_steps=num_steps, config=config, logging_config=logging_config
     )
 

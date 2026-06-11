@@ -1,10 +1,10 @@
 # Quick Start Guide
 
-Get up and running with Axion in minutes. This guide assumes you have already [installed Axion](installation.md) using `uv`.
+Get up and running with Ostrich in minutes. This guide assumes you have already [installed Ostrich](installation.md) using `uv`.
 
 ## Running Your First Simulation
 
-Axion comes with several pre-built examples. Let's run the simplest one.
+Ostrich comes with several pre-built examples. Let's run the simplest one.
 
 ```bash
 uv run ball_bounce_example
@@ -20,7 +20,7 @@ This command will:
 
 ## Exploring the Examples
 
-You can run several other examples using the same `uv run` command. Each demonstrates different features of the Axion physics engine.
+You can run several other examples using the same `uv run` command. Each demonstrates different features of the Ostrich physics engine.
 
 | Command | Description |
 | :--- | :--- |
@@ -34,7 +34,7 @@ You can run several other examples using the same `uv run` command. Each demonst
 
 All examples are configured using a powerful library called [Hydra](https://hydra.cc/). Hydra allows you to easily override any part of the simulation's configuration directly from the command line, without ever touching the code.
 
-The configuration files for the examples are located in `src/axion/examples/conf/`.
+The configuration files for the examples are located in `src/ostrich/examples/conf/`.
 
 ### Viewing All Configuration Options
 
@@ -72,7 +72,7 @@ For example, the `rendering` group has two options: `30_fps` (the default) and `
 uv run ball_bounce_example rendering=headless
 ```
 
-By specifying `rendering=headless`, you are selecting the `headless.yaml` configuration file from the `src/axion/examples/conf/rendering/` directory. This single command is a shortcut for setting `rendering.enable=false`.
+By specifying `rendering=headless`, you are selecting the `headless.yaml` configuration file from the `src/ostrich/examples/conf/rendering/` directory. This single command is a shortcut for setting `rendering.enable=false`.
 
 !!! info "Combining Overrides"
     You can combine configuration groups and specific overrides in a single command. The most specific override (the `key=value` pair) always wins.
@@ -84,8 +84,8 @@ By specifying `rendering=headless`, you are selecting the `headless.yaml` config
 
 ## Next Steps
 
-You now have the basics of running and configuring Axion simulations.
+You now have the basics of running and configuring Ostrich simulations.
 
 - [**Create Your First Simulation**](first-simulation.md) to learn how to build a scene from scratch.
-- Dive into the [**User Guide**](../user-guide/concepts.md) to understand the core physics concepts behind Axion.
-- Explore the [**Configuration System Guide**](../user-guide/configuration.md) for a deeper look into how Hydra is used in Axion.
+- Dive into the [**User Guide**](../user-guide/concepts.md) to understand the core physics concepts behind Ostrich.
+- Explore the [**Configuration System Guide**](../user-guide/configuration.md) for a deeper look into how Hydra is used in Ostrich.

@@ -2,7 +2,7 @@ defaults:
   - simulation: helhest
   - rendering: headless
   - logging: hdf5
-  - engine: axion
+  - engine: ostrich
   - control: helhest/velocity
   - _self_
 

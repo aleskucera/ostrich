@@ -2,7 +2,7 @@
 
 This section establishes the mathematical foundation for representing articulated bodies and their interactions as constraint equations. Understanding these constraint formulations is essential before exploring how they are enforced through optimization principles and numerical methods.
 
-In Axion, all physical interactions—joints, contacts, and friction—are unified under a single mathematical framework of constraint equations. This creates a large-scale system that captures the essential physics while enabling robust numerical solution.
+In Ostrich, all physical interactions—joints, contacts, and friction—are unified under a single mathematical framework of constraint equations. This creates a large-scale system that captures the essential physics while enabling robust numerical solution.
 
 ---
 
@@ -79,7 +79,7 @@ To be used in a velocity-level solver, this is rearranged into a modified veloci
 
 While this spring-based stabilization is more physically intuitive, tuning ERP and CFM values is notoriously difficult. Poor tuning can lead to spongy, oscillating joints or bouncy contacts.
 
-Axion's direct, position-level DVI formulation elegantly sidesteps this entire problem. By solving for the position constraints directly, it eliminates drift by design, removing the need for fragile stabilization hacks and ensuring superior long-term stability.
+Ostrich's direct, position-level DVI formulation elegantly sidesteps this entire problem. By solving for the position constraints directly, it eliminates drift by design, removing the need for fragile stabilization hacks and ensuring superior long-term stability.
 
 ---
 
@@ -108,7 +108,7 @@ This mathematical relationship captures the essential physics:
 * **Non-negativity**: Contact forces are repulsive (\(\lambda_n \geq 0\)) and no penetration occurs (\(\mathbf{c}(\mathbf{q}) \geq 0\))
 * **Complementarity**: Either bodies are separated (\(\mathbf{c}(\mathbf{q}) > 0\), \(\lambda_n = 0\)) or in contact (\(\mathbf{c}(\mathbf{q}) = 0\), \(\lambda_n \geq 0\))
 
-By solving this position-level problem directly, Axion finds the exact forces required to satisfy the non-penetration constraint, resulting in stable simulation without drift.
+By solving this position-level problem directly, Ostrich finds the exact forces required to satisfy the non-penetration constraint, resulting in stable simulation without drift.
 
 ### Velocity-Level Formulation (Alternative)
 
@@ -124,7 +124,7 @@ This forms a **Linear Complementarity Problem (LCP)** that ensures bodies don't 
 
 ## 3. Friction Constraints
 
-Friction constraints apply tangential forces that resist sliding motion between contacting bodies. Axion uses the smooth, isotropic Coulomb friction model derived from the **principle of maximal dissipation**.
+Friction constraints apply tangential forces that resist sliding motion between contacting bodies. Ostrich uses the smooth, isotropic Coulomb friction model derived from the **principle of maximal dissipation**.
 
 ### Mathematical Formulation
 
@@ -145,13 +145,13 @@ This principle-based formulation is implemented using an NCP-function and a fixe
 
 ## 4. Joint Constraints
 
-Joints connect bodies and restrict their relative motion. In Axion, joints are implemented using the same unified constraint framework as contacts and friction. The engine employs a **constraints-based** (or **full-coordinate**) approach, where each rigid body retains its full 6 degrees of freedom (DOFs), and the solver computes the exact joint impulses required to enforce the desired motion restriction.
+Joints connect bodies and restrict their relative motion. In Ostrich, joints are implemented using the same unified constraint framework as contacts and friction. The engine employs a **constraints-based** (or **full-coordinate**) approach, where each rigid body retains its full 6 degrees of freedom (DOFs), and the solver computes the exact joint impulses required to enforce the desired motion restriction.
 
-Axion currently supports four joint types: **Revolute**, **Prismatic**, **Ball**, and **Fixed**.
+Ostrich currently supports four joint types: **Revolute**, **Prismatic**, **Ball**, and **Fixed**.
 
 #### Mathematical Model
 
-Like contacts, joint constraints can be defined at either the position or velocity level. A revolute joint (or hinge) is modeled as a set of five simultaneous **bilateral (equality) constraints**. Axion solves these directly at the position level to ensure maximum stability.
+Like contacts, joint constraints can be defined at either the position or velocity level. A revolute joint (or hinge) is modeled as a set of five simultaneous **bilateral (equality) constraints**. Ostrich solves these directly at the position level to ensure maximum stability.
 
 The constraint functions \(\mathbf{c}(q)\) are defined to be zero when the joint is perfectly aligned:
 
@@ -163,7 +163,7 @@ The constraint functions \(\mathbf{c}(q)\) are defined to be zero when the joint
 
 2. **Hinge Axes Collinear (2 DOFs):** The designated axes on each body must remain aligned.
 
-The solver finds the joint forces \(\boldsymbol{\lambda}_j\) required to enforce \(\mathbf{c}(q) = \mathbf{0}\). Because Axion solves the position-level equation directly via its non-smooth Newton method, any numerical error that would cause the joint to separate is corrected automatically.
+The solver finds the joint forces \(\boldsymbol{\lambda}_j\) required to enforce \(\mathbf{c}(q) = \mathbf{0}\). Because Ostrich solves the position-level equation directly via its non-smooth Newton method, any numerical error that would cause the joint to separate is corrected automatically.
 
 **Alternative: Velocity-Level Formulation**
 
@@ -179,7 +179,7 @@ Here, the solver finds impulses that force the relative velocity **u** along the
 
 ## 5. Control Constraints
 
-Control constraints allow Axion to drive joints towards a desired state, effectively acting as implicit motors or drives. Unlike external forces, which are applied explicitly, control constraints are solved for as part of the unified system, ensuring stability even with high gains or stiff tracking requirements.
+Control constraints allow Ostrich to drive joints towards a desired state, effectively acting as implicit motors or drives. Unlike external forces, which are applied explicitly, control constraints are solved for as part of the unified system, ensuring stability even with high gains or stiff tracking requirements.
 
 ### Mathematical Formulation
 
@@ -191,7 +191,7 @@ A control constraint introduces a new residual equation that relates the joint s
 
 where \(\boldsymbol{\lambda}_{\text{ctrl}}\) is the actuation force computed by the solver, \(h\) is the time step, and \(\alpha\) is a compliance parameter derived from the control gains.
 
-Axion supports two primary control modes:
+Ostrich supports two primary control modes:
 
 **1. Target Position Mode**
 
@@ -225,7 +225,7 @@ The compliance term depends on the stiffness gain (acting as a velocity gain her
 
 This acts as a velocity servo or a viscous damper.
 
-By solving for the actuation force \(\boldsymbol{\lambda}_{\text{ctrl}}\) implicitly, Axion avoids the instability often associated with explicit PD controllers in physics simulations.
+By solving for the actuation force \(\boldsymbol{\lambda}_{\text{ctrl}}\) implicitly, Ostrich avoids the instability often associated with explicit PD controllers in physics simulations.
 
 ---
 

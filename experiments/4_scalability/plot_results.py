@@ -14,7 +14,7 @@ import numpy as np
 from matplotlib.transforms import blended_transform_factory
 
 RESULTS_DIR = pathlib.Path(__file__).parent / "results"
-PAPER_DIR = pathlib.Path(__file__).resolve().parents[3] / ".." / "axion_paper" / "figures"
+PAPER_DIR = pathlib.Path(__file__).resolve().parents[3] / ".." / "ostrich_paper" / "figures"
 
 plt.rcParams.update(
     {
@@ -32,11 +32,11 @@ plt.rcParams.update(
 )
 
 STYLES = {
-    "Axion": {"color": "#2196F3", "marker": "o", "lw": 2.0, "zorder": 5},
+    "Ostrich": {"color": "#2196F3", "marker": "o", "lw": 2.0, "zorder": 5},
     "MJX-grad": {"color": "#E91E63", "marker": "o", "lw": 1.8, "zorder": 3},
 }
 LABELS = {
-    "Axion": r"\textbf{Axion}",
+    "Ostrich": r"\textbf{Ostrich}",
     "MJX-grad": "MJX-grad",
 }
 SIM_ORDER = list(STYLES.keys())
@@ -211,14 +211,14 @@ def main():
             )
 
     # --- Speedup annotations: double-headed arrow ---
-    if "Axion" in sim_data and "MJX-grad" in sim_data:
-        axion = sim_data["Axion"]
+    if "Ostrich" in sim_data and "MJX-grad" in sim_data:
+        ostrich = sim_data["Ostrich"]
         mjx = sim_data["MJX-grad"]
 
-        common = sorted(set(axion["worlds"]) & set(mjx["worlds"]))
+        common = sorted(set(ostrich["worlds"]) & set(mjx["worlds"]))
         if common:
             w = common[0]
-            ax_t = axion["times"][axion["worlds"].index(w)]
+            ax_t = ostrich["times"][ostrich["worlds"].index(w)]
             mx_t = mjx["times"][mjx["worlds"].index(w)]
             ratio = mx_t / ax_t
 
@@ -243,14 +243,14 @@ def main():
             )
 
     # --- Knee point annotation ---
-    if "Axion" in sim_data:
-        axion = sim_data["Axion"]
+    if "Ostrich" in sim_data:
+        ostrich = sim_data["Ostrich"]
         # Knee is around 256-512 worlds where per-world cost starts growing
         knee_w = 512
-        if knee_w in axion["worlds"]:
-            knee_idx = axion["worlds"].index(knee_w)
-            knee_t = axion["times"][knee_idx]
-            knee_m = axion["mems"][knee_idx]
+        if knee_w in ostrich["worlds"]:
+            knee_idx = ostrich["worlds"].index(knee_w)
+            knee_t = ostrich["times"][knee_idx]
+            knee_m = ostrich["mems"][knee_idx]
 
             for ax, val in [(ax_time, knee_t), (ax_mem, knee_m)]:
                 ax.axvline(knee_w, color="#2196F3", linestyle="--", linewidth=1.2, alpha=0.75)
@@ -272,7 +272,7 @@ def main():
     ax_mem.axhspan(GPU_MEM_LIMIT_MB, ax_mem.get_ylim()[1], color="red", alpha=0.05, zorder=0)
 
     # Place "GPU saturated" text next to the dashed line
-    if "Axion" in sim_data and "_knee_w" in dir():
+    if "Ostrich" in sim_data and "_knee_w" in dir():
         for ax in (ax_time, ax_mem):
             ax.text(
                 _knee_w - 100,

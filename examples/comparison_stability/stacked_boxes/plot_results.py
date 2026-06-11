@@ -1,7 +1,7 @@
-"""Plot maximum stable timestep per simulator — horizontal bar chart with ×N vs Axion.
+"""Plot maximum stable timestep per simulator — horizontal bar chart with ×N vs Ostrich.
 
 Same layout as plot_stability_horizontal.py but annotates each bar with a
-multiplier showing how many times larger Axion's max stable dt is compared
+multiplier showing how many times larger Ostrich's max stable dt is compared
 to that simulator.  The ×N column is placed outside the axes area using a
 blended transform so it never overlaps with value labels.
 
@@ -40,7 +40,7 @@ STYLES = {
     "MJX":           {"color": "#FF5722"},
     "TinyDiffSim":   {"color": "#9C27B0"},
     "Dojo":          {"color": "#FF9800"},
-    "Axion":         {"color": "#2196F3"},
+    "Ostrich":         {"color": "#2196F3"},
 }
 SIM_ORDER = list(STYLES.keys())
 
@@ -51,10 +51,10 @@ LABELS = {
     "MJX":           "MJX",
     "TinyDiffSim":   "TinyDiffSim",
     "Dojo":          "Dojo",
-    "Axion":         r"\textbf{Axion}",
+    "Ostrich":         r"\textbf{Ostrich}",
 }
 
-AXION_COLOR = "#2196F3"
+OSTRICH_COLOR = "#2196F3"
 
 
 def load_thresholds() -> dict[str, dict]:
@@ -87,8 +87,8 @@ def main():
         print("No threshold results found. Run the benchmark scripts first.")
         return
 
-    if "Axion" not in thresholds:
-        print("Axion results not found — cannot compute ×N ratios.")
+    if "Ostrich" not in thresholds:
+        print("Ostrich results not found — cannot compute ×N ratios.")
         return
 
     sims = [s for s in SIM_ORDER if s in thresholds]
@@ -99,12 +99,12 @@ def main():
     never_stable = {s for s in sims if thresholds[s]["max_stable_dt"] == 0}
     stable_sims = [s for s in sims if s not in never_stable]
 
-    # Sort ascending so the strongest simulator (Axion) is at the top
+    # Sort ascending so the strongest simulator (Ostrich) is at the top
     # Never-stable simulators go at the bottom
     never_stable_sorted = sorted(never_stable)
     sims = never_stable_sorted + sorted(stable_sims, key=lambda s: thresholds[s]["max_stable_dt"])
 
-    axion_dt = thresholds["Axion"]["max_stable_dt"]
+    ostrich_dt = thresholds["Ostrich"]["max_stable_dt"]
     colors   = [STYLES.get(s, {"color": "gray"})["color"] for s in sims]
     values   = [thresholds[s]["max_stable_dt"] for s in sims]
     hit_max  = [thresholds[s].get("hit_max", False) for s in sims]
@@ -140,7 +140,7 @@ def main():
             ax.text(
                 1.04, cy, r"$\times\infty$",
                 va="center", ha="left", fontsize=7,
-                color=AXION_COLOR, fontweight="bold",
+                color=OSTRICH_COLOR, fontweight="bold",
                 transform=right_xfm, clip_on=False,
             )
         else:
@@ -148,20 +148,20 @@ def main():
             val_label = f"${_fmt(val)}$" + (r"$^+$" if hm else "")
             ax.text(val * 1.5, cy, val_label, va="center", ha="left", fontsize=7)
 
-            if sim != "Axion":
-                ratio = axion_dt / val
+            if sim != "Ostrich":
+                ratio = ostrich_dt / val
                 ratio_str = (
                     f"$\\times{ratio:.0f}$" if ratio >= 10 else f"$\\times{ratio:.1f}$"
                 )
                 ax.text(
                     1.04, cy, ratio_str,
                     va="center", ha="left", fontsize=7,
-                    color=AXION_COLOR, fontweight="bold",
+                    color=OSTRICH_COLOR, fontweight="bold",
                     transform=right_xfm, clip_on=False,
                 )
 
     ax.text(
-        1.04, 1.01, r"vs \textbf{Axion}",
+        1.04, 1.01, r"vs \textbf{Ostrich}",
         va="bottom", ha="left", fontsize=6,
         color="gray", transform=ax.transAxes, clip_on=False,
     )

@@ -1,6 +1,6 @@
 # Can We Warm-Start PCR?
 
-The Preconditioned Conjugate Residual solver in `axion/optim/pcr_solver.py`
+The Preconditioned Conjugate Residual solver in `ostrich/optim/pcr_solver.py`
 runs once per Newton-Raphson iteration. NR currently calls it 5–16 times
 per simulation step, and PCR inside each call runs up to
 `max_linear_iters = 16`. That makes PCR the dominant cost (~85% of step
@@ -470,7 +470,7 @@ pairs, so there's real coupling to capture.
 
 Phases 1–4 of the per-body-pair block-Jacobi preconditioner shipped
 in commits `86bf36e`, `348edd3`, `c9e8bb9`, `0936b47`. The
-implementation in `src/axion/optim/per_body_pair_preconditioner.py`
+implementation in `src/ostrich/optim/per_body_pair_preconditioner.py`
 is correct and validated by 4 phase smoke tests against numpy
 references at float32 precision:
 
@@ -604,7 +604,7 @@ linear-solver-side preconditioner improvements pay off.
 
 ## See also
 
-* `axion/optim/pcr_solver.py` — current PCR implementation
+* `ostrich/optim/pcr_solver.py` — current PCR implementation
 * `test_scripts/measure_A_stability.py` — the A-volatility probe
   used for option 4's verdict
 * [`warm_start_iterate_seeding_issue.md`](warm_start_iterate_seeding_issue.md)

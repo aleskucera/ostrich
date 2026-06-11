@@ -8,7 +8,7 @@ The physics engine exposes a variety of parameters that allow you to configure t
 The `EngineConfig` dataclass centralizes all parameters that control the solver's behavior. Below is a breakdown of these parameters, grouped by their function.
 
 ```python
-from axion import EngineConfig
+from ostrich import EngineConfig
 
 @dataclass(frozen=True)
 class EngineConfig:
@@ -97,7 +97,7 @@ Compliance is the inverse of stiffness. These parameters introduce a controlled 
 The `SimulationConfig` dataclass holds parameters for controlling the overall simulation behavior.
 
 ```python
-from axion import SimulationConfig
+from ostrich import SimulationConfig
 
 @dataclass
 class SimulationConfig:
@@ -114,7 +114,7 @@ class SimulationConfig:
 The `RenderingConfig` dataclass holds parameters for controlling the visual output of the simulation. The rendering is done using the [USD format](https://openusd.org/release/index.html), which can be viewed in tools like [Blender](https://www.blender.org/) or [Pixar's USDView](https://www.pixar.com/openusd).
 
 ```python
-from axion import RenderingConfig
+from ostrich import RenderingConfig
 
 @dataclass
 class RenderingConfig:
@@ -149,7 +149,7 @@ step).
 Three independent HDF5 logging subsystems, each toggled by its own sub-config:
 
 ```python
-from axion import LoggingConfig, HDF5LoggingConfig, DatasetLoggingConfig, AdjointLoggingConfig
+from ostrich import LoggingConfig, HDF5LoggingConfig, DatasetLoggingConfig, AdjointLoggingConfig
 
 @dataclass
 class LoggingConfig:
@@ -171,11 +171,11 @@ there is no separate ``max_steps`` knob.
 ---
 
 ## `ProfilingConfig`: CUDA-event profiling
-Lives on ``AxionEngineConfig.profiling`` (not on ``LoggingConfig``).
-Drives the CUDA-event profiler in ``axion.profiling.EngineProfiler``.
+Lives on ``OstrichEngineConfig.profiling`` (not on ``LoggingConfig``).
+Drives the CUDA-event profiler in ``ostrich.profiling.EngineProfiler``.
 
 ```python
-from axion import ProfilingConfig
+from ostrich import ProfilingConfig
 
 @dataclass
 class ProfilingConfig:

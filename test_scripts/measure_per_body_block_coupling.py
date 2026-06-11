@@ -35,13 +35,13 @@ CONFIG_PATH = "../examples/conf"
     version_base=None,
 )
 def main(cfg: DictConfig):
-    from axion import (
+    from ostrich import (
         EngineConfig,
         LoggingConfig,
         RenderingConfig,
         SimulationConfig,
     )
-    from axion.optim.preconditioner import JacobiPreconditioner
+    from ostrich.optim.preconditioner import JacobiPreconditioner
 
     sys.path.insert(
         0, os.path.join(os.path.dirname(__file__), "..", "examples", "helhest")
@@ -77,7 +77,7 @@ def main(cfg: DictConfig):
         body_idx = self.engine.data._constr_body_idx.numpy()[0]  # (N_c, 2)
         active = self.engine.data._constr_active_mask.numpy()[0]  # (N_c,)
         C_vals = self.engine.data._C_values.numpy()[0]  # (N_c,)
-        body_inv_mass = self.engine.axion_model.body_inv_mass.numpy()[0]  # (N_b,)
+        body_inv_mass = self.engine.ostrich_model.body_inv_mass.numpy()[0]  # (N_b,)
         body_inv_inertia = self.engine.data.world_inv_inertia.numpy()[0]  # (N_b, 3, 3)
 
         N_c = J_values.shape[0]

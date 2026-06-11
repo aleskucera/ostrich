@@ -1,11 +1,11 @@
 """Newton Semi-Implicit parameter sweep for the box sim-to-real benchmark.
 
-Same junior model + box scene as the Axion sweep, but built on top of
+Same junior model + box scene as the Ostrich sweep, but built on top of
 ``SemiImplicitEngineConfig``. Semi-implicit Euler is explicit on the contact
 forces, so it needs:
   - small dt (~1e-3 or finer for stability),
   - explicit spring-damper contact stiffness (ke/kd) — *not* ignored like in
-    Axion. wheel_ke/wheel_kd/wheel_kf are exposed for this reason.
+    Ostrich. wheel_ke/wheel_kd/wheel_kf are exposed for this reason.
   - kf (friction stiffness) — separate tunable.
 
 Drive signal and scoring are identical to the other engines (yaw-aware
@@ -27,7 +27,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
 
 import numpy as np
 import warp as wp
-from axion import LoggingConfig, RenderingConfig, SemiImplicitEngineConfig, SimulationConfig
+from ostrich import LoggingConfig, RenderingConfig, SemiImplicitEngineConfig, SimulationConfig
 
 from common_box import DATA_DIR, RESULTS_DIR, load_gt, resample_setpoints, score
 from examples.helhest_junior.replay_real import HelhestJuniorReplaySimulator
@@ -38,7 +38,7 @@ DURATION = 12.0
 def run_config(dt, mu, ke, kd, kf, k_d_act, joint_ke, joint_kd, gts, use_graph):
     """Build one sim at these params, replay every GT run, return per-run scores.
     `k_d_act` is the wheel actuator velocity-feedback gain — SemiImplicit needs
-    this nonzero to apply torque in TARGET_VELOCITY mode (Axion doesn't).
+    this nonzero to apply torque in TARGET_VELOCITY mode (Ostrich doesn't).
     `joint_ke/joint_kd` are SemiImplicit's joint-constraint stiffness/damping
     (engine-level); the library defaults (1e4/1e2) are too soft for our heavy
     chassis hitting the box, but pushing them too high destabilises the
@@ -88,7 +88,7 @@ def main():
     #    chassis attachment; the heavy chassis was effectively decoupling on
     #    impact. Raising further (1e7) NaNs.
     #  - k_d_act = wheel actuator velocity gain; SemiImplicit needs >0 to apply
-    #    torque in TARGET_VELOCITY mode (Axion drives fine with kd=0).
+    #    torque in TARGET_VELOCITY mode (Ostrich drives fine with kd=0).
     #  - dt=5e-4 is at the stability edge; smaller dt is also stable, larger
     #    blows up. Tuning is fragile — many neighbouring configs NaN.
     ap.add_argument("--dt", type=float, nargs="+", default=[5e-4])

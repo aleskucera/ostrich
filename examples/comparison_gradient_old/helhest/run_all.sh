@@ -3,7 +3,7 @@ set -e
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 mkdir -p "$DIR/results"
 
-python "$DIR/axion_sim.py"       --save "$DIR/results/axion.json"
+python "$DIR/ostrich_sim.py"       --save "$DIR/results/ostrich.json"
 python "$DIR/genesis_sim.py"     --save "$DIR/results/genesis.json"
 python "$DIR/mjfd.py"        --save "$DIR/results/mjfd.json"
 python "$DIR/mjx.py"         --save "$DIR/results/mjx.json"

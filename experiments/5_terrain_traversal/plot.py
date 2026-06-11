@@ -20,7 +20,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 RESULTS_DIR = pathlib.Path(__file__).parent / "results"
-PAPER_DIR = pathlib.Path(__file__).resolve().parents[2] / ".." / "axion_paper" / "figures"
+PAPER_DIR = pathlib.Path(__file__).resolve().parents[2] / ".." / "ostrich_paper" / "figures"
 
 plt.rcParams.update({
     "text.usetex": True,
@@ -35,8 +35,8 @@ plt.rcParams.update({
     "axes.spines.right": False,
 })
 
-AXION_COLOR = "#2196F3"
-AXION_LIGHT = "#90CAF9"
+OSTRICH_COLOR = "#2196F3"
+OSTRICH_LIGHT = "#90CAF9"
 TARGET_COLOR = "#E91E63"
 
 
@@ -120,7 +120,7 @@ def plot_single(data, show=False, out_name="terrain_traversal.png"):
     t_final = trajs[str(last_iter)]
     last_rmse = rmse[last_iter] if last_iter < len(rmse) else 0
     ax_traj.plot(t_final["x"], t_final["y"],
-                 color=AXION_COLOR, linewidth=2.5,
+                 color=OSTRICH_COLOR, linewidth=2.5,
                  label=f"iter {last_iter} ({last_rmse:.2f}\\,m)")
 
     # Target
@@ -130,7 +130,7 @@ def plot_single(data, show=False, out_name="terrain_traversal.png"):
     ax_traj.plot(target["x"][0], target["y"][0],
                  "o", color=TARGET_COLOR, markersize=6, zorder=5)
     ax_traj.plot(t_final["x"][0], t_final["y"][0],
-                 "o", color=AXION_COLOR, markersize=6, zorder=5)
+                 "o", color=OSTRICH_COLOR, markersize=6, zorder=5)
 
     seed_label = data.get("seed", "?")
     ax_traj.set_title(f"seed {seed_label}", fontsize=16)
@@ -147,10 +147,10 @@ def plot_single(data, show=False, out_name="terrain_traversal.png"):
     best_rmse = float(np.min(rmse))
     best_iter_idx = int(np.argmin(rmse))
 
-    ax_rmse.plot(iters, rmse, color=AXION_LIGHT, linewidth=1.0, alpha=0.7)
-    ax_rmse.plot(iters, smooth(rmse), color=AXION_COLOR, linewidth=2.0)
+    ax_rmse.plot(iters, rmse, color=OSTRICH_LIGHT, linewidth=1.0, alpha=0.7)
+    ax_rmse.plot(iters, smooth(rmse), color=OSTRICH_COLOR, linewidth=2.0)
     ax_rmse.axhline(best_rmse, color="gray", linestyle="--", linewidth=0.8, alpha=0.5)
-    ax_rmse.plot(best_iter_idx, best_rmse, "v", color=AXION_COLOR, markersize=8, zorder=5)
+    ax_rmse.plot(best_iter_idx, best_rmse, "v", color=OSTRICH_COLOR, markersize=8, zorder=5)
 
     # Mark best_iters on the RMSE curve
     if best_iters:
@@ -165,7 +165,7 @@ def plot_single(data, show=False, out_name="terrain_traversal.png"):
     ax_rmse.text(0.97, 0.95, f"best = {best_rmse:.2f}\\,m (iter {best_iter_idx})",
                  transform=ax_rmse.transAxes, ha="right", va="top", fontsize=14, color="gray")
     ax_rmse.text(0.97, 0.87, f"median iter time = {median_time:.0f}\\,ms",
-                 transform=ax_rmse.transAxes, ha="right", va="top", fontsize=14, color=AXION_COLOR)
+                 transform=ax_rmse.transAxes, ha="right", va="top", fontsize=14, color=OSTRICH_COLOR)
 
     plt.tight_layout(pad=0.4)
 
@@ -218,9 +218,9 @@ def plot_batch_dir(batch_dir, show=False):
     p_min = np.min(all_rmse, axis=0)
     p_max = np.max(all_rmse, axis=0)
 
-    ax_conv.fill_between(iters, p_min, p_max, color=AXION_LIGHT, alpha=0.3, label="min--max")
-    ax_conv.fill_between(iters, p25, p75, color=AXION_LIGHT, alpha=0.5, label="IQR")
-    ax_conv.plot(iters, median_rmse, color=AXION_COLOR, linewidth=2.0, label="median")
+    ax_conv.fill_between(iters, p_min, p_max, color=OSTRICH_LIGHT, alpha=0.3, label="min--max")
+    ax_conv.fill_between(iters, p25, p75, color=OSTRICH_LIGHT, alpha=0.5, label="IQR")
+    ax_conv.plot(iters, median_rmse, color=OSTRICH_COLOR, linewidth=2.0, label="median")
     ax_conv.set_xlabel("Iteration")
     ax_conv.set_ylabel("RMSE (m)")
     ax_conv.grid(True, which="major", alpha=0.25, linewidth=0.5)
@@ -228,7 +228,7 @@ def plot_batch_dir(batch_dir, show=False):
     ax_conv.set_title(f"{num_seeds} random terrains", fontsize=16)
 
     # ===== Right: Best RMSE histogram =====
-    ax_hist.hist(all_best, bins=max(num_seeds // 3, 10), color=AXION_COLOR, alpha=0.8,
+    ax_hist.hist(all_best, bins=max(num_seeds // 3, 10), color=OSTRICH_COLOR, alpha=0.8,
                  edgecolor="white", linewidth=0.5)
     ax_hist.axvline(np.median(all_best), color=TARGET_COLOR, linewidth=2, linestyle="--",
                     label=f"median = {np.median(all_best):.2f}\\,m")

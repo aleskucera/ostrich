@@ -12,16 +12,16 @@ wp.init()
 
 import numpy as np
 import newton
-from axion.core.engine import AxionEngine
-from axion.core.engine_config import AxionEngineConfig, LinearSolverConfig, NewtonRaphsonConfig
-from axion.core.logging_config import LoggingConfig
-from axion.core.model_builder import AxionModelBuilder
-from axion.core.types import JointMode
+from ostrich.core.engine import OstrichEngine
+from ostrich.core.engine_config import OstrichEngineConfig, LinearSolverConfig, NewtonRaphsonConfig
+from ostrich.core.logging_config import LoggingConfig
+from ostrich.core.model_builder import OstrichModelBuilder
+from ostrich.core.types import JointMode
 
 
 def make_pendulum(ke, kd):
     no_collision = newton.ModelBuilder.ShapeConfig(has_shape_collision=False)
-    builder = AxionModelBuilder()
+    builder = OstrichModelBuilder()
     link = builder.add_link()
     builder.add_shape_box(link, hx=0.05, hy=0.05, hz=0.5, cfg=no_collision)
     j = builder.add_joint_revolute(
@@ -36,11 +36,11 @@ def make_pendulum(ke, kd):
 
 
 def run_forward(model, num_steps, dt, init_angle=0.5):
-    config = AxionEngineConfig(
+    config = OstrichEngineConfig(
         nr=NewtonRaphsonConfig(max_iters=20),
         linear=LinearSolverConfig(max_iters=200, tol=1e-8, atol=1e-8),
     )
-    engine = AxionEngine(
+    engine = OstrichEngine(
         model=model, sim_steps=num_steps, config=config,
         logging_config=LoggingConfig(), differentiable_simulation=True,
     )
@@ -112,7 +112,7 @@ def test_stiffness_gradient_multi_step():
     """Multi-step ke/kd gradient with trajectory buffer."""
     print("\n=== Test: Stiffness gradient (2 steps, TARGET_POSITION) ===")
 
-    from axion.simulation.trajectory_buffer import TrajectoryBuffer
+    from ostrich.simulation.trajectory_buffer import TrajectoryBuffer
 
     ke_val, kd_val = 500.0, 50.0
     dt = 0.01
@@ -125,7 +125,7 @@ def test_stiffness_gradient_multi_step():
 
     # Save trajectory
     buffer = TrajectoryBuffer(
-        data=engine.data, contacts=engine.axion_contacts,
+        data=engine.data, contacts=engine.ostrich_contacts,
         dims=dims, num_steps=num_steps, device=model.device,
     )
     # Need to re-run forward with buffer saving
@@ -140,7 +140,7 @@ def test_stiffness_gradient_multi_step():
     for i in range(num_steps):
         c = model.collide(states2[i])
         engine.step(states2[i], states2[i + 1], control, c, dt)
-        buffer.save_step(i, engine.data, engine.axion_contacts)
+        buffer.save_step(i, engine.data, engine.ostrich_contacts)
 
     # Backward: terminal velocity loss
     buffer.zero_grad()
@@ -152,7 +152,7 @@ def test_stiffness_gradient_multi_step():
             wp.array(vel_grad, dtype=wp.spatial_vector, device=model.device))
 
     for i in range(num_steps - 1, -1, -1):
-        buffer.load_step(i, engine.data, engine.axion_contacts)
+        buffer.load_step(i, engine.data, engine.ostrich_contacts)
         engine.data.zero_gradients()
         engine.step_backward()
         buffer.save_gradients(i, engine.data)
@@ -197,7 +197,7 @@ def test_wheeled_robot_ke_gradient():
     dt = 0.01
 
     def build_robot(ke):
-        builder = AxionModelBuilder()
+        builder = OstrichModelBuilder()
         builder.rigid_gap = 0.05
         builder.add_ground_plane()
         create_taros4_model(
@@ -207,13 +207,13 @@ def test_wheeled_robot_ke_gradient():
         )
         return builder.finalize_replicated(num_worlds=1, gravity=-9.81)
 
-    config = AxionEngineConfig(
+    config = OstrichEngineConfig(
         nr=NewtonRaphsonConfig(max_iters=20),
         linear=LinearSolverConfig(max_iters=200, tol=1e-8, atol=1e-8),
     )
 
     model = build_robot(ke_val)
-    engine = AxionEngine(
+    engine = OstrichEngine(
         model=model, sim_steps=1, config=config,
         logging_config=LoggingConfig(), differentiable_simulation=True,
     )
@@ -240,19 +240,19 @@ def test_wheeled_robot_ke_gradient():
 
     # Backward
     engine.data.zero_gradients()
-    engine.axion_model.joint_target_ke.grad.zero_()
+    engine.ostrich_model.joint_target_ke.grad.zero_()
     wp.copy(engine.data.body_vel_grad,
             wp.array(w.reshape(engine.data.body_vel_grad.numpy().shape),
                      dtype=wp.spatial_vector, device=model.device))
     engine.step_backward()
 
-    ke_a = float(engine.axion_model.joint_target_ke.grad.numpy().sum())
+    ke_a = float(engine.ostrich_model.joint_target_ke.grad.numpy().sum())
 
     # FD: rebuild model with different ke
     eps = 10.0
     def get_loss(ke):
         m = build_robot(ke)
-        e = AxionEngine(model=m, sim_steps=1, config=config,
+        e = OstrichEngine(model=m, sim_steps=1, config=config,
                         logging_config=LoggingConfig(), differentiable_simulation=True)
         s_in = m.state()
         newton.eval_fk(m, m.joint_q, m.joint_qd, s_in)
@@ -277,7 +277,7 @@ def test_wheeled_robot_ke_gradient_multi_step():
     """Multi-step ke gradient for wheeled robot."""
     import sys
     from pathlib import Path
-    from axion.simulation.trajectory_buffer import TrajectoryBuffer
+    from ostrich.simulation.trajectory_buffer import TrajectoryBuffer
     sys.path.insert(0, str(Path(__file__).parent.parent.parent / "examples"))
     from taros_4.common import create_taros4_model
 
@@ -288,7 +288,7 @@ def test_wheeled_robot_ke_gradient_multi_step():
     num_steps = 5
 
     def build_robot(ke):
-        builder = AxionModelBuilder()
+        builder = OstrichModelBuilder()
         builder.rigid_gap = 0.05
         builder.add_ground_plane()
         create_taros4_model(
@@ -298,13 +298,13 @@ def test_wheeled_robot_ke_gradient_multi_step():
         )
         return builder.finalize_replicated(num_worlds=1, gravity=-9.81)
 
-    config = AxionEngineConfig(
+    config = OstrichEngineConfig(
         nr=NewtonRaphsonConfig(max_iters=20),
         linear=LinearSolverConfig(max_iters=200, tol=1e-8, atol=1e-8),
     )
 
     model = build_robot(ke_val)
-    engine = AxionEngine(
+    engine = OstrichEngine(
         model=model, sim_steps=num_steps, config=config,
         logging_config=LoggingConfig(), differentiable_simulation=True,
     )
@@ -324,7 +324,7 @@ def test_wheeled_robot_ke_gradient_multi_step():
             wp.array(target_vel.reshape(1, -1), dtype=wp.float32, device=model.device))
 
     buffer = TrajectoryBuffer(
-        data=engine.data, contacts=engine.axion_contacts,
+        data=engine.data, contacts=engine.ostrich_contacts,
         dims=dims, num_steps=num_steps, device=model.device,
     )
     states = [model.state() for _ in range(num_steps + 1)]
@@ -333,29 +333,29 @@ def test_wheeled_robot_ke_gradient_multi_step():
     for i in range(num_steps):
         c = model.collide(states[i])
         engine.step(states[i], states[i + 1], control, c, dt)
-        buffer.save_step(i, engine.data, engine.axion_contacts)
+        buffer.save_step(i, engine.data, engine.ostrich_contacts)
 
     # Backward
     buffer.zero_grad()
-    engine.axion_model.joint_target_ke.grad.zero_()
+    engine.ostrich_model.joint_target_ke.grad.zero_()
     wp.copy(buffer.body_vel.grad[num_steps],
             wp.array(w.reshape(engine.data.body_vel_grad.numpy().shape),
                      dtype=wp.spatial_vector, device=model.device))
 
     for i in range(num_steps - 1, -1, -1):
-        buffer.load_step(i, engine.data, engine.axion_contacts)
+        buffer.load_step(i, engine.data, engine.ostrich_contacts)
         engine.data.zero_gradients()
         engine.step_backward()
         buffer.save_gradients(i, engine.data)
         buffer.save_pose_gradients(i, engine.data)
 
-    ke_a = float(engine.axion_model.joint_target_ke.grad.numpy().sum())
+    ke_a = float(engine.ostrich_model.joint_target_ke.grad.numpy().sum())
 
     # FD
     eps = 10.0
     def get_loss(ke):
         m = build_robot(ke)
-        e = AxionEngine(model=m, sim_steps=num_steps, config=config,
+        e = OstrichEngine(model=m, sim_steps=num_steps, config=config,
                         logging_config=LoggingConfig(), differentiable_simulation=True)
         s_in = m.state()
         newton.eval_fk(m, m.joint_q, m.joint_qd, s_in)

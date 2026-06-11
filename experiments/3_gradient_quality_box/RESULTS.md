@@ -16,20 +16,20 @@ Headline figure: [`results/gradient_quality_box.png`](results/gradient_quality_b
 
 | engine | converged loss (m²) | best across trials | wall to converge | gradient mechanism |
 |---|---|---|---|---|
-| **Axion**         | **0.074** ± 5% | 0.072 | **~10 s** | implicit-step adjoint |
+| **Ostrich**         | **0.074** ± 5% | 0.072 | **~10 s** | implicit-step adjoint |
 | MJX              | ~0.30 (median) | 0.273 | ~900 s (slow descent) | JAX BPTT through `mjx.step` |
 | **Semi-Implicit** | ~1.25 (median, seed-dependent) | 0.711 | does not converge | Warp tape BPTT through penalty contact |
 
 The hierarchy is robust on both axes:
 
-- **Per-iter warm cost (same 3090)**: Axion 0.515 s, MJX 17.7 s, SI 28.2 s → **Axion is 34× faster per iter than MJX, 55× than SI**.
-- **Time-to-converge**: Axion ~10 s; MJX still descending after 15 min; SI never converges.
-- **Final loss**: **~3.8× lower** Axion vs MJX, **~17× lower** Axion vs SI.
-- **Cross-seed reliability**: Axion ±5% across seeds; MJX few-tens-of-percent; SI factor-of-2 spread (one seed converges, two don't).
+- **Per-iter warm cost (same 3090)**: Ostrich 0.515 s, MJX 17.7 s, SI 28.2 s → **Ostrich is 34× faster per iter than MJX, 55× than SI**.
+- **Time-to-converge**: Ostrich ~10 s; MJX still descending after 15 min; SI never converges.
+- **Final loss**: **~3.8× lower** Ostrich vs MJX, **~17× lower** Ostrich vs SI.
+- **Cross-seed reliability**: Ostrich ±5% across seeds; MJX few-tens-of-percent; SI factor-of-2 spread (one seed converges, two don't).
 
 ## Per-engine result detail
 
-### Axion (implicit adjoint)
+### Ostrich (implicit adjoint)
 
 | seed | best | final | wall (s) |
 |---|---|---|---|
@@ -37,7 +37,7 @@ The hierarchy is robust on both axes:
 | 43 | 0.0716 | 0.0717 | 25.8 |
 | 44 | 0.0783 | 0.0783 | 26.1 |
 
-¹ Trial 1 includes ~66 s one-time axion-module compile; subsequent trials
+¹ Trial 1 includes ~66 s one-time ostrich-module compile; subsequent trials
 reuse the Warp kernel cache.
 
 Best = final on every trial (gap ≤ 0.0001). Convergence is monotonic and the
@@ -51,7 +51,7 @@ trials once the first-trial module compile is warm).
 
 Side observation worth noting: an earlier identical run on a laptop RTX
 A500 (4 GB) produced **0.52 s/iter warm** — basically the same as the 3090.
-Axion's per-iter cost on this scene is dominated by Warp kernel-launch
+Ostrich's per-iter cost on this scene is dominated by Warp kernel-launch
 overhead, not raw GPU compute, so it scales with available GPUs about as
 well as it scales sideways.
 
@@ -112,7 +112,7 @@ captures exactly this variance.
    iter ~35 because optimizer-driven wheel velocities pushed the penalty
    contact past stability. Adding `--clip-grad-norm 1.0` (default after
    2026-05-23) keeps Adam state finite.
-2. **lr=0.02** for SI (vs 0.05 for MJX, 0.1 for Axion) — even with clipping,
+2. **lr=0.02** for SI (vs 0.05 for MJX, 0.1 for Ostrich) — even with clipping,
    lr=0.05 produced loss-increasing iterations in the first 5 iters at
    horizon=6 s.
 3. **Clip rate is the diagnostic.** Trial 1 had 41/50 clipped iters and
@@ -124,7 +124,7 @@ captures exactly this variance.
 
 The three engines stack in the order their gradient mechanism would predict:
 
-1. **Implicit-step adjoint (Axion)** is mathematically smoothed by construction
+1. **Implicit-step adjoint (Ostrich)** is mathematically smoothed by construction
    — the discrete time step *is* the regularization, so contact discontinuities
    don't propagate to the adjoint at all. Gradients are small, well-conditioned,
    and Adam at lr=0.1 sails into a basin.
@@ -138,7 +138,7 @@ The three engines stack in the order their gradient mechanism would predict:
    *direction* is often actively wrong. Clipping only caps magnitude.
 
 This is consistent with the dt-stability story in `experiments/2_dt_stability_box`,
-where the same ordering shows up on the forward side: Axion's stable plateau
+where the same ordering shows up on the forward side: Ostrich's stable plateau
 extends to dt≈0.3, MJX's caps near dt≈0.01, SI's NaNs past dt=5e-4. Same
 underlying property, observed at the gradient level.
 
@@ -147,8 +147,8 @@ underlying property, observed at the gradient level.
 The three production runs that produced the figure:
 
 ```bash
-# Axion (~79 s)
-python experiments/3_gradient_quality_box/optimize_axion.py
+# Ostrich (~79 s)
+python experiments/3_gradient_quality_box/optimize_ostrich.py
 
 # MJX (~44 min, needs JAX + mujoco-mjx)
 python experiments/3_gradient_quality_box/optimize_mjx.py --lr 0.05

@@ -105,9 +105,9 @@ unstable due to Newton convergence path sensitivity.
 
 ## Affected Code
 
-- `src/axion/core/residual_utils.py:223-233` — control gradient formula (FIXED)
-- `src/axion/core/adjoint_friction.py` — friction mode freeze kernel (NEW)
-- `src/axion/core/base_engine.py:386+` — `step_backward()` integration (MODIFIED)
+- `src/ostrich/core/residual_utils.py:223-233` — control gradient formula (FIXED)
+- `src/ostrich/core/adjoint_friction.py` — friction mode freeze kernel (NEW)
+- `src/ostrich/core/base_engine.py:386+` — `step_backward()` integration (MODIFIED)
 
 ## Test Coverage
 

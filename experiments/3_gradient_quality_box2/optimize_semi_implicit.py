@@ -1,6 +1,6 @@
 """Helhest_junior box random-IC final-pose optimisation — Semi-Implicit.
 
-Newton SI counterpart of optimize_axion.py / optimize_mjx.py. Same task
+Newton SI counterpart of optimize_ostrich.py / optimize_mjx.py. Same task
 (random IC + random target + weighted 5-term loss), same calibrated
 physics (mu=0.05, ke=8e4, kd=2e3, kf=1500, k_d_act=200, joint_attach_ke=1e6,
 dt=5e-4).
@@ -23,9 +23,9 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
 import newton
 import numpy as np
 import warp as wp
-from axion import (LoggingConfig, RenderingConfig, SemiImplicitEngineConfig,
+from ostrich import (LoggingConfig, RenderingConfig, SemiImplicitEngineConfig,
                    SimulationConfig)
-from axion.simulation.differentiable_simulator import NewtonDifferentiableSimulator
+from ostrich.simulation.differentiable_simulator import NewtonDifferentiableSimulator
 
 from examples.helhest_junior.common import create_helhest_junior_model
 from examples.helhest_junior.replay_real import BOX_CENTER, BOX_HALF_EXTENTS
@@ -90,11 +90,11 @@ def chassis_track_step_kernel(
 
     L_track = w * Σ_t ‖xy(t) − ref_xy(t)‖²  (chassis = body 0). Launched once
     per timestep on that state's body_q (SI keeps per-step State objects, so
-    there is no batched body_pose array to launch over in one go like Axion).
+    there is no batched body_pose array to launch over in one go like Ostrich).
 
     Gives each spline knot a direct gradient signal at every timestep instead
     of relying on the terminal loss to compound back through thousands of BPTT
-    steps — the same shaping term used in optimize_axion.py / optimize_mjx.py.
+    steps — the same shaping term used in optimize_ostrich.py / optimize_mjx.py.
     """
     p = wp.transform_get_translation(body_q[0])
     dx = p[0] - ref_x
@@ -256,7 +256,7 @@ class HelhestJuniorBoxFinalPoseSI(NewtonDifferentiableSimulator):
         #    (not produced by a sim step), and backpropping a loss through it
         #    NaNs the semi-implicit adjoint. box1 (3_gradient_quality_box) does
         #    the same. Normalise by T so the term is a mean over steps —
-        #    dt-independent and comparable to Axion/MJX.
+        #    dt-independent and comparable to Ostrich/MJX.
         if w.get("track", 0.0) > 0.0:
             T_states = T + 1
             per_step_track = float(w["track"] / T)
@@ -423,7 +423,7 @@ INIT_TYPES = ("constant", "distance-aware")
 
 def initial_spline(K, num_dofs, seed, init_type, target_xy, horizon,
                    noise_std=0.2, const_mean=2.0, const_std=0.5):
-    """K×num_dofs initial spline guess — same helper as optimize_axion.py.
+    """K×num_dofs initial spline guess — same helper as optimize_ostrich.py.
 
     'distance-aware' starts as a decaying ramp from 2·ω_avg to 0, where
     ω_avg = |target_x| / (horizon · wheel_radius); 'constant' is the old
@@ -472,7 +472,7 @@ def run_trial(seed, K, lr, iterations, horizon, dt, ic, target, weights,
             n_nan_grad_iters += 1; total_bad_grad += n_bad
         # Snapshot best-iter params — the noisy contact gradient makes Adam
         # wander past discovered minima, so the deployable params are the
-        # best Adam visited, not iter N-1. Matches optimize_axion / _mjx.
+        # best Adam visited, not iter N-1. Matches optimize_ostrich / _mjx.
         if loss < best_loss:
             best_loss = float(loss); best_iter = it
             best_params = sim.spline_params.copy()
@@ -519,10 +519,10 @@ def main():
     ap.add_argument("--dt", type=float, default=5e-4)
     ap.add_argument("--ic-xy", type=float, default=0.1,
                     help="±range for IC xy perturbation (m). Matched to "
-                    "optimize_axion / _mjx (reduced from the original ±0.3).")
+                    "optimize_ostrich / _mjx (reduced from the original ±0.3).")
     ap.add_argument("--ic-yaw-deg", type=float, default=5.0,
                     help="±range for IC yaw perturbation (deg). Matched to "
-                    "optimize_axion / _mjx (reduced from ±15°).")
+                    "optimize_ostrich / _mjx (reduced from ±15°).")
     ap.add_argument("--target-x", type=float, default=3.0)
     ap.add_argument("--target-y", type=float, default=0.0)
     ap.add_argument("--target-xy-jitter", type=float, default=0.3)
@@ -530,14 +530,14 @@ def main():
     ap.add_argument("--w-track", type=float, default=1.0,
                     help="Per-step chassis-xy tracking weight against a linear "
                     "IC→target reference (the shaping term). Matches "
-                    "optimize_axion / _mjx. Set to 0 to disable.")
+                    "optimize_ostrich / _mjx. Set to 0 to disable.")
     ap.add_argument("--w-pos", type=float, default=1.0)
     ap.add_argument("--w-yaw", type=float, default=0.5)
     ap.add_argument("--w-vel", type=float, default=0.3)
     ap.add_argument("--w-smooth", type=float, default=1e-3)
     ap.add_argument("--w-reg", type=float, default=1e-5)
     ap.add_argument("--init-type", choices=INIT_TYPES, default="constant",
-                    help="initial spline guess; matched to optimize_axion "
+                    help="initial spline guess; matched to optimize_ostrich "
                     "(constant mean=2.0 — the canonical apples-to-apples init).")
     ap.add_argument("--init-noise-std", type=float, default=0.2)
     ap.add_argument("--clip-grad-norm", type=float, default=1.0)

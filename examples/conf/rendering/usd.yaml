@@ -1,5 +1,5 @@
 # @package rendering
-_target_: axion.RenderingConfig
+_target_: ostrich.RenderingConfig
 vis_type: "usd"
 target_fps: 30
 usd_file: "${project_name}.usd"

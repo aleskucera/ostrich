@@ -16,7 +16,7 @@ import warp as wp
 wp.init()
 
 import numpy as np
-from axion.simulation.trajectory_buffer import TrajectoryBuffer
+from ostrich.simulation.trajectory_buffer import TrajectoryBuffer
 
 sys.path.insert(0, str(Path(__file__).parent))
 from helpers import build_free_box, make_engine, scalar_loss_vel
@@ -62,7 +62,7 @@ def test_multi_step_velocity_gradient():
     # --- Analytical gradient via adjoint + trajectory buffer ---
     buffer = TrajectoryBuffer(
         data=engine.data,
-        contacts=engine.axion_contacts,
+        contacts=engine.ostrich_contacts,
         dims=engine.dims,
         num_steps=num_steps,
         device=model.device,
@@ -75,7 +75,7 @@ def test_multi_step_velocity_gradient():
     for i in range(num_steps):
         contacts = model.collide(states[i])
         engine.step(states[i], states[i + 1], control, contacts, dt)
-        buffer.save_step(i, engine.data, engine.axion_contacts)
+        buffer.save_step(i, engine.data, engine.ostrich_contacts)
 
     buffer.zero_grad()
 
@@ -86,7 +86,7 @@ def test_multi_step_velocity_gradient():
     )
 
     for i in range(num_steps - 1, -1, -1):
-        buffer.load_step(i, engine.data, engine.axion_contacts)
+        buffer.load_step(i, engine.data, engine.ostrich_contacts)
         engine.data.zero_gradients()
         engine.step_backward()
         buffer.save_gradients(i, engine.data)
