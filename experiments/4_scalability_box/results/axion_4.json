@@ -1,0 +1,19 @@
+{
+  "simulator": "Axion",
+  "num_worlds": 4,
+  "median_time_ms": 542.9564015066717,
+  "peak_gpu_mb": 204.3834867477417,
+  "peak_gpu_mb_nvml_absolute": null,
+  "peak_gpu_mb_nvml": null,
+  "time_ms": [
+    1577.6759760337882,
+    541.3613159907982,
+    540.0431220186874,
+    543.2110049878247,
+    542.7017980255187
+  ],
+  "K": 10,
+  "dt": 0.1,
+  "duration_s": 6.0,
+  "iterations": 5
+}

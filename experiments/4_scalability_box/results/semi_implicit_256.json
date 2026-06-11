@@ -1,0 +1,19 @@
+{
+  "simulator": "Semi-Implicit",
+  "num_worlds": 256,
+  "median_time_ms": 13598.856157506816,
+  "peak_gpu_mb": 7142.38371181488,
+  "peak_gpu_mb_nvml_absolute": null,
+  "peak_gpu_mb_nvml": null,
+  "time_ms": [
+    1221899.8332549818,
+    13544.893676007632,
+    13602.910300018266,
+    13566.411659005098,
+    13631.300656008534
+  ],
+  "K": 10,
+  "dt": 0.0005,
+  "duration_s": 6.0,
+  "iterations": 5
+}

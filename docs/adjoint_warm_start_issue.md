@@ -21,12 +21,22 @@ The `control_target_grad_kernel` used the wrong scaling factor:
 - **Velocity mode**: changed `w_lambda * (-1/dt)` → `w_lambda * (-1)`
 
 Derivation from the IFT (see `implicit_gradient.pdf`):
-```
-dL/d(target) = w^T ∂R/∂target
 
-R_c_position = (q - target)/h + α·λ·h   →   ∂R_c/∂target = -1/h
-R_c_velocity = (qd - target) + α·λ·h    →   ∂R_c/∂target = -1
-```
+$$
+\frac{dL}{d\,\text{target}} = w^{\top}\,\frac{\partial R}{\partial\,\text{target}}
+$$
+
+$$
+R_c^{\text{pos}} = \frac{q - \text{target}}{h} + \alpha\,\lambda\,h
+\quad\Longrightarrow\quad
+\frac{\partial R_c}{\partial\,\text{target}} = -\frac{1}{h}
+$$
+
+$$
+R_c^{\text{vel}} = (\dot q - \text{target}) + \alpha\,\lambda\,h
+\quad\Longrightarrow\quad
+\frac{\partial R_c}{\partial\,\text{target}} = -1
+$$
 
 Verified: with the pendulum raised above ground (no friction contacts), the
 corrected formula gives **2% error** vs finite differences for the control
@@ -64,12 +74,12 @@ O(1e-5). When friction residuals are large:
 
 ### Per-constraint residuals (pendulum at ground level)
 
-| Constraint type | Active | Max |h_c| | Converged? |
-|----------------|--------|---------|------------|
-| Joint (5 DOF)  | 5      | 8e-6   | Yes        |
-| Control (1)    | 1      | 3e-5   | Yes        |
-| Normal (4)     | 4      | 1e-4   | Marginal   |
-| **Friction (8)** | **8** | **3e-2** | **No**  |
+| Constraint type  | Active | Max \|h_c\| | Converged? |
+|------------------|--------|-------------|------------|
+| Joint (5 DOF)    | 5      | 8e-6        | Yes        |
+| Control (1)      | 1      | 3e-5        | Yes        |
+| Normal (4)       | 4      | 1e-4        | Marginal   |
+| **Friction (8)** | **8**  | **3e-2**    | **No**     |
 
 ### Convergence tolerance sweep
 
