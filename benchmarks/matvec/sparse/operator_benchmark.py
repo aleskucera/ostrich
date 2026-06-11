@@ -2,12 +2,12 @@ import time
 
 import numpy as np
 import warp as wp
-from axion.sparse.sparse_operator import JacobianOperator
-from axion.sparse.sparse_operator import MAX_CONTACTS_BETWEEN_BODIES_PER_WORLD
-from axion.sparse.sparse_operator import MAX_GROUND_CONTACTS_PER_BODY
-from axion.sparse.sparse_operator import NUM_BODIES
-from axion.sparse.sparse_operator import NUM_JOINT_CONSTRAINTS
-from axion.sparse.sparse_operator import NUM_WORLDS
+from ostrich.sparse.sparse_operator import JacobianOperator
+from ostrich.sparse.sparse_operator import MAX_CONTACTS_BETWEEN_BODIES_PER_WORLD
+from ostrich.sparse.sparse_operator import MAX_GROUND_CONTACTS_PER_BODY
+from ostrich.sparse.sparse_operator import NUM_BODIES
+from ostrich.sparse.sparse_operator import NUM_JOINT_CONSTRAINTS
+from ostrich.sparse.sparse_operator import NUM_WORLDS
 
 wp.init()
 

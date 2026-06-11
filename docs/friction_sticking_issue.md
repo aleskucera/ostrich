@@ -37,7 +37,7 @@ Expected: body stays at rest. Observed:
 applied force. Body accelerates with the residual 1.43 N until reaching
 a steady-state velocity.
 
-Notably: `friction_compliance = 2e-2` (the value `sweep_axion.py` uses,
+Notably: `friction_compliance = 2e-2` (the value `sweep_ostrich.py` uses,
 24,000× the engine default of `1e-6`) makes **no difference** in this
 test. Whatever sticking the user sees in their experiments isn't coming
 from this knob.
@@ -45,7 +45,7 @@ from this knob.
 ## Root cause: active-arm degeneracy of the friction NCP
 
 The friction NCP is enforced via a Fisher–Burmeister formulation in
-`compute_friction_model` (`src/axion/constraints/friction_constraint.py:32-85`):
+`compute_friction_model` (`src/ostrich/constraints/friction_constraint.py:32-85`):
 
 ```
 v_t   = J_t · u                          (tangential velocity)
@@ -174,9 +174,9 @@ already exists. Re-run the diagnostic at both dt's; if `f_t` reaches
 ## References
 
 - Reproducer: `experiments/2_dt_stability/diagnose.py --mu 0.5 --fx 2.0`
-- Code path: `src/axion/constraints/friction_constraint.py:compute_friction_model`
+- Code path: `src/ostrich/constraints/friction_constraint.py:compute_friction_model`
   (line 32) and `compute_friction_core` (line 93)
-- Existing-but-unused warm-start: `src/axion/core/base_engine.py:compute_warm_start_forces`
+- Existing-but-unused warm-start: `src/ostrich/core/base_engine.py:compute_warm_start_forces`
   (line 247)
 - Macklin et al. 2019, "Non-Smooth Newton Methods for Deformable
   Multi-Body Dynamics", §3.4 "Friction" and §8.1 "Line Search and

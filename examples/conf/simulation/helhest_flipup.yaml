@@ -1,5 +1,5 @@
 # @package simulation
-_target_: axion.SimulationConfig
+_target_: ostrich.SimulationConfig
 duration_seconds: 4.0
 target_timestep_seconds: 5e-2
 num_worlds: 1

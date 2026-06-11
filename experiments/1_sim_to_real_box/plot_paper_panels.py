@@ -10,7 +10,7 @@ one wide multi-panel PNG per figure, shared legend at the bottom, serif fonts,
 top/right spines off. Pairs with a separately-rendered scene viz PNG in LaTeX
 via the same minipage pattern as the existing Fig 2 in the paper.
 
-Outputs (then installed to axion_paper/figures/ by make_paper_figs.sh):
+Outputs (then installed to ostrich_paper/figures/ by make_paper_figs.sh):
   results/paper_panels/box_sim_to_real.png   -- 3 panels (xy, z, bar)
   results/paper_panels/box_dt_stability.png  -- 1 panel (dt sweep)
 """
@@ -32,9 +32,9 @@ sys.path.insert(0, str(EXP1))
 
 from common_box import DATA_DIR, load_gt  # noqa: E402
 
-SIM_COLORS = {"Axion": "#2196F3", "MuJoCo": "#E91E63", "Semi-Implicit": "#FF9800",
+SIM_COLORS = {"Ostrich": "#2196F3", "MuJoCo": "#E91E63", "Semi-Implicit": "#FF9800",
               "Brax": "#4CAF50"}
-SIM_ORDER = ["Axion", "MuJoCo", "Semi-Implicit"]  # benchmarked engines
+SIM_ORDER = ["Ostrich", "MuJoCo", "Semi-Implicit"]  # benchmarked engines
 # Brax is NOT shown here: it forward-tracks the box fine (spring, ~0.074 m), so it
 # is excluded on GRADIENT grounds (footnote), not forward accuracy.
 THRESHOLD = 0.5
@@ -69,7 +69,7 @@ def load_dt_data():
 
 
 def _display(name):
-    if name == "Axion":
+    if name == "Ostrich":
         return r"\textbf{Ostrich}"
     return {"Semi-Implicit": "Semi-Impl."}.get(name, name)
 
@@ -136,7 +136,7 @@ def panel_z(ax, sweeps, gt):
 
 
 def panel_bar(ax, sweeps):
-    BAR_ORDER = ["Axion", "MuJoCo", "Semi-Implicit"]
+    BAR_ORDER = ["Ostrich", "MuJoCo", "Semi-Implicit"]
     sims = [s for s in BAR_ORDER if s in sweeps]
     errs = [sweeps[s]["best_error"] for s in sims]
     dts = [sweeps[s]["best_params"]["dt"] for s in sims]
@@ -228,13 +228,13 @@ def make_fig2(dt_data):
             rf"usable threshold ({THRESHOLD:.1f}\,m)",
             fontsize=10, color="dimgray", ha="center", va="bottom")
 
-    if "Axion" in usable_max and "MuJoCo" in usable_max:
-        ratio = usable_max["Axion"] / usable_max["MuJoCo"]
+    if "Ostrich" in usable_max and "MuJoCo" in usable_max:
+        ratio = usable_max["Ostrich"] / usable_max["MuJoCo"]
         y_arrow = 0.030
-        ax.annotate("", xy=(usable_max["Axion"] * 1.03, y_arrow),
+        ax.annotate("", xy=(usable_max["Ostrich"] * 1.03, y_arrow),
                     xytext=(usable_max["MuJoCo"] * 0.97, y_arrow),
                     arrowprops=dict(arrowstyle="<->", color="black", lw=1.6))
-        x_mid = np.sqrt(usable_max["Axion"] * usable_max["MuJoCo"])
+        x_mid = np.sqrt(usable_max["Ostrich"] * usable_max["MuJoCo"])
         ax.text(x_mid, y_arrow * 0.55,
                 rf"$\mathbf{{\sim {int(round(ratio))}\times}}$ "
                 rf"\textbf{{larger usable}} $\boldsymbol{{\Delta t}}$",

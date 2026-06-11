@@ -22,12 +22,12 @@ from typing import override
 import newton
 import numpy as np
 import warp as wp
-from axion import ExecutionConfig
-from axion import InteractiveSimulator
-from axion import LoggingConfig
-from axion import RenderingConfig
-from axion import SemiImplicitEngineConfig
-from axion import SimulationConfig
+from ostrich import ExecutionConfig
+from ostrich import InteractiveSimulator
+from ostrich import LoggingConfig
+from ostrich import RenderingConfig
+from ostrich import SemiImplicitEngineConfig
+from ostrich import SimulationConfig
 
 from examples.helhest.common import create_helhest_model
 

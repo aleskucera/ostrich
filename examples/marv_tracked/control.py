@@ -9,11 +9,11 @@ import hydra
 import newton
 import numpy as np
 import warp as wp
-from axion import EngineConfig
-from axion import InteractiveSimulator
-from axion import LoggingConfig
-from axion import RenderingConfig
-from axion import SimulationConfig
+from ostrich import EngineConfig
+from ostrich import InteractiveSimulator
+from ostrich import LoggingConfig
+from ostrich import RenderingConfig
+from ostrich import SimulationConfig
 from omegaconf import DictConfig
 
 try:
@@ -171,7 +171,7 @@ class MarvTrackedSimulator(InteractiveSimulator):
         # But wait, 'joint_idx' is an integer ID returned by add_joint.
         # We need to map this to the index in the joint_target array?
         # If we use a single articulation, the joint indices are sequential in the articulation.
-        # Axion's model.joint_target corresponds to the articulation DOFs.
+        # Ostrich's model.joint_target corresponds to the articulation DOFs.
         # The base is 0-5.
         # Then we added legs.
         # We should find the index of the flipper joint in the articulation.

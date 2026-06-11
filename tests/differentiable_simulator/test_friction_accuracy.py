@@ -14,10 +14,10 @@ wp.init()
 
 import numpy as np
 import newton
-from axion.core.engine import AxionEngine
-from axion.core.engine_config import AxionEngineConfig, LinearSolverConfig, NewtonRaphsonConfig
-from axion.core.logging_config import LoggingConfig
-from axion.core.model_builder import AxionModelBuilder
+from ostrich.core.engine import OstrichEngine
+from ostrich.core.engine_config import OstrichEngineConfig, LinearSolverConfig, NewtonRaphsonConfig
+from ostrich.core.logging_config import LoggingConfig
+from ostrich.core.model_builder import OstrichModelBuilder
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "examples"))
 from differentiable.uphill_drive import create_4wheel_robot, WHEEL_RADIUS
@@ -30,7 +30,7 @@ def run_robot_on_slope(
     """4-wheel robot on tilted flat surface. Settle, then optionally drive."""
     slope_rad = np.radians(slope_deg)
 
-    builder = AxionModelBuilder()
+    builder = OstrichModelBuilder()
     builder.rigid_gap = 0.05
 
     ground_rot = wp.quat_from_axis_angle(wp.vec3(0.0, 1.0, 0.0), float(-slope_rad))
@@ -51,11 +51,11 @@ def run_robot_on_slope(
     drive_steps = max(1, int(drive_time / dt))
     total_steps = settle_steps + drive_steps
 
-    config = AxionEngineConfig(
+    config = OstrichEngineConfig(
         nr=NewtonRaphsonConfig(max_iters=newton_iters),
         linear=LinearSolverConfig(max_iters=linear_iters),
     )
-    engine = AxionEngine(model=model, sim_steps=total_steps, config=config, logging_config=LoggingConfig())
+    engine = OstrichEngine(model=model, sim_steps=total_steps, config=config, logging_config=LoggingConfig())
 
     state_in = model.state()
     newton.eval_fk(model, model.joint_q, model.joint_qd, state_in)

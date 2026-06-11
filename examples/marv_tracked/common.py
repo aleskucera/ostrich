@@ -7,7 +7,7 @@ from typing import Tuple
 import newton
 import numpy as np
 import warp as wp
-from axion import JointMode
+from ostrich import JointMode
 
 ASSETS_DIR = pathlib.Path(__file__).parent.parent.joinpath("assets")
 

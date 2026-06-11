@@ -6,7 +6,7 @@ box` scene as `experiments/1_sim_to_real_box` with the real recorded wheel
 setpoints, sweeps `dt` for each engine at its yaw-tuned best params, and
 overlays the resulting accuracy-vs-dt curves.
 
-The headline result: **Axion stays usable at ~20× larger `dt` than MuJoCo for
+The headline result: **Ostrich stays usable at ~20× larger `dt` than MuJoCo for
 the same trajectory accuracy on this scene.**
 
 ## Pipeline (fully reproducible from data)
@@ -47,7 +47,7 @@ The plot then categorises each point as:
 ## Engine configs swept (from 1_sim_to_real_box)
 
 ```python
-Axion:  mu_front=0.8, mu_rear=1.5, mu_rolling=0.7, compliance.contact=1e-7
+Ostrich:  mu_front=0.8, mu_rear=1.5, mu_rolling=0.7, compliance.contact=1e-7
 MuJoCo: μ=1.2, tor=0.3, kv=1000, solref0=0.005, condim=6, integrator=implicitfast, wheel_geom=capsule
 ```
 
@@ -67,18 +67,18 @@ All MuJoCo numbers below are the current **turning config** (`tor=0.3`, capsule)
   ×10⁻³, then climbs through the 0.2 m threshold around `dt ≈ 0.02 s` and
   degrades steeply (multi-metre error by `dt = 0.05` and up; the solver stays
   finite but the trajectory is meaningless). Usable wall (0.2 m): ~`0.02 s`.
-- **Axion (blue)** — floor ~0.063 m, flat across almost two decades; stays
+- **Ostrich (blue)** — floor ~0.063 m, flat across almost two decades; stays
   under threshold to `dt ≈ 0.4 s`, first instability/NaN at `dt = 0.7 s`.
   Usable wall (0.2 m): ~`0.4 s`.
 
-Resulting usable-`dt` ratios (Axion vs MuJoCo) depend on the threshold:
+Resulting usable-`dt` ratios (Ostrich vs MuJoCo) depend on the threshold:
 
-| threshold | Axion max | MuJoCo max | Axion / MuJoCo |
+| threshold | Ostrich max | MuJoCo max | Ostrich / MuJoCo |
 |---|---|---|---|
 | 0.2 m (figure) | 0.4 s | 0.02 s | **~20×** |
 | 0.5 m | 0.5 s | 0.03 s | ~17× |
 
-Axion / Semi-Implicit is ~800× (≈ three orders of magnitude).
+Ostrich / Semi-Implicit is ~800× (≈ three orders of magnitude).
 The figure's headline annotation (computed from the data) is the **0.2 m**
 value, ~20×.
 

@@ -89,7 +89,7 @@ over-tightens and subsequent iters can't keep up.
 
 ## Why this fits our solver
 
-Three reasons specific to the Axion setup:
+Three reasons specific to the Ostrich setup:
 
 1. **PCR call already takes `tol` as a parameter** —
    `pcr_solver.py:177`. We just pass a different number per NR iter.
@@ -151,7 +151,7 @@ Roughly 50-80 LOC. Phases:
 
 ### Phase 1: scaffolding
 
-* Add config knobs to `AxionEngineConfig`:
+* Add config knobs to `OstrichEngineConfig`:
   ```
   eisenstat_walker_enabled: bool = False  # opt-in
   eisenstat_walker_gamma: float = 0.9
@@ -326,8 +326,8 @@ norm cleanliness issue first.
 
 ## See also
 
-* `axion/optim/pcr_solver.py` — current PCR with fixed-tol behavior
-* `axion/core/base_engine.py:nr_loop_step` — where PCR is called
+* `ostrich/optim/pcr_solver.py` — current PCR with fixed-tol behavior
+* `ostrich/core/base_engine.py:nr_loop_step` — where PCR is called
 * [`pcr_warm_start_options.md`](pcr_warm_start_options.md) — broader
   context, lists this approach as Option 5 of 5
 * [`convergence_criterion_options.md`](convergence_criterion_options.md)

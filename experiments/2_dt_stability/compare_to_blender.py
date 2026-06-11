@@ -2,12 +2,12 @@
 
 Each ``--input NAME=PATH`` adds one robot. They share the timeline (iteration
 N of each input plays simultaneously), are laid out along Y at fixed
-separation, and get a static identity label ("Axion" / "MuJoCo") above the
+separation, and get a static identity label ("Ostrich" / "MuJoCo") above the
 chassis plus the standard "dt = X ms" floating per-iteration label.
 
 Run inside Blender:
     blender --background --python experiments/2_dt_stability/compare_to_blender.py -- \
-        --input Axion=experiments/2_dt_stability/results/axion_dt.npz \
+        --input Ostrich=experiments/2_dt_stability/results/ostrich_dt.npz \
         --input MuJoCo=experiments/2_dt_stability/results/mujoco_dt.npz \
         --output experiments/2_dt_stability/results/compare.blend
 
@@ -49,7 +49,7 @@ def parse_args() -> argparse.Namespace:
         action="append",
         required=True,
         metavar="NAME=PATH",
-        help="Add one robot. Repeatable. Example: --input Axion=axion_dt.npz",
+        help="Add one robot. Repeatable. Example: --input Ostrich=ostrich_dt.npz",
     )
     p.add_argument("--output", type=Path, default=None, help="Save to this .blend after import")
     p.add_argument(

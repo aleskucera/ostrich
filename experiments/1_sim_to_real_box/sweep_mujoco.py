@@ -1,7 +1,7 @@
 """MuJoCo parameter sweep for the box sim-to-real benchmark.
 
 Junior helhest geometry (matches examples/helhest_junior/common.py:HelhestJuniorConfig)
-authored inline as MJCF, with the same static box obstacle as the Axion replay.
+authored inline as MJCF, with the same static box obstacle as the Ostrich replay.
 Drives the wheels with the GT command timeseries (sim-order, sign-flipped so
 forward = positive) and scores the prism-tracked trajectory vs the real one.
 
@@ -31,7 +31,7 @@ DURATION = 12.0
 #
 # Frame: chassis body origin sits at wheel-axle height (z = wheel radius at
 # rest). Wheels at local (0, ±0.365, 0) for front, (-0.75, 0, 0) for rear, all
-# with hinge axis (0,1,0) — positive velocity → forward (same as Axion junior).
+# with hinge axis (0,1,0) — positive velocity → forward (same as Ostrich junior).
 # Two chassis boxes are rigid geoms on the chassis body; their combined inertia
 # about the chassis CoM is rolled into one <inertial>.
 JUNIOR_BOX_XML = """<?xml version="1.0"?>

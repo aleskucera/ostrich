@@ -1,7 +1,7 @@
 """Helhest_junior box trajectory optimization using Newton Semi-Implicit
 + Warp tape BPTT.
 
-SemiImplicit counterpart of optimize_axion.py / optimize_mjx.py. Optimises
+SemiImplicit counterpart of optimize_ostrich.py / optimize_mjx.py. Optimises
 a K-knot wheel-velocity spline so the helhest_junior matches a recorded
 real trajectory while crossing the box, with gradients via backpropagation
 through Warp's computation tape over Newton's SemiImplicit solver.
@@ -11,7 +11,7 @@ Calibrated SI physics + joint stiffness from experiments/1_sim_to_real_box
 dt=5e-4 — at SI's stability edge on this scene, larger dt NaNs).
 
 Outputs results/semi_implicit.json with the same per-trial loss-curve
-schema as optimize_axion.py, so plot_results.py overlays both engines.
+schema as optimize_ostrich.py, so plot_results.py overlays both engines.
 
 Usage:
     python experiments/3_gradient_quality_box/optimize_semi_implicit.py
@@ -28,9 +28,9 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
 import newton
 import numpy as np
 import warp as wp
-from axion import (LoggingConfig, RenderingConfig, SemiImplicitEngineConfig,
+from ostrich import (LoggingConfig, RenderingConfig, SemiImplicitEngineConfig,
                    SimulationConfig)
-from axion.simulation.differentiable_simulator import NewtonDifferentiableSimulator
+from ostrich.simulation.differentiable_simulator import NewtonDifferentiableSimulator
 
 from examples.helhest_junior.common import create_helhest_junior_model
 from examples.helhest_junior.replay_real import BOX_CENTER, BOX_HALF_EXTENTS
@@ -275,7 +275,7 @@ def main():
     ap.add_argument("--K", type=int, default=10)
     ap.add_argument("--iterations", type=int, default=50)
     ap.add_argument("--lr", type=float, default=0.05,
-                    help="lower than Axion's 0.1 — SI gradients can be noisy")
+                    help="lower than Ostrich's 0.1 — SI gradients can be noisy")
     ap.add_argument("--num-trials", type=int, default=3)
     ap.add_argument("--seed-base", type=int, default=42)
     # 6 s would be 12k SI steps and a heavy Warp tape; default 4 s.

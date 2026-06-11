@@ -1,6 +1,6 @@
 """Run Genesis over a fixed list of dt values and dump trajectories for Blender.
 
-Mirrors sweep_mujoco_blender.py / sweep_axion_blender.py / sweep_semi_implicit_blender.py
+Mirrors sweep_mujoco_blender.py / sweep_ostrich_blender.py / sweep_semi_implicit_blender.py
 — same DT_LIST so the four sweeps line up frame-by-frame in compare_to_blender.py.
 
 Genesis loads the same Helhest+obstacle MJCF used by the MuJoCo sweep. Wheel

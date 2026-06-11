@@ -1,6 +1,6 @@
 """Compare recovered wheel-velocity splines against real joint setpoints.
 
-Loads results/axion.json (which now includes per-trial init_params and
+Loads results/ostrich.json (which now includes per-trial init_params and
 final_params after the rerun) and overlays the recovered spline against
 the recorded joint setpoints from the GT JSON.
 
@@ -19,7 +19,7 @@ HERE = pathlib.Path(__file__).resolve().parent
 GT_PATH = HERE.parent / "1_sim_to_real_box" / "data" / "run_2026_05_20-18_10_33.json"
 RES = HERE / "results"
 WHEEL_NAMES = ["left", "right", "rear"]
-COLOR = "#2196F3"  # Axion blue
+COLOR = "#2196F3"  # Ostrich blue
 
 plt.rcParams.update({
     "font.size": 11,
@@ -45,12 +45,12 @@ def make_interp_matrix(T, K):
 
 
 def main():
-    axion = json.load(open(RES / "axion.json"))
+    ostrich = json.load(open(RES / "ostrich.json"))
     gt = json.load(open(GT_PATH))
 
-    K = axion["K"]
-    dt = axion["dt"]
-    horizon_s = axion["horizon_s"]
+    K = ostrich["K"]
+    dt = ostrich["dt"]
+    horizon_s = ostrich["horizon_s"]
     T = int(round(horizon_s / dt))
     W = make_interp_matrix(T, K)
     t_sim = np.arange(T) * dt
@@ -72,7 +72,7 @@ def main():
     for w, (ax, name) in enumerate(zip(axes, WHEEL_NAMES)):
         ax.plot(real_t, real_lrr[:, w], "k--", lw=1.6, label="Real",
                 zorder=10)
-        for ti, trial in enumerate(axion["trials"]):
+        for ti, trial in enumerate(ostrich["trials"]):
             init_lrr = lrr_from_params(trial["init_params"])
             final_lrr = lrr_from_params(trial["final_params"])
             ax.plot(t_sim, init_lrr[:, w], color="lightgray", lw=1.0,
@@ -80,7 +80,7 @@ def main():
                     label="initial" if ti == 0 else None)
             ax.plot(t_sim, final_lrr[:, w], color=COLOR, lw=1.4, alpha=0.85,
                     zorder=5,
-                    label="recovered (Axion)" if ti == 0 else None)
+                    label="recovered (Ostrich)" if ti == 0 else None)
         ax.set_xlabel("time (s)")
         if w == 0:
             ax.set_ylabel("wheel velocity (rad/s)")

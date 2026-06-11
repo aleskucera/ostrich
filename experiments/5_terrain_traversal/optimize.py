@@ -1,4 +1,4 @@
-"""Terrain traversal benchmark — Axion only.
+"""Terrain traversal benchmark — Ostrich only.
 
 Optimises K spline control knots for the Helhest robot to follow a target
 trajectory over a procedurally generated triangle mesh surface.
@@ -28,13 +28,13 @@ import time
 import newton
 import numpy as np
 import warp as wp
-from axion import AxionDifferentiableSimulator
-from axion import AxionEngineConfig
-from axion import ExecutionConfig
-from axion import LoggingConfig
-from axion import RenderingConfig
-from axion import SimulationConfig
-from axion.simulation.sim_config import SyncMode
+from ostrich import OstrichDifferentiableSimulator
+from ostrich import OstrichEngineConfig
+from ostrich import ExecutionConfig
+from ostrich import LoggingConfig
+from ostrich import RenderingConfig
+from ostrich import SimulationConfig
+from ostrich.simulation.sim_config import SyncMode
 from newton import Model
 
 from examples.terrain_traversal.helhest_model import create_helhest_model
@@ -205,7 +205,7 @@ def regularization_kernel(
     wp.atomic_add(loss, 0, weight * v * v)
 
 
-class TerrainTraversalOptimizer(AxionDifferentiableSimulator):
+class TerrainTraversalOptimizer(OstrichDifferentiableSimulator):
     def __init__(
         self,
         sim_config,
@@ -544,7 +544,7 @@ class TerrainTraversalOptimizer(AxionDifferentiableSimulator):
             self.finite_diff_check()
 
         results = {
-            "simulator": "Axion",
+            "simulator": "Ostrich",
             "problem": "terrain_traversal",
             "seed": self._terrain_seed,
             "target_spline": self._target_spline.tolist(),
@@ -647,7 +647,7 @@ def run_single(args, seed):
         use_cuda_graph=True,
         headless_steps_per_segment=1,
     )
-    engine_config = AxionEngineConfig(
+    engine_config = OstrichEngineConfig(
         max_newton_iters=14,
         max_linear_iters=16,
         backtrack_min_iter=10,

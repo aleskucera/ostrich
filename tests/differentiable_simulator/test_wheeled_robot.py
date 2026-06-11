@@ -16,18 +16,18 @@ wp.init()
 
 import numpy as np
 import newton
-from axion.core.engine import AxionEngine
-from axion.core.engine_config import AxionEngineConfig, LinearSolverConfig, NewtonRaphsonConfig
-from axion.core.logging_config import LoggingConfig
-from axion.core.model_builder import AxionModelBuilder
-from axion.simulation.trajectory_buffer import TrajectoryBuffer
+from ostrich.core.engine import OstrichEngine
+from ostrich.core.engine_config import OstrichEngineConfig, LinearSolverConfig, NewtonRaphsonConfig
+from ostrich.core.logging_config import LoggingConfig
+from ostrich.core.model_builder import OstrichModelBuilder
+from ostrich.simulation.trajectory_buffer import TrajectoryBuffer
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "examples"))
 from taros_4.common import create_taros4_model
 
 
 def build_taros4(control_mode="velocity", k_p=1000.0, k_d=0.0, friction=0.8):
-    builder = AxionModelBuilder()
+    builder = OstrichModelBuilder()
     builder.rigid_gap = 0.05
     builder.add_ground_plane()
     chassis, wheels = create_taros4_model(
@@ -44,11 +44,11 @@ def build_taros4(control_mode="velocity", k_p=1000.0, k_d=0.0, friction=0.8):
 
 
 def make_engine(model, sim_steps=5):
-    config = AxionEngineConfig(
+    config = OstrichEngineConfig(
         nr=NewtonRaphsonConfig(max_iters=20),
         linear=LinearSolverConfig(max_iters=200, tol=1e-8, atol=1e-8),
     )
-    return AxionEngine(
+    return OstrichEngine(
         model=model,
         sim_steps=sim_steps,
         config=config,
@@ -63,10 +63,10 @@ def get_contact_modes(engine):
     active_n = engine.data.constr_active_mask.full.numpy()[0, dims.slice_n]
     lam_n = engine.data._constr_force.numpy()[0, dims.offset_n:dims.offset_f]
     lam_f = engine.data._constr_force.numpy()[0, dims.offset_f:dims.offset_f + 2 * dims.contact_count]
-    shapes0 = engine.axion_contacts.contact_shape0.numpy()[0]
-    shapes1 = engine.axion_contacts.contact_shape1.numpy()[0]
-    mu_arr = engine.axion_model.shape_material_mu.numpy()[0]
-    cc = engine.axion_contacts.contact_count.numpy()[0]
+    shapes0 = engine.ostrich_contacts.contact_shape0.numpy()[0]
+    shapes1 = engine.ostrich_contacts.contact_shape1.numpy()[0]
+    mu_arr = engine.ostrich_model.shape_material_mu.numpy()[0]
+    cc = engine.ostrich_contacts.contact_count.numpy()[0]
 
     n_stick, n_slide, n_inactive = 0, 0, 0
     for ci in range(cc):
@@ -105,17 +105,17 @@ def compute_wheel_vel_gradient(model, engine, target_vel, w, dt=0.01):
 
     # Backward
     buffer = TrajectoryBuffer(
-        data=engine.data, contacts=engine.axion_contacts,
+        data=engine.data, contacts=engine.ostrich_contacts,
         dims=dims, num_steps=1, device=model.device,
     )
-    buffer.save_step(0, engine.data, engine.axion_contacts)
+    buffer.save_step(0, engine.data, engine.ostrich_contacts)
     buffer.zero_grad()
     wp.copy(
         buffer.body_vel.grad[1],
         wp.array(w.reshape(engine.data.body_vel_grad.numpy().shape),
                  dtype=wp.spatial_vector, device=model.device),
     )
-    buffer.load_step(0, engine.data, engine.axion_contacts)
+    buffer.load_step(0, engine.data, engine.ostrich_contacts)
     engine.data.zero_gradients()
     engine.step_backward()
 
@@ -279,7 +279,7 @@ def test_multi_step_trajectory():
     )
 
     buffer = TrajectoryBuffer(
-        data=engine.data, contacts=engine.axion_contacts,
+        data=engine.data, contacts=engine.ostrich_contacts,
         dims=dims, num_steps=num_steps, device=model.device,
     )
     states = [model.state() for _ in range(num_steps + 1)]
@@ -288,7 +288,7 @@ def test_multi_step_trajectory():
     for i in range(num_steps):
         contacts = model.collide(states[i])
         engine.step(states[i], states[i + 1], control, contacts, dt)
-        buffer.save_step(i, engine.data, engine.axion_contacts)
+        buffer.save_step(i, engine.data, engine.ostrich_contacts)
 
     buffer.zero_grad()
     wp.copy(
@@ -297,7 +297,7 @@ def test_multi_step_trajectory():
                  dtype=wp.spatial_vector, device=model.device),
     )
     for i in range(num_steps - 1, -1, -1):
-        buffer.load_step(i, engine.data, engine.axion_contacts)
+        buffer.load_step(i, engine.data, engine.ostrich_contacts)
         engine.data.zero_gradients()
         engine.step_backward()
         buffer.save_gradients(i, engine.data)

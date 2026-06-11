@@ -4,7 +4,7 @@ TinyDiffSim supports batch simulation for its built-in robots (Ant, Laikago)
 via VectorizedAntEnv/VectorizedLaikagoEnv, but has no generic batch API for
 custom URDFs. Each world is therefore simulated sequentially on a single CPU
 thread. This script runs NUM_WORLDS independent rollouts per iteration and
-averages their gradients, mirroring the Axion multi-world setup.
+averages their gradients, mirroring the Ostrich multi-world setup.
 
 Usage:
     python examples/comparison_scalability/helhest_batch/tinydiffsim.py

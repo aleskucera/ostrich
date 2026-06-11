@@ -2,7 +2,7 @@ defaults:
   - simulation: taros-4
   - rendering: gl
   - logging: disabled
-  - engine: axion 
+  - engine: ostrich 
   - control: taros-4/velocity
   - _self_
 

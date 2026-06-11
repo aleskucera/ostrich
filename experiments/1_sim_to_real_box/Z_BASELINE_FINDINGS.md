@@ -22,7 +22,7 @@ current figure/scores.
   identical for all three engines. It only removes whatever spawn-settle each
   engine actually has.
 - **Result:** MuJoCo z RMSE 25.3→19.2 mm (run 18_10_33) and 20.5→15.1 mm
-  (18_04_51); combined error 67→64.7 mm. Axion (z 14.1 mm) and Semi-Implicit
+  (18_04_51); combined error 67→64.7 mm. Ostrich (z 14.1 mm) and Semi-Implicit
   (z 37.9 mm) essentially unchanged — they don't settle, so the rebase is a
   no-op for them.
 
@@ -73,7 +73,7 @@ Z_SETTLE_HI = 1.0  # s
 ## Same code, different effect across engines
 
 `score()` is defined **once** and called identically by every engine:
-`sweep_axion.py:65`, `sweep_mujoco.py:175`, `sweep_semi_implicit.py:68`. No engine
+`sweep_ostrich.py:65`, `sweep_mujoco.py:175`, `sweep_semi_implicit.py:68`. No engine
 has its own z handling. The engines differ only in how they produce the raw
 `pose`; from the pose onward the pipeline is byte-for-byte identical — this is the
 apples-to-apples guarantee.
@@ -84,11 +84,11 @@ depends on how much that engine settles:
 | Engine          | spawn-settle        | rebase removes | net z effect              |
 |-----------------|---------------------|----------------|---------------------------|
 | MuJoCo          | ~2 cm (soft contact)| ~2 cm offset   | z RMSE 25.3→19.2 / 20.5→15.1 mm |
-| Axion           | ~0 (stiff contact)  | ≈0             | unchanged (14.1 mm)       |
+| Ostrich           | ~0 (stiff contact)  | ≈0             | unchanged (14.1 mm)       |
 | Semi-Implicit   | ~0                  | ≈0             | unchanged (37.9 mm)       |
 
 A single uniform rule ("z=0 is your settled flat-ground height") that happens to
-be a no-op for Axion/SI and only bites MuJoCo's spurious spawn-drop. No engine
+be a no-op for Ostrich/SI and only bites MuJoCo's spurious spawn-drop. No engine
 gets special treatment.
 
 `plot_results.py` reads the already-rebased `sim_rel` straight from the jsons
@@ -115,7 +115,7 @@ The current MuJoCo config is the **turning** config, adopted before the z fix:
   *wrong sign* (+y) vs the real (−y) box-crossing kick, but the magnitude is
   right and the chassis actually rotates.
 - We adopted `tor=0.3` capsule as canonical MuJoCo. Ranking became
-  **Axion < MuJoCo < Semi-Implicit** (vs the old MuJoCo "win" that came from
+  **Ostrich < MuJoCo < Semi-Implicit** (vs the old MuJoCo "win" that came from
   suppressing the turn).
 
 Current MuJoCo best params:
@@ -128,7 +128,7 @@ Combined error (position + yaw, L=0.5 m), averaged over the 2 runs:
 
 | Engine          | combined | yaw RMSE | z RMSE (18_10_33) | config                          |
 |-----------------|----------|----------|-------------------|---------------------------------|
-| Axion           | 0.062 m  | 3.4°     | 14.1 mm           | μ_r=1.2, ke=150, Δt=0.05        |
+| Ostrich           | 0.062 m  | 3.4°     | 14.1 mm           | μ_r=1.2, ke=150, Δt=0.05        |
 | MuJoCo          | 0.065 m  | 3.0°     | 19.2 mm           | μ=1.2, tor=0.3, Δt=0.002        |
 | Semi-Implicit   | 0.110 m  | 3.6°     | 37.9 mm           | μ=0.05, ke=80000, Δt=0.0005     |
 
@@ -136,13 +136,13 @@ Combined error (position + yaw, L=0.5 m), averaged over the 2 runs:
 
 - `common_box.py` — added `Z_SETTLE_LO/HI` constants and the settled-baseline
   z rebase in `score()`.
-- `results/sweep_axion.json`, `results/sweep_mujoco.json`,
+- `results/sweep_ostrich.json`, `results/sweep_mujoco.json`,
   `results/sweep_semi_implicit.json` — rescored with the new z baseline.
 - `results/box_sim_to_real.png` — regenerated; copied to
-  `axion_paper/figures/box_sim_to_real.png`.
+  `ostrich_paper/figures/box_sim_to_real.png`.
 
 ## Still open
 
 - Commit the `common_box.py` z-fix + updated jsons + figure (not yet committed).
-- `axion_paper/sections/04_experiments.tex` prose may still cite the old
-  MuJoCo-best ~54 mm ranking, which now contradicts the figure (Axion is best).
+- `ostrich_paper/sections/04_experiments.tex` prose may still cite the old
+  MuJoCo-best ~54 mm ranking, which now contradicts the figure (Ostrich is best).

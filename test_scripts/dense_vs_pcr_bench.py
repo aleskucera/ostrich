@@ -34,7 +34,7 @@ import torch
 from test_scripts.precond_lab import load_systems
 
 DT = torch.float64
-PCR_ITERS = 26  # engine cap (examples/conf/engine/axion.yaml linear.max_iters)
+PCR_ITERS = 26  # engine cap (examples/conf/engine/ostrich.yaml linear.max_iters)
 
 
 def sync(dev):

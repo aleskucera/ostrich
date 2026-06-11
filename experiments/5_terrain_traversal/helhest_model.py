@@ -6,7 +6,7 @@ import newton
 import numpy as np
 import openmesh
 import warp as wp
-from axion import JointMode
+from ostrich import JointMode
 
 ASSETS_DIR = pathlib.Path(__file__).parent / "assets"
 

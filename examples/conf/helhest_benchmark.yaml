@@ -2,7 +2,7 @@ defaults:
   - simulation: helhest
   - rendering: headless
   - logging: disabled
-  - engine: axion_profile_per_iter
+  - engine: ostrich_profile_per_iter
   - control: helhest/velocity
   - _self_
 

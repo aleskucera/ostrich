@@ -1,4 +1,4 @@
-"""Import an axion trajectory.npz dump as a keyframed Blender scene.
+"""Import an ostrich trajectory.npz dump as a keyframed Blender scene.
 
 Run inside Blender:
     blender [template.blend] --background --python import_to_blender.py -- TRAJ.npz

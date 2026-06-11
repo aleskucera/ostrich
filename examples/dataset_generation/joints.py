@@ -4,12 +4,12 @@ import pathlib
 import hydra
 import newton
 import warp as wp
-from axion import InteractiveSimulator
-from axion import EngineConfig
-from axion import RenderingConfig
-from axion import SimulationConfig
-from axion import LoggingConfig
-from axion.generation import PlacementSceneGenerator
+from ostrich import InteractiveSimulator
+from ostrich import EngineConfig
+from ostrich import RenderingConfig
+from ostrich import SimulationConfig
+from ostrich import LoggingConfig
+from ostrich.generation import PlacementSceneGenerator
 from omegaconf import DictConfig
 
 os.environ["PYOPENGL_PLATFORM"] = "glx"

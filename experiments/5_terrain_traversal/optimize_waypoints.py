@@ -29,13 +29,13 @@ import time
 import newton
 import numpy as np
 import warp as wp
-from axion import AxionDifferentiableSimulator
-from axion import AxionEngineConfig
-from axion import ExecutionConfig
-from axion import LoggingConfig
-from axion import RenderingConfig
-from axion import SimulationConfig
-from axion.simulation.sim_config import SyncMode
+from ostrich import OstrichDifferentiableSimulator
+from ostrich import OstrichEngineConfig
+from ostrich import ExecutionConfig
+from ostrich import LoggingConfig
+from ostrich import RenderingConfig
+from ostrich import SimulationConfig
+from ostrich.simulation.sim_config import SyncMode
 from newton import Model
 
 from examples.terrain_traversal.helhest_model import create_helhest_model
@@ -61,7 +61,7 @@ def generate_waypoints_from_spline(
     dt: float,
     duration: float,
     spawn_pos: tuple[float, float, float],
-    engine_config: AxionEngineConfig,
+    engine_config: OstrichEngineConfig,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Simulate the target spline on flat ground and sample waypoints.
 
@@ -78,11 +78,11 @@ def generate_waypoints_from_spline(
     expanded = W @ target_spline  # (T, 3)
 
     # Build a throwaway 1-world model
-    from axion.core.engine import AxionEngine
-    from axion.core.logging_config import LoggingConfig as _LoggingConfig
-    from axion.core.model_builder import AxionModelBuilder
+    from ostrich.core.engine import OstrichEngine
+    from ostrich.core.logging_config import LoggingConfig as _LoggingConfig
+    from ostrich.core.model_builder import OstrichModelBuilder
 
-    builder = AxionModelBuilder()
+    builder = OstrichModelBuilder()
     builder.rigid_gap = 0.1
     builder.add_ground_plane(
         cfg=newton.ModelBuilder.ShapeConfig(mu=0.7, ke=50.0, kd=50.0, kf=50.0),
@@ -95,7 +95,7 @@ def generate_waypoints_from_spline(
         friction_left_right=0.8, friction_rear=0.35,
     )
     model = builder.finalize_replicated(num_worlds=1, gravity=-9.81)
-    engine = AxionEngine(
+    engine = OstrichEngine(
         model=model, sim_steps=T, config=engine_config,
         logging_config=_LoggingConfig(), differentiable_simulation=False,
     )
@@ -329,7 +329,7 @@ def smoothness_kernel(
 SPAWN_POS = (-8.0, 0.0, 0.5)
 
 
-class WaypointOptimizer(AxionDifferentiableSimulator):
+class WaypointOptimizer(OstrichDifferentiableSimulator):
     def __init__(
         self,
         sim_config,
@@ -567,7 +567,7 @@ class WaypointOptimizer(AxionDifferentiableSimulator):
         print(f"  Waypoint timesteps: {self._waypoint_steps_np.tolist()}")
 
         results = {
-            "simulator": "Axion",
+            "simulator": "Ostrich",
             "problem": "waypoint_flat",
             "K": self.K,
             "T": T,
@@ -650,7 +650,7 @@ class WaypointOptimizer(AxionDifferentiableSimulator):
 # ---------------------------------------------------------------------------
 
 def run_single(args, seed):
-    engine_config = AxionEngineConfig(
+    engine_config = OstrichEngineConfig(
         max_newton_iters=14,
         max_linear_iters=16,
         backtrack_min_iter=10,

@@ -1,6 +1,6 @@
 """Export recovered wheel-velocity control at 10 Hz for hardware replay.
 
-Reads results/axion.json, picks a trial (default: lowest best_loss), expands
+Reads results/ostrich.json, picks a trial (default: lowest best_loss), expands
 the K-knot spline at the native dt (0.1 s = 10 Hz), applies skid-steer
 coupling (rear = (L+R)/2), and writes:
 
@@ -64,7 +64,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--trial", default="best",
                     help="trial index, 'best' (default, lowest best_loss), or 'all'")
-    ap.add_argument("--source", default=str(RES / "axion.json"))
+    ap.add_argument("--source", default=str(RES / "ostrich.json"))
     args = ap.parse_args()
 
     d = json.loads(pathlib.Path(args.source).read_text())

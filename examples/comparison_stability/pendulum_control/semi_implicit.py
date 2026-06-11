@@ -4,7 +4,7 @@ Scene: single pendulum, pivot fixed at (0,0,2), 1m link, 1 kg.
        Start at Q_INIT=0 rad (hanging). Target: Q_TARGET=pi/3 rad.
 
 The semi-implicit solver uses explicit PD torque (applied before the velocity
-integration step), unlike Axion's implicit servo which embeds the target in
+integration step), unlike Ostrich's implicit servo which embeds the target in
 the Newton solve.
 
 Usage:
@@ -24,13 +24,13 @@ from config import (DURATION, LINK_MASS, Q_INIT, Q_TARGET, STABILITY_TOL,
 import newton
 import numpy as np
 import warp as wp
-from axion import InteractiveSimulator
-from axion import LoggingConfig
-from axion import RenderingConfig
-from axion import SimulationConfig
-from axion import SemiImplicitEngineConfig
-from axion.core.types import JointMode
-from axion.simulation.sim_config import SyncMode
+from ostrich import InteractiveSimulator
+from ostrich import LoggingConfig
+from ostrich import RenderingConfig
+from ostrich import SimulationConfig
+from ostrich import SemiImplicitEngineConfig
+from ostrich.core.types import JointMode
+from ostrich.simulation.sim_config import SyncMode
 from newton import Model
 
 os.environ["PYOPENGL_PLATFORM"] = "glx"

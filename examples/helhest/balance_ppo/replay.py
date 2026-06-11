@@ -1,8 +1,8 @@
-"""Replay a trained PPO policy in the Axion GL viewer (or write to USD).
+"""Replay a trained PPO policy in the Ostrich GL viewer (or write to USD).
 
 Loads a checkpoint from ``examples.helhest.balance_ppo.train`` and runs ONE
 deterministic rollout (mean action, no exploration noise), then opens the
-real Newton/Axion viewer to play it back. Use this to actually *see* what the
+real Newton/Ostrich viewer to play it back. Use this to actually *see* what the
 policy is doing — the matplotlib video logged to wandb is a crude side-view
 sanity check, not a debugging tool.
 
@@ -21,8 +21,8 @@ import newton
 import torch
 import warp as wp
 
-from axion import (
-    AxionEngineConfig,
+from ostrich import (
+    OstrichEngineConfig,
     ComplianceConfig,
     ContactsConfig,
     LinearSolverConfig,

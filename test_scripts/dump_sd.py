@@ -8,8 +8,8 @@ from omegaconf import DictConfig
 
 @hydra.main(config_path="../examples/conf", config_name="helhest", version_base=None)
 def main(cfg):
-    from axion import EngineConfig, LoggingConfig, RenderingConfig, SimulationConfig
-    from axion.collision.warm_start import ContactWarmStarter
+    from ostrich import EngineConfig, LoggingConfig, RenderingConfig, SimulationConfig
+    from ostrich.collision.warm_start import ContactWarmStarter
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "examples", "helhest"))
     from surface_drive import HelhestSurfaceSimulator as HelhestSurfaceDrive
 

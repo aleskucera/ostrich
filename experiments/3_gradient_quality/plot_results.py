@@ -18,7 +18,7 @@ import matplotlib.ticker as ticker
 import numpy as np
 
 RESULTS_DIR = pathlib.Path(__file__).parent / "results"
-PAPER_DIR = pathlib.Path(__file__).resolve().parents[2] / ".." / "axion_paper" / "figures"
+PAPER_DIR = pathlib.Path(__file__).resolve().parents[2] / ".." / "ostrich_paper" / "figures"
 
 plt.rcParams.update(
     {
@@ -36,20 +36,20 @@ plt.rcParams.update(
 )
 
 STYLES = {
-    "Axion":         {"color": "#2196F3", "marker": "o", "lw": 2.0, "zorder": 5},
+    "Ostrich":         {"color": "#2196F3", "marker": "o", "lw": 2.0, "zorder": 5},
     "MuJoCo":        {"color": "#E91E63", "marker": "s", "lw": 1.8, "zorder": 4},
     "MJX":           {"color": "#E91E63", "marker": "s", "lw": 1.8, "zorder": 4},
     "TinyDiffSim":   {"color": "#607D8B", "marker": "D", "lw": 1.8, "zorder": 3},
     "Semi-Implicit": {"color": "#FF9800", "marker": "^", "lw": 1.8, "zorder": 2},
 }
 LABELS = {
-    "Axion":         r"\textbf{Axion}",
+    "Ostrich":         r"\textbf{Ostrich}",
     "MJX":           "MJX",
     "MuJoCo":        "MuJoCo",
     "TinyDiffSim":   "TinyDiffSim",
     "Semi-Implicit": "Semi-Impl.",
 }
-SIM_ORDER = ["Axion", "MJX", "TinyDiffSim", "Semi-Implicit"]
+SIM_ORDER = ["Ostrich", "MJX", "TinyDiffSim", "Semi-Implicit"]
 
 N_GRID = 80  # points in the common wall-clock grid
 
@@ -112,7 +112,7 @@ def main():
     suffix = f"_{gt_stem}" if gt_stem else ""
 
     name_map = {
-        "axion": "Axion", "mjx": "MJX",
+        "ostrich": "Ostrich", "mjx": "MJX",
         "semi_implicit": "Semi-Implicit", "tinydiffsim": "TinyDiffSim",
     }
     sims = {}

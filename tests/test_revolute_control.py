@@ -2,16 +2,16 @@ import newton
 import numpy as np
 import pytest
 import warp as wp
-from axion import JointMode
-from axion.core.engine import AxionEngine
-from axion.core.engine_config import AxionEngineConfig, ComplianceConfig, LinearSolverConfig, NewtonRaphsonConfig
-from axion.core.model_builder import AxionModelBuilder
+from ostrich import JointMode
+from ostrich.core.engine import OstrichEngine
+from ostrich.core.engine_config import OstrichEngineConfig, ComplianceConfig, LinearSolverConfig, NewtonRaphsonConfig
+from ostrich.core.model_builder import OstrichModelBuilder
 
 wp.init()
 
 
 def setup_test_engine():
-    config = AxionEngineConfig(
+    config = OstrichEngineConfig(
         nr=NewtonRaphsonConfig(max_iters=20),
         linear=LinearSolverConfig(max_iters=50),
         compliance=ComplianceConfig(joint=0.0),
@@ -20,7 +20,7 @@ def setup_test_engine():
 
 
 def create_revolute_model():
-    builder = AxionModelBuilder()
+    builder = OstrichModelBuilder()
 
     link_1 = builder.add_link()
     builder.add_shape_box(
@@ -96,7 +96,7 @@ def run_revolute_control_test(mode: JointMode):
             ),
         )
 
-    engine = AxionEngine(model=model, sim_steps=100, config=config)
+    engine = OstrichEngine(model=model, sim_steps=100, config=config)
     newton.eval_fk(model, model.joint_q, model.joint_qd, state_in)
 
     target = spec["target"]

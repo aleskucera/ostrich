@@ -1,13 +1,13 @@
 """Ball throw trajectory optimization using MuJoCo MJX (JAX-based differentiable physics).
 
-Comparison to ball_throw_trajectory_axion.py which uses Axion implicit gradients.
+Comparison to ball_throw_trajectory_ostrich.py which uses Ostrich implicit gradients.
 
 Setup: optimize initial velocity of a free ball to match a target trajectory.
-  - Duration: 1.5s, dt=3e-2 -> T=50 steps  (matches Axion base config)
+  - Duration: 1.5s, dt=3e-2 -> T=50 steps  (matches Ostrich base config)
   - Initial guess: linear vel (0, 2, 1)
   - Target:        linear vel (0, 4, 7)
   - Loss: sum of L2 position errors over all timesteps
-  - Optimizer: gradient descent with gradient clamping (lr=0.2), matching Axion
+  - Optimizer: gradient descent with gradient clamping (lr=0.2), matching Ostrich
 """
 
 import time
@@ -18,7 +18,7 @@ import mujoco
 import mujoco.mjx as mjx
 import numpy as np
 
-# Match Axion base config: dt=3e-2, duration=1.5s
+# Match Ostrich base config: dt=3e-2, duration=1.5s
 DT = 3e-2
 T = int(1.5 / DT)  # 50 steps
 
@@ -61,7 +61,7 @@ def main():
     # Ball start: pos=(0,0,1), quaternion=(w=1,x=0,y=0,z=0)
     q0_np = np.array([0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0])
 
-    # Matching Axion: spatial_vector(0, 4, 7, 0, 0, 0) where [0:3] = linear vel
+    # Matching Ostrich: spatial_vector(0, 4, 7, 0, 0, 0) where [0:3] = linear vel
     target_qd0 = jnp.array([0.0, 4.0, 7.0, 0.0, 0.0, 0.0])
     init_qd0 = jnp.array([0.0, 2.0, 1.0, 0.0, 0.0, 0.0])
 

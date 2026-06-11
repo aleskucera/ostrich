@@ -36,9 +36,9 @@ for path in sorted(src.rglob("*.py")):
 
     mkdocs_gen_files.set_edit_path(full_doc_path, path.relative_to(root))
 
-doc_path = "axion/index.md"
+doc_path = "ostrich/index.md"
 full_doc_path = "reference" + "/" + doc_path
-nav["axion"] = doc_path
+nav["ostrich"] = doc_path
 with mkdocs_gen_files.open(full_doc_path, "w") as fd:
     for member in members:
         fd.write(f"::: {member}\n\toptions:\n\t\tshow_signature: false\n\n")

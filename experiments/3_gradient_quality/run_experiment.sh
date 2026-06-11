@@ -6,8 +6,8 @@
 #
 # Usage:
 #   ./run_all.sh                             # run all
-#   ./run_all.sh --axion                     # run only Axion
-#   ./run_all.sh --axion --mjx               # run Axion and MJX
+#   ./run_all.sh --ostrich                     # run only Ostrich
+#   ./run_all.sh --ostrich --mjx               # run Ostrich and MJX
 #   ./run_all.sh --iterations 100 --K 15     # forward extra args to every script
 set -e
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -29,12 +29,12 @@ else
     SAVE_SUFFIX=""
 fi
 
-RUN_AXION=false; RUN_MJX=false; RUN_SEMI=false; RUN_TINY=false
+RUN_OSTRICH=false; RUN_MJX=false; RUN_SEMI=false; RUN_TINY=false
 RUN_ALL=true
 EXTRA_ARGS=()
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --axion)          RUN_AXION=true; RUN_ALL=false; shift;;
+        --ostrich)          RUN_OSTRICH=true; RUN_ALL=false; shift;;
         --mjx)            RUN_MJX=true;   RUN_ALL=false; shift;;
         --semi-implicit)  RUN_SEMI=true;  RUN_ALL=false; shift;;
         --tinydiffsim)    RUN_TINY=true;  RUN_ALL=false; shift;;
@@ -45,10 +45,10 @@ done
 COMMON_ARGS=(--ground-truth "$GT" --horizon-s "$HORIZON" --iterations "$ITERATIONS" \
              --num-trials "$NUM_TRIALS" --seed-base "$SEED_BASE")
 
-if $RUN_ALL || $RUN_AXION; then
-    echo "=== Axion (adjoint)  [horizon=${HORIZON}s, iters=${ITERATIONS}, trials=${NUM_TRIALS}] ==="
-    python "$DIR/optimize_axion.py" \
-        "${COMMON_ARGS[@]}" --save "$RESULTS/axion${SAVE_SUFFIX}.json" "${EXTRA_ARGS[@]}"
+if $RUN_ALL || $RUN_OSTRICH; then
+    echo "=== Ostrich (adjoint)  [horizon=${HORIZON}s, iters=${ITERATIONS}, trials=${NUM_TRIALS}] ==="
+    python "$DIR/optimize_ostrich.py" \
+        "${COMMON_ARGS[@]}" --save "$RESULTS/ostrich${SAVE_SUFFIX}.json" "${EXTRA_ARGS[@]}"
     echo ""
 fi
 

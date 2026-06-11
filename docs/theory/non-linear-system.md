@@ -29,7 +29,7 @@ In essence, this equation states: "The change in momentum from the unconstrained
 
 ### Kinematics: Time Integration (\(\mathbf{h_\text{kin}}\))
 
-This residual connects the system's final configuration \(\mathbf{q}^+\) to its final velocity \(\mathbf{u}^+\) through a time integration rule. Axion uses an implicit integration scheme for superior stability.
+This residual connects the system's final configuration \(\mathbf{q}^+\) to its final velocity \(\mathbf{u}^+\) through a time integration rule. Ostrich uses an implicit integration scheme for superior stability.
 
 The equation is:
 
@@ -46,9 +46,9 @@ This equation ensures that the final configuration and velocity are mutually con
 
 ### Bilateral Constraints (Joints)
 
-Bilateral constraints enforce an exact geometric relationship (\(\mathbf{c}_b(\mathbf{q}) = \mathbf{0}\)). Axion can enforce this at either the position or velocity level.
+Bilateral constraints enforce an exact geometric relationship (\(\mathbf{c}_b(\mathbf{q}) = \mathbf{0}\)). Ostrich can enforce this at either the position or velocity level.
 
-- **Position-Level Formulation:** This is Axion's preferred method as it completely eliminates numerical drift. The constraint is enforced directly on the final configuration \(\mathbf{q}^+\). A compliance matrix \(\boldsymbol{\Sigma}\) can be introduced to model "soft" joints or improve numerical conditioning. The resulting residual equation is:
+- **Position-Level Formulation:** This is Ostrich's preferred method as it completely eliminates numerical drift. The constraint is enforced directly on the final configuration \(\mathbf{q}^+\). A compliance matrix \(\boldsymbol{\Sigma}\) can be introduced to model "soft" joints or improve numerical conditioning. The resulting residual equation is:
 
 \[
 \mathbf{h_b}^{(\text{pos})} = \mathbf{c}_b(\mathbf{q}^+) + \boldsymbol{\Sigma} \cdot \boldsymbol{\lambda}_b^+ = \mathbf{0}
@@ -112,7 +112,7 @@ The resulting Karush-Kuhn-Tucker (KKT) conditions mathematically express the sti
 0 \leq |\mathbf{J}_f^T \cdot \mathbf{u}| \perp \mu \cdot \lambda_n - \|\boldsymbol{\lambda}_f\| \geq 0
 \]
 
-To make this complex system solvable and efficient, Axion employs a two-step transformation. First, the complementarity condition is turned into a root-finding problem with an NCP function, \(\phi_f\). Second, a **fixed-point iteration** is introduced via a carefully constructed scalar compliance term \(W\):
+To make this complex system solvable and efficient, Ostrich employs a two-step transformation. First, the complementarity condition is turned into a root-finding problem with an NCP function, \(\phi_f\). Second, a **fixed-point iteration** is introduced via a carefully constructed scalar compliance term \(W\):
 
 \[
 W = \frac{|\mathbf{J}_f^T \cdot \mathbf{u}| - \phi_f(|\mathbf{J}_f^T \cdot \mathbf{u}|, \mu \cdot \lambda_n - \|\boldsymbol{\lambda}_f\|)}{\|\boldsymbol{\lambda}_f\| + \phi_f(|\mathbf{J}_f^T \cdot \mathbf{u}|, \mu \cdot \lambda_n - \|\boldsymbol{\lambda_f}\|)}
@@ -138,7 +138,7 @@ Here, \(\mathbf{J}_{\text{ctrl}}\) is the Jacobian relating joint velocities to 
 
 ## **The Complete Nonlinear System**
 
-Assembling all the individual residual blocks yields the complete nonlinear system that Axion must solve at every time step.
+Assembling all the individual residual blocks yields the complete nonlinear system that Ostrich must solve at every time step.
 
 The full residual vector is stacked as follows:
 

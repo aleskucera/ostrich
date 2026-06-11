@@ -29,7 +29,7 @@ optimize_<engine>.py   --->   results/<engine>.json   --->   plot_results.py   -
   (median + min/max band per engine).
 
 ```bash
-# regenerate everything (Axion only for now; ~30 min at iters=50 trials=3)
+# regenerate everything (Ostrich only for now; ~30 min at iters=50 trials=3)
 ./experiments/3_gradient_quality_box/run_experiment.sh
 
 # or with a shorter horizon / fewer iters for a quick look
@@ -44,7 +44,7 @@ python experiments/3_gradient_quality_box/plot_results.py
 
 | script | engine | gradient mechanism | status |
 |---|---|---|---|
-| `optimize_axion.py` | Axion | adjoint (`AxionDifferentiableSimulator`) | ✅ working |
+| `optimize_ostrich.py` | Ostrich | adjoint (`OstrichDifferentiableSimulator`) | ✅ working |
 | `optimize_mjx.py` | MuJoCo MJX | `jax.grad` / BPTT through `mjx.step` | ✅ written (needs `jax` + `mujoco-mjx`) |
 | `optimize_semi_implicit.py` | Newton SemiImplicit | Warp tape / BPTT (via `NewtonDifferentiableSimulator`) | ✅ working |
 | `optimize_tinydiffsim.py` | TinyDiffSim | CppAD | ⏳ TODO (separate codebase) |
@@ -68,13 +68,13 @@ Iteration timing on this scene (with CUDA-graph capture of the forward
   | SemiImplicit | ~120 s | ~3 s | ~0.4 ms |
 
 So the cold capture dominates a single trial; the warm steady-state is
-actually *faster* per-step than Axion's adjoint (~8 ms) because SI's
+actually *faster* per-step than Ostrich's adjoint (~8 ms) because SI's
 per-step solve is much cheaper (penalty contact, no NR iterations).
 
 ### MJX setup
 
 ```bash
-# in a separate venv (axion's main env doesn't carry JAX)
+# in a separate venv (ostrich's main env doesn't carry JAX)
 pip install jax mujoco-mjx
 
 python experiments/3_gradient_quality_box/optimize_mjx.py
@@ -102,7 +102,7 @@ overlap by ~7 cm at the spawn pose. We isolate the wheels into
 wheel↔ground and wheel↔box (both default 1/1) still fire. Net effect on
 the chassis trajectory is small; the spline absorbs any residual bias.
 
-For now only Axion is implemented; the others will be added as their
+For now only Ostrich is implemented; the others will be added as their
 junior + box setups become available. `plot_results.py` picks up any
 present `*.json` automatically, so adding a new engine doesn't require
 plot changes.
@@ -111,7 +111,7 @@ plot changes.
 
 - **Scene**: `helhest_junior` over the box (matches `1_sim_to_real_box`).
 - **Physics params**: `mu_front=0.8, mu_rear=1.2, mu_rolling=0.7,
-  compliance.contact=1e-7, dt=0.02` (Axion's tuned best; engine-specific
+  compliance.contact=1e-7, dt=0.02` (Ostrich's tuned best; engine-specific
   knobs come from each engine's calibration when added).
 - **Parameterization**: `[K, 3]` array of control points (default K=10)
   interpolated linearly to per-step `[T, 3]` wheel-velocity commands for
@@ -122,11 +122,11 @@ plot changes.
   without informing the wheel-velocity spline.
 - **Optimizer**: Adam on the spline params with cosine LR decay, `lr=0.1`.
 
-## Per-engine `axion.json` schema
+## Per-engine `ostrich.json` schema
 
 ```json
 {
-  "simulator": "Axion",
+  "simulator": "Ostrich",
   "gt": "2026_05_20-18_10_33",
   "K": 10, "lr": 0.1, "iterations": 50,
   "horizon_s": 6.0, "dt": 0.02,
@@ -141,7 +141,7 @@ plot changes.
 
 ## Speed
 
-`AxionDifferentiableSimulator.diff_step()` captures the full
+`OstrichDifferentiableSimulator.diff_step()` captures the full
 forward+backward physics+loss into a CUDA graph when
 `use_cuda_graph=True` (the default in our `make_configs`). With it:
 
@@ -153,7 +153,7 @@ forward+backward physics+loss into a CUDA graph when
 
 The 47× speedup over the no-CUDA-graph version is entirely the missing
 kernel-launch overhead — the box adds zero adjoint cost. Per-step we
-match the original `experiments/3_gradient_quality` Axion throughput
+match the original `experiments/3_gradient_quality` Ostrich throughput
 (~9 ms/step adjoint).
 
 A full **50-iter × 3-trial** optimisation finishes in ~80 s at the
@@ -161,7 +161,7 @@ default dt=0.10.
 
 ### Why dt=0.10 (not 0.05)?
 
-From `experiments/2_dt_stability_box`, Axion's forward error plateau
+From `experiments/2_dt_stability_box`, Ostrich's forward error plateau
 extends from `dt=0.005` to `dt≈0.30` (combined error 0.063→0.088 m
 on this scene). dt=0.10 sits comfortably in the plateau yet halves the
 sim-step count vs dt=0.05 — for free. Larger dt is fine too:

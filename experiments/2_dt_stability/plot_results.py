@@ -18,7 +18,7 @@ from matplotlib.transforms import blended_transform_factory
 
 RESULTS_DIR = pathlib.Path(__file__).parent / "results"
 SIM_TO_REAL_DIR = pathlib.Path(__file__).parent.parent / "1_sim_to_real" / "results"
-PAPER_DIR = pathlib.Path(__file__).resolve().parents[2] / ".." / "axion_paper" / "figures"
+PAPER_DIR = pathlib.Path(__file__).resolve().parents[2] / ".." / "ostrich_paper" / "figures"
 
 plt.rcParams.update(
     {
@@ -36,13 +36,13 @@ plt.rcParams.update(
 )
 
 STYLES = {
-    "Axion": {"color": "#2196F3", "marker": "o", "lw": 2.0, "zorder": 5},
+    "Ostrich": {"color": "#2196F3", "marker": "o", "lw": 2.0, "zorder": 5},
     "MuJoCo": {"color": "#E91E63", "marker": "s", "lw": 1.8, "zorder": 4},
     "Semi-Implicit": {"color": "#FF9800", "marker": "^", "lw": 1.8, "zorder": 3},
     "TinyDiffSim": {"color": "#607D8B", "marker": "D", "lw": 1.8, "zorder": 2},
 }
 LABELS = {
-    "Axion": r"\textbf{Axion}",
+    "Ostrich": r"\textbf{Ostrich}",
     "MuJoCo": "MuJoCo",
     "Semi-Implicit": "Semi-Impl.",
     "TinyDiffSim": "TinyDiffSim",
@@ -61,7 +61,7 @@ def main():
     # --- Load dt_stability (max-stable-dt on obstacle) ---
     stability = {}
     for sim_file, sim_name in [
-        ("sweep_axion.json", "Axion"),
+        ("sweep_ostrich.json", "Ostrich"),
         ("sweep_mujoco.json", "MuJoCo"),
         ("sweep_semi_implicit.json", "Semi-Implicit"),
     ]:
@@ -73,7 +73,7 @@ def main():
     # --- Load dt-only sweeps from 1_sim_to_real ---
     dt_sweeps = {}
     for sim_file, sim_name in [
-        ("sweep_axion_dt.json", "Axion"),
+        ("sweep_ostrich_dt.json", "Ostrich"),
         ("sweep_mujoco_dt.json", "MuJoCo"),
         ("sweep_semi_implicit_dt.json", "Semi-Implicit"),
         ("sweep_tinydiffsim_dt.json", "TinyDiffSim"),

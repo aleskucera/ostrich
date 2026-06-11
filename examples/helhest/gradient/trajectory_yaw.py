@@ -6,12 +6,12 @@ import hydra
 import newton
 import numpy as np
 import warp as wp
-from axion import AxionDifferentiableSimulator
-from axion import EngineConfig
-from axion import LoggingConfig
-from axion import RenderingConfig
-from axion import SimulationConfig
-from axion.optim.trajectory_adam import TrajectoryAdam
+from ostrich import OstrichDifferentiableSimulator
+from ostrich import EngineConfig
+from ostrich import LoggingConfig
+from ostrich import RenderingConfig
+from ostrich import SimulationConfig
+from ostrich.optim.trajectory_adam import TrajectoryAdam
 from newton import Model
 from omegaconf import DictConfig
 
@@ -85,7 +85,7 @@ def smoothness_kernel(
     wp.atomic_add(loss, 0, weight * diff * diff)
 
 
-class HelhestTrajectoryYawOptimizer(AxionDifferentiableSimulator):
+class HelhestTrajectoryYawOptimizer(OstrichDifferentiableSimulator):
     def __init__(
         self,
         sim_config: SimulationConfig,

@@ -1,11 +1,11 @@
 # Configuration System
 
-Axion's examples use the [Hydra](https://hydra.cc/) library to manage simulation parameters. This allows for easy experimentation and configuration changes directly from the command line.
+Ostrich's examples use the [Hydra](https://hydra.cc/) library to manage simulation parameters. This allows for easy experimentation and configuration changes directly from the command line.
 
 !!! info "This Configuration is for the Examples"
-    The Hydra configuration files discussed here are located within the `axion/examples/conf` directory. They are designed to make running the pre-built examples easy and flexible.
+    The Hydra configuration files discussed here are located within the `ostrich/examples/conf` directory. They are designed to make running the pre-built examples easy and flexible.
 
-    You are **not required** to use Hydra in your own projects. You can instantiate Axion's configuration classes directly in your Python code. This guide explains how the examples are set up so you can understand them and optionally adapt the pattern for your own use.
+    You are **not required** to use Hydra in your own projects. You can instantiate Ostrich's configuration classes directly in your Python code. This guide explains how the examples are set up so you can understand them and optionally adapt the pattern for your own use.
 
 ---
 
@@ -15,7 +15,7 @@ The core idea is to separate configuration from code. Instead of hardcoding valu
 
 ### The Configuration Directory Structure
 
-All configuration files for the examples live in `src/axion/examples/conf/`:
+All configuration files for the examples live in `src/ostrich/examples/conf/`:
 
 ```
 conf/
@@ -92,14 +92,14 @@ from importlib.resources import files
 
 import hydra
 import warp as wp
-from axion import (
+from ostrich import (
     InteractiveSimulator, EngineConfig, ExecutionConfig, 
     ProfilingConfig, RenderingConfig, SimulationConfig
 )
 from omegaconf import DictConfig
 
 # (1) Define the path to the example configuration files
-CONFIG_PATH = files("axion").joinpath("examples").joinpath("conf")
+CONFIG_PATH = files("ostrich").joinpath("examples").joinpath("conf")
 
 class Simulator(InteractiveSimulator):
     # ... (build_model implementation)
@@ -131,23 +131,23 @@ if __name__ == "__main__":
 
 ```
 
-1. **Locating Config Files**: The script uses `importlib.resources` to find the absolute path to the `conf` directory inside the installed `axion` package.
+1. **Locating Config Files**: The script uses `importlib.resources` to find the absolute path to the `conf` directory inside the installed `ostrich` package.
 2. **The `@hydra.main` Decorator**: This is the magic that hooks your function into Hydra. It tells Hydra where to find the configuration files (`config_path` and `config_name`).
 3. **Receiving the Configuration**: Hydra parses the YAML files and command-line overrides, then passes the final, merged configuration into your function as a special dictionary-like object called a `DictConfig`.
-4. **Instantiating Objects**: The `_target_` key in the YAML files (e.g., `_target_: axion.SimulationConfig`) tells Hydra which Python class to create. The `hydra.utils.instantiate()` function reads this key and uses the rest of the config values as constructor arguments to create the actual `SimulationConfig`, `EngineConfig`, etc. objects.
+4. **Instantiating Objects**: The `_target_` key in the YAML files (e.g., `_target_: ostrich.SimulationConfig`) tells Hydra which Python class to create. The `hydra.utils.instantiate()` function reads this key and uses the rest of the config values as constructor arguments to create the actual `SimulationConfig`, `EngineConfig`, etc. objects.
 
 ---
 
 ## Using Configuration in Your Own Project
 
-You have two primary options for managing configuration in your own Axion-based project.
+You have two primary options for managing configuration in your own Ostrich-based project.
 
 === "Option 1: Without Hydra"
 
     You don't need Hydra at all. You can simply import the configuration dataclasses and instantiate them yourself. This is the most straightforward approach for simple projects.
 
     ```python
-    from axion import (
+    from ostrich import (
         Simulator, SimulationConfig, EngineConfig, RenderingConfig, 
         ExecutionConfig, ProfilingConfig
     )
@@ -206,13 +206,13 @@ You have two primary options for managing configuration in your own Axion-based 
 
     If you like the flexibility of the examples, you can adopt the same pattern.
 
-    1. **Copy the `conf` directory** from `src/axion/examples/conf` into your own project's root.
+    1. **Copy the `conf` directory** from `src/ostrich/examples/conf` into your own project's root.
     2. **Create your main script** and use the `@hydra.main` decorator, pointing it to your new `conf` directory.
 
     ```python
     import hydra
     from omegaconf import DictConfig
-    from axion import ...
+    from ostrich import ...
 
     @hydra.main(config_path="str(CONFIG_PATH)", config_name="config", version_base=None)
     def my_main_function(cfg: DictConfig):

@@ -28,7 +28,7 @@ import numpy as np
 from matplotlib.transforms import blended_transform_factory
 
 RESULTS_DIR = pathlib.Path(__file__).parent / "results"
-PAPER_DIR = pathlib.Path(__file__).resolve().parents[2] / ".." / "axion_paper" / "figures"
+PAPER_DIR = pathlib.Path(__file__).resolve().parents[2] / ".." / "ostrich_paper" / "figures"
 
 plt.rcParams.update(
     {
@@ -46,12 +46,12 @@ plt.rcParams.update(
 )
 
 STYLES = {
-    "Axion": {"color": "#2196F3", "marker": "o", "lw": 2.0, "zorder": 5},
+    "Ostrich": {"color": "#2196F3", "marker": "o", "lw": 2.0, "zorder": 5},
     "MuJoCo": {"color": "#E91E63", "marker": "s", "lw": 1.8, "zorder": 4},
     "Semi-Implicit": {"color": "#FF9800", "marker": "^", "lw": 1.8, "zorder": 3},
 }
 LABELS = {
-    "Axion": r"\textbf{Ostrich}",
+    "Ostrich": r"\textbf{Ostrich}",
     "MuJoCo": "MuJoCo",
     "Semi-Implicit": "Semi-Impl.",
 }
@@ -195,9 +195,9 @@ def main():
         transform=blended_transform_factory(ax.transAxes, ax.transData),
     )
 
-    # "Nx larger usable dt" arrow between MuJoCo's and Axion's largest usable
+    # "Nx larger usable dt" arrow between MuJoCo's and Ostrich's largest usable
     # (stable AND under-threshold) dts.
-    if "Axion" in results and "MuJoCo" in results:
+    if "Ostrich" in results and "MuJoCo" in results:
 
         def _max_usable_dt(rows):
             usable = [
@@ -208,7 +208,7 @@ def main():
             return max(usable) if usable else None
 
         mj_max = _max_usable_dt(results["MuJoCo"])
-        ax_max = _max_usable_dt(results["Axion"])
+        ax_max = _max_usable_dt(results["Ostrich"])
         if mj_max and ax_max:
             ratio = ax_max / mj_max
             # Auto defaults, applied wherever SPEEDUP_LABEL_CFG entry is None.

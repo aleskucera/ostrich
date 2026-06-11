@@ -17,16 +17,16 @@ wp.init()
 
 import numpy as np
 import newton
-from axion.core.engine import AxionEngine
-from axion.core.engine_config import AxionEngineConfig, LinearSolverConfig, NewtonRaphsonConfig
-from axion.core.logging_config import LoggingConfig
-from axion.core.model_builder import AxionModelBuilder
-from axion.core.types import JointMode
-from axion.simulation.trajectory_buffer import TrajectoryBuffer
+from ostrich.core.engine import OstrichEngine
+from ostrich.core.engine_config import OstrichEngineConfig, LinearSolverConfig, NewtonRaphsonConfig
+from ostrich.core.logging_config import LoggingConfig
+from ostrich.core.model_builder import OstrichModelBuilder
+from ostrich.core.types import JointMode
+from ostrich.simulation.trajectory_buffer import TrajectoryBuffer
 
 
 def build_cartpole():
-    builder = AxionModelBuilder()
+    builder = OstrichModelBuilder()
     no_collision = newton.ModelBuilder.ShapeConfig(has_shape_collision=False)
 
     link_cart = builder.add_link()
@@ -58,11 +58,11 @@ def run_gradient_test(num_steps, loss_type="velocity"):
     loss_type: "velocity" (pole angular velocity) or "position" (pole z-position)
     """
     model = build_cartpole()
-    config = AxionEngineConfig(
+    config = OstrichEngineConfig(
         nr=NewtonRaphsonConfig(max_iters=20),
         linear=LinearSolverConfig(max_iters=200, tol=1e-8, atol=1e-8),
     )
-    engine = AxionEngine(
+    engine = OstrichEngine(
         model=model, sim_steps=num_steps, config=config,
         logging_config=LoggingConfig(), differentiable_simulation=True,
     )
@@ -83,7 +83,7 @@ def run_gradient_test(num_steps, loss_type="velocity"):
 
     # Forward
     buffer = TrajectoryBuffer(
-        data=engine.data, contacts=engine.axion_contacts,
+        data=engine.data, contacts=engine.ostrich_contacts,
         dims=dims, num_steps=num_steps, device=model.device,
     )
     states = [model.state() for _ in range(num_steps + 1)]
@@ -92,7 +92,7 @@ def run_gradient_test(num_steps, loss_type="velocity"):
     for i in range(num_steps):
         c = model.collide(states[i])
         engine.step(states[i], states[i + 1], control, c, dt)
-        buffer.save_step(i, engine.data, engine.axion_contacts)
+        buffer.save_step(i, engine.data, engine.ostrich_contacts)
 
     # Backward
     buffer.zero_grad()
@@ -108,7 +108,7 @@ def run_gradient_test(num_steps, loss_type="velocity"):
                 wp.array(pg, dtype=wp.transform, device=model.device))
 
     for i in range(num_steps - 1, -1, -1):
-        buffer.load_step(i, engine.data, engine.axion_contacts)
+        buffer.load_step(i, engine.data, engine.ostrich_contacts)
         engine.data.zero_gradients()
         engine.step_backward()
         buffer.save_gradients(i, engine.data)

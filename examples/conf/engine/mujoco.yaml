@@ -1,5 +1,5 @@
 # @package engine
-_target_: axion.MuJoCoEngineConfig
+_target_: ostrich.MuJoCoEngineConfig
 separate_worlds: null
 njmax: 200
 nconmax: 100

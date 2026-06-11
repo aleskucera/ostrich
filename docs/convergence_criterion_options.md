@@ -3,7 +3,7 @@
 ## The problem
 
 Newton-Raphson stops when $\|r\|^2 < \texttt{newton\_atol}^2$, with `newton_atol = 1e-3`
-in `examples/conf/engine/axion.yaml`. There are two things wrong with that:
+in `examples/conf/engine/ostrich.yaml`. There are two things wrong with that:
 
 **1. The threshold has no physical meaning.** It was picked by trial
 and error — tighten until convergence looks "good", loosen until
@@ -248,7 +248,7 @@ The lesson, for future would-be improvers of this convergence check:
 ## Postscript 2: option 2 (mass-weighted dynamics block) was tried and reverted
 
 Implemented uncommitted, then reverted. Three modes added to
-`AxionEngineConfig`:
+`OstrichEngineConfig`:
 
   * `dynamics_residual_weighting = "none"`     — today's behavior
   * `dynamics_residual_weighting = "mass"`     — dyn rows ÷ m_i
@@ -370,8 +370,8 @@ Three reasons we weren't aware of going in:
 
 ## See also
 
-* `axion/core/residual_utils.py` — current residual assembly
-* `axion/core/base_engine.py:228` — the `_check_residuals_kernel`
+* `ostrich/core/residual_utils.py` — current residual assembly
+* `ostrich/core/base_engine.py:228` — the `_check_residuals_kernel`
   call where this decision lives today
 * `engine_dims.offset_n`, `offset_f`, etc. — already-tracked block
   boundaries (option 2 keys off these)

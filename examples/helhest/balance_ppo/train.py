@@ -1,7 +1,7 @@
-"""PPO trainer for the Helhest balance task, tied to Axion's parallel sim.
+"""PPO trainer for the Helhest balance task, tied to Ostrich's parallel sim.
 
 Architecture overview:
-- Inherits AxionDifferentiableSimulator for model build / state allocation /
+- Inherits OstrichDifferentiableSimulator for model build / state allocation /
   collision pipeline / viewer plumbing, but bypasses ``diff_step`` entirely.
 - Each PPO iteration runs one fixed-length episode (T sim steps) across N
   parallel worlds. Per step: extract obs from state, sample action via the
@@ -36,9 +36,9 @@ import torch
 import warp as wp
 from newton import Model
 
-from axion import (
-    AxionDifferentiableSimulator,
-    AxionEngineConfig,
+from ostrich import (
+    OstrichDifferentiableSimulator,
+    OstrichEngineConfig,
     ComplianceConfig,
     ContactsConfig,
     LinearSolverConfig,
@@ -228,12 +228,12 @@ def load_policy(
 # -----------------------------------------------------------------------------
 
 
-class HelhestBalancePPO(AxionDifferentiableSimulator):
+class HelhestBalancePPO(OstrichDifferentiableSimulator):
     def __init__(
         self,
         sim_config: SimulationConfig,
         render_config: RenderingConfig,
-        engine_config: AxionEngineConfig,
+        engine_config: OstrichEngineConfig,
         logging_config: LoggingConfig,
         policy_hidden: int = 64,
         v_max: float = 8.0,
@@ -579,8 +579,8 @@ class HelhestBalancePPO(AxionDifferentiableSimulator):
 # -----------------------------------------------------------------------------
 
 
-def _make_default_engine_config() -> AxionEngineConfig:
-    return AxionEngineConfig(
+def _make_default_engine_config() -> OstrichEngineConfig:
+    return OstrichEngineConfig(
         nr=NewtonRaphsonConfig(max_iters=16, backtrack_min_iter=12, atol=1e-3),
         linear=LinearSolverConfig(max_iters=16, atol=1e-3, tol=1e-3, regularization=1e-6),
         compliance=ComplianceConfig(joint=6e-8, contact=1e-10, friction=1e-6),
@@ -617,7 +617,7 @@ def main():
     parser.add_argument("--w-action-rate", type=float, default=0.05)
 
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--wandb-project", type=str, default="axion-helhest-balance")
+    parser.add_argument("--wandb-project", type=str, default="ostrich-helhest-balance")
     parser.add_argument("--wandb-entity", type=str, default=None)
     parser.add_argument("--wandb-mode", type=str, default="online",
                         choices=["online", "offline", "disabled"])

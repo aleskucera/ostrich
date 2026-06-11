@@ -1,7 +1,7 @@
 """
 Helhest trajectory optimization using Dojo (Julia differentiable physics).
 
-Comparable to examples/comparison/helhest_mjx.py and helhest_axion.py.
+Comparable to examples/comparison/helhest_mjx.py and helhest_ostrich.py.
 
 Optimizes K spline control points linearly interpolated to per-timestep wheel
 velocities. Gradients flow through Dojo's implicit differentiation (BPTT via

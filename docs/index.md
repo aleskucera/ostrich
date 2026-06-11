@@ -1,10 +1,10 @@
-# Axion
+# Ostrich
 
 A GPU-accelerated physics simulator with non-smooth contact and exact friction.
 
 ---
 
-Axion is a rigid body simulator built for robotics research where contact accuracy matters. Unlike simulators that smooth or approximate the friction cone, Axion solves the **non-penetration contact constraints exactly** and handles **non-smooth friction** — making it particularly well-suited for skid-steer locomotion, flipper robots, and any scenario where slip behavior drives the dynamics.
+Ostrich is a rigid body simulator built for robotics research where contact accuracy matters. Unlike simulators that smooth or approximate the friction cone, Ostrich solves the **non-penetration contact constraints exactly** and handles **non-smooth friction** — making it particularly well-suited for skid-steer locomotion, flipper robots, and any scenario where slip behavior drives the dynamics.
 
 **Key properties:**
 
@@ -71,7 +71,7 @@ Marv is a tracked robot with four articulated flippers — each flipper carries 
 
 - :material-rocket-launch: **[Installation](getting-started/installation.md)**
 
-    Set up Axion and its dependencies
+    Set up Ostrich and its dependencies
 
 - :material-book-open-variant: **[Quick Start](getting-started/quickstart.md)**
 

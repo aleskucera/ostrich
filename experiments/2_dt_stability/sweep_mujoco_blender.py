@@ -49,7 +49,7 @@ DURATION = 4.0
 # Bodies that get per-step pose capture. Index 0 must be chassis.
 RENDER_BODIES = ["chassis", "left_wheel", "right_wheel", "rear_wheel"]
 
-# Shared with sweep_axion_blender.py and sweep_semi_implicit_blender.py so
+# Shared with sweep_ostrich_blender.py and sweep_semi_implicit_blender.py so
 # the three runs line up frame-by-frame in compare_to_blender.py.
 # MuJoCo's nominal max stable dt is ~1.5 ms — only the 0.5 ms entry should
 # stay stable here; the rest fail (stall, bounce, or fly).

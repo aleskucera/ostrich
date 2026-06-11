@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Sweep num_worlds for Axion and MJX, skipping gracefully on OOM or crash.
+# Sweep num_worlds for Ostrich and MJX, skipping gracefully on OOM or crash.
 #
 # Usage: bash examples/comparison/helhest_scalability/run_sweep.sh
 
@@ -7,7 +7,7 @@ set -e
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 mkdir -p "$DIR/results"
 
-AXION_WORLDS=(1 2 4 8 16 32 64 128 256 512 1024 2048 4096 8192 16384 32768 65536 131072 262144)
+OSTRICH_WORLDS=(1 2 4 8 16 32 64 128 256 512 1024 2048 4096 8192 16384 32768 65536 131072 262144)
 MJX_WORLDS=(1 2 4 8 16 32)   # MJX OOMs around 32 worlds (BPTT tape ~1.3 GB/world)
 
 run_sim() {
@@ -30,8 +30,8 @@ run_sim() {
     fi
 }
 
-for N in "${AXION_WORLDS[@]}"; do
-    run_sim "$DIR/axion_sim.py"   "Axion"      "$N" "$DIR/results/axion_${N}.json"
+for N in "${OSTRICH_WORLDS[@]}"; do
+    run_sim "$DIR/ostrich_sim.py"   "Ostrich"      "$N" "$DIR/results/ostrich_${N}.json"
 done
 
 for N in "${MJX_WORLDS[@]}"; do

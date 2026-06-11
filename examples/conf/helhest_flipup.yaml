@@ -2,7 +2,7 @@ defaults:
   - simulation: helhest_flipup
   - rendering: gl
   - logging: disabled
-  - engine: axion
+  - engine: ostrich
   - _self_
 
 project_name: ${hydra:job.name}

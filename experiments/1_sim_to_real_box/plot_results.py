@@ -3,7 +3,7 @@
     DEV / DIAGNOSTIC FIGURE — NOT the paper figure.
     This script writes results/box_sim_to_real.png with per-panel titles, a
     suptitle, and verbose bar labels (yaw, full param strings) — useful while
-    iterating, but it must NOT be installed into axion_paper/figures/.
+    iterating, but it must NOT be installed into ostrich_paper/figures/.
     The PAPER figure is produced by plot_paper_panels.py; install it with
     `bash make_paper_figs.sh`.
 
@@ -34,9 +34,9 @@ import numpy as np
 
 from common_box import DATA_DIR, RESULTS_DIR, load_gt
 
-SIM_COLORS = {"Axion": "#2196F3", "MuJoCo": "#E91E63",
+SIM_COLORS = {"Ostrich": "#2196F3", "MuJoCo": "#E91E63",
               "Semi-Implicit": "#FF9800", "TinyDiffSim": "#607D8B", "Dojo": "#4CAF50"}
-SIM_ORDER = ["Axion", "MuJoCo", "Semi-Implicit", "TinyDiffSim", "Dojo"]
+SIM_ORDER = ["Ostrich", "MuJoCo", "Semi-Implicit", "TinyDiffSim", "Dojo"]
 ACCURACY_THRESHOLD = 0.5  # metres — box benchmark is tighter than exp-1's 1.0
 
 
@@ -50,7 +50,7 @@ def load_sweeps():
 
 
 def fmt_params(sim, bp):
-    if sim == "Axion":
+    if sim == "Ostrich":
         ke = bp.get("ke"); ke_s = rf", ke={ke:g}" if ke is not None else ""
         return rf"$\mu_r$={bp['mu_rear']}{ke_s}, $\Delta t$={bp['dt']}"
     if sim == "MuJoCo":
@@ -70,7 +70,7 @@ def main():
 
     sweeps = load_sweeps()
     if not sweeps:
-        print(f"No sweep_*.json in {RESULTS_DIR} — run sweep_axion / sweep_mujoco first.")
+        print(f"No sweep_*.json in {RESULTS_DIR} — run sweep_ostrich / sweep_mujoco first.")
         return
 
     run_key = f"run_2026_05_20-{args.run}"

@@ -1,7 +1,7 @@
 import gc
 import time
 
-import axion.optim.M_inv_Jt3 as kernels  # Imports the new file
+import ostrich.optim.M_inv_Jt3 as kernels  # Imports the new file
 import numpy as np
 import warp as wp
 

@@ -13,12 +13,12 @@ import hydra
 import newton
 import numpy as np
 import warp as wp
-from axion import AxionDifferentiableSimulator
-from axion import EngineConfig
-from axion import LoggingConfig
-from axion import RenderingConfig
-from axion import SimulationConfig
-from axion.core.types import JointMode
+from ostrich import OstrichDifferentiableSimulator
+from ostrich import EngineConfig
+from ostrich import LoggingConfig
+from ostrich import RenderingConfig
+from ostrich import SimulationConfig
+from ostrich.core.types import JointMode
 from newton import Model
 from omegaconf import DictConfig
 
@@ -171,7 +171,7 @@ def init_cartpole_state_kernel(
     joint_q[pole_idx] = pole_init_angle
 
 
-class CartPoleSwingUp(AxionDifferentiableSimulator):
+class CartPoleSwingUp(OstrichDifferentiableSimulator):
     def __init__(
         self,
         sim_config: SimulationConfig,
@@ -212,7 +212,7 @@ class CartPoleSwingUp(AxionDifferentiableSimulator):
         self.builder.add_shape_box(link_cart, hx=0.3, hy=0.5, hz=0.2, cfg=no_collision_cfg)
 
         # We want the cart to slide along the World Y-axis.
-        # We hardcode the joint axis to X (1,0,0) so Axion/Newton agree perfectly.
+        # We hardcode the joint axis to X (1,0,0) so Ostrich/Newton agree perfectly.
         # Then we rotate the joint frame 90 degrees around Z, pointing local X down World Y.
         rot_z_90 = wp.quat_from_axis_angle(wp.vec3(0.0, 0.0, 1.0), wp.pi / 2.0)
 

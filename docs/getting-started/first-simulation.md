@@ -1,10 +1,10 @@
 # Your First Simulation
 
-This tutorial will guide you through creating a custom physics simulation with Axion.
+This tutorial will guide you through creating a custom physics simulation with Ostrich.
 
 ## Basic Structure
 
-Every Axion simulation follows the same pattern:
+Every Ostrich simulation follows the same pattern:
 
 !!! info "The Three Core Steps"
 
@@ -15,7 +15,7 @@ Every Axion simulation follows the same pattern:
 The simplest possible simulator looks like this:
 
 ```python
-from axion import InteractiveSimulator
+from ostrich import InteractiveSimulator
 import warp as wp
 
 class MySimulator(InteractiveSimulator):
@@ -32,10 +32,10 @@ Let's begin by creating a simple simulation of a single rod falling under gravit
 
 ```python hl_lines="30-35 37-46 48-49"
 import warp as wp
-from axion import InteractiveSimulator
-from axion import EngineConfig
-from axion import RenderingConfig
-from axion import SimulationConfig
+from ostrich import InteractiveSimulator
+from ostrich import EngineConfig
+from ostrich import RenderingConfig
+from ostrich import SimulationConfig
 
 
 class Simulator(InteractiveSimulator):
@@ -280,7 +280,7 @@ The `__main__` block in the script passes several configuration objects to the s
     @dataclass(frozen=True)
     class EngineConfig:
         """
-        Configuration parameters for the AxionEngine solver.
+        Configuration parameters for the OstrichEngine solver.
 
         This object centralizes all tunable parameters for the physics simulation,
         including solver iterations, stabilization factors, and compliance values.
@@ -331,8 +331,8 @@ The `__main__` block in the script passes several configuration objects to the s
 
 === "ProfilingConfig"
     ```python
-    # Lives on AxionEngineConfig as ``profiling``. Drives the CUDA-event
-    # profiler (``axion.profiling.EngineProfiler``).
+    # Lives on OstrichEngineConfig as ``profiling``. Drives the CUDA-event
+    # profiler (``ostrich.profiling.EngineProfiler``).
     @dataclass
     class ProfilingConfig:
         mode: Literal["off", "end_to_end", "per_component"] = "off"

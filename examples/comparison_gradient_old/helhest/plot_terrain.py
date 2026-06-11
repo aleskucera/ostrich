@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 RESULTS_DIR = pathlib.Path(__file__).parent / "results"
-PAPER_DIR = pathlib.Path(__file__).resolve().parents[3] / ".." / "axion_paper" / "figures"
+PAPER_DIR = pathlib.Path(__file__).resolve().parents[3] / ".." / "ostrich_paper" / "figures"
 
 plt.rcParams.update({
     "text.usetex": True,
@@ -27,8 +27,8 @@ plt.rcParams.update({
     "axes.spines.right": False,
 })
 
-AXION_COLOR = "#2196F3"
-AXION_LIGHT = "#90CAF9"
+OSTRICH_COLOR = "#2196F3"
+OSTRICH_LIGHT = "#90CAF9"
 TARGET_COLOR = "#E91E63"
 
 
@@ -88,7 +88,7 @@ def main():
     # Final optimized trajectory
     t_final = trajs[str(last_iter)]
     ax_traj.plot(t_final["x"], t_final["y"],
-                 color=AXION_COLOR, linewidth=2.5, label=f"iter {last_iter}")
+                 color=OSTRICH_COLOR, linewidth=2.5, label=f"iter {last_iter}")
 
     ax_traj.plot(target["x"], target["y"],
                  color=TARGET_COLOR, linewidth=2.5, linestyle="--", label="target")
@@ -96,7 +96,7 @@ def main():
     ax_traj.plot(target["x"][0], target["y"][0],
                  "o", color=TARGET_COLOR, markersize=6, zorder=5)
     ax_traj.plot(t_final["x"][0], t_final["y"][0],
-                 "o", color=AXION_COLOR, markersize=6, zorder=5)
+                 "o", color=OSTRICH_COLOR, markersize=6, zorder=5)
 
     ax_traj.set_xlabel("$x$ (m)")
     ax_traj.set_ylabel("$y$ (m)")
@@ -110,17 +110,17 @@ def main():
     best_rmse = float(np.min(rmse))
     best_iter = int(np.argmin(rmse))
 
-    ax_rmse.plot(iters, rmse, color=AXION_LIGHT, linewidth=1.0, alpha=0.7)
-    ax_rmse.plot(iters, smooth(rmse), color=AXION_COLOR, linewidth=2.0)
+    ax_rmse.plot(iters, rmse, color=OSTRICH_LIGHT, linewidth=1.0, alpha=0.7)
+    ax_rmse.plot(iters, smooth(rmse), color=OSTRICH_COLOR, linewidth=2.0)
     ax_rmse.axhline(best_rmse, color="gray", linestyle="--", linewidth=0.8, alpha=0.5)
-    ax_rmse.plot(best_iter, best_rmse, "v", color=AXION_COLOR, markersize=8, zorder=5)
+    ax_rmse.plot(best_iter, best_rmse, "v", color=OSTRICH_COLOR, markersize=8, zorder=5)
     ax_rmse.set_xlabel("Iteration")
     ax_rmse.set_ylabel("RMSE (m)")
     ax_rmse.grid(True, which="major", alpha=0.25, linewidth=0.5)
     ax_rmse.text(0.97, 0.95, f"best = {best_rmse:.2f}\\,m (iter {best_iter})",
                  transform=ax_rmse.transAxes, ha="right", va="top", fontsize=14, color="gray")
     ax_rmse.text(0.97, 0.87, f"median iter time = {median_time:.0f}\\,ms",
-                 transform=ax_rmse.transAxes, ha="right", va="top", fontsize=14, color=AXION_COLOR)
+                 transform=ax_rmse.transAxes, ha="right", va="top", fontsize=14, color=OSTRICH_COLOR)
 
     plt.tight_layout(pad=0.4)
 

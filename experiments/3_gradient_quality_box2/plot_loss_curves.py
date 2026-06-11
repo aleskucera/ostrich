@@ -26,7 +26,7 @@ import matplotlib.ticker as ticker
 import numpy as np
 
 RESULTS_DIR = pathlib.Path(__file__).parent / "results"
-PAPER_DIR = pathlib.Path(__file__).resolve().parents[2] / ".." / "axion_paper" / "figures"
+PAPER_DIR = pathlib.Path(__file__).resolve().parents[2] / ".." / "ostrich_paper" / "figures"
 
 plt.rcParams.update({
     "text.usetex": True,
@@ -43,7 +43,7 @@ plt.rcParams.update({
 
 # Match the paper's existing engine colours.
 ENGINE_COLOR = {
-    "Axion":         "#2196F3",
+    "Ostrich":         "#2196F3",
     "MJX":           "#E91E63",
     "Semi-Implicit": "#FF9800",
 }
@@ -52,12 +52,12 @@ ENGINE_COLOR = {
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                   formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--json", default=str(RESULTS_DIR / "axion_all_fixes.json"))
+    ap.add_argument("--json", default=str(RESULTS_DIR / "ostrich_all_fixes.json"))
     ap.add_argument("--save", default=str(RESULTS_DIR / "loss_curves.png"))
     args = ap.parse_args()
 
     d = json.load(open(args.json))
-    sim = d.get("simulator", "Axion")
+    sim = d.get("simulator", "Ostrich")
     trials = d["trials"]
     N = len(trials)
     n_iters = len(trials[0]["losses"])

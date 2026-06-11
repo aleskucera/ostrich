@@ -9,8 +9,8 @@ import plotly.graph_objects as go
 import streamlit as st
 
 # --- CONFIGURATION ---
-st.set_page_config(layout="wide", page_title="Axion Analyzer 2.2")
-st.title("Axion Physics Debugger 2.2 🔍")
+st.set_page_config(layout="wide", page_title="Ostrich Analyzer 2.2")
+st.title("Ostrich Physics Debugger 2.2 🔍")
 
 # --- SESSION STATE INITIALIZATION ---
 if "run_index" not in st.session_state:

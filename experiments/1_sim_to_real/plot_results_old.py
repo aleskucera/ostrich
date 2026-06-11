@@ -32,14 +32,14 @@ plt.rcParams.update(
 )
 
 SIM_COLORS = {
-    "Axion": "#2196F3",
+    "Ostrich": "#2196F3",
     "MuJoCo": "#E91E63",
     "Semi-Implicit": "#FF9800",
     "TinyDiffSim": "#607D8B",
     "Dojo": "#4CAF50",
 }
 
-SIM_ORDER = ["Axion", "MuJoCo", "Semi-Implicit", "TinyDiffSim", "Dojo"]
+SIM_ORDER = ["Ostrich", "MuJoCo", "Semi-Implicit", "TinyDiffSim", "Dojo"]
 
 # Simulators above this error are considered failed (excluded from Experiment 2+)
 ACCURACY_THRESHOLD = 1.0  # meters

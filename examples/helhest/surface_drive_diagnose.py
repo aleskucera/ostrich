@@ -317,10 +317,10 @@ class HelhestSurfaceDiagnose(HelhestSurfaceBenchmark):
 
 @hydra.main(config_path=str(CONFIG_PATH), config_name="helhest_diagnose", version_base=None)
 def helhest_surface_diagnose(cfg: DictConfig):
-    from axion import EngineConfig
-    from axion import LoggingConfig
-    from axion import RenderingConfig
-    from axion import SimulationConfig
+    from ostrich import EngineConfig
+    from ostrich import LoggingConfig
+    from ostrich import RenderingConfig
+    from ostrich import SimulationConfig
 
     sim_config: SimulationConfig = hydra.utils.instantiate(cfg.simulation)
     render_config: RenderingConfig = hydra.utils.instantiate(cfg.rendering)

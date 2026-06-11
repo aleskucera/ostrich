@@ -10,7 +10,7 @@ gradients via backpropagation through Warp's computation tape over the XPBD
 position-projection solver.
 
 Outputs results/xpbd.json with the same per-trial loss-curve schema as
-optimize_semi_implicit.py / optimize_axion.py.
+optimize_semi_implicit.py / optimize_ostrich.py.
 
 Usage:
     python experiments/3_gradient_quality_box/optimize_xpbd.py
@@ -27,9 +27,9 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
 import newton
 import numpy as np
 import warp as wp
-from axion import (LoggingConfig, RenderingConfig, XPBDEngineConfig,
+from ostrich import (LoggingConfig, RenderingConfig, XPBDEngineConfig,
                    SimulationConfig)
-from axion.simulation.differentiable_simulator import NewtonDifferentiableSimulator
+from ostrich.simulation.differentiable_simulator import NewtonDifferentiableSimulator
 
 from examples.helhest_junior.common import create_helhest_junior_model
 from examples.helhest_junior.replay_real import BOX_CENTER, BOX_HALF_EXTENTS
@@ -272,7 +272,7 @@ def main():
     ap.add_argument("--K", type=int, default=10)
     ap.add_argument("--iterations", type=int, default=50)
     ap.add_argument("--lr", type=float, default=0.05,
-                    help="lower than Axion's 0.1 — SI gradients can be noisy")
+                    help="lower than Ostrich's 0.1 — SI gradients can be noisy")
     ap.add_argument("--num-trials", type=int, default=3)
     ap.add_argument("--seed-base", type=int, default=42)
     # 6 s would be 12k SI steps and a heavy Warp tape; default 4 s.

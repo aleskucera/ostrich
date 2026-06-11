@@ -26,13 +26,13 @@ import time
 import newton
 import numpy as np
 import warp as wp
-from axion import AxionDifferentiableSimulator
-from axion import AxionEngineConfig
-from axion import ExecutionConfig
-from axion import LoggingConfig
-from axion import RenderingConfig
-from axion import SimulationConfig
-from axion.simulation.sim_config import SyncMode
+from ostrich import OstrichDifferentiableSimulator
+from ostrich import OstrichEngineConfig
+from ostrich import ExecutionConfig
+from ostrich import LoggingConfig
+from ostrich import RenderingConfig
+from ostrich import SimulationConfig
+from ostrich.simulation.sim_config import SyncMode
 from newton import Model
 
 from examples.terrain_traversal.helhest_model import create_helhest_model
@@ -96,7 +96,7 @@ def regularization_kernel(
     wp.atomic_add(loss, 0, weight * v * v)
 
 
-class TerrainTraversalBundledOptimizer(AxionDifferentiableSimulator):
+class TerrainTraversalBundledOptimizer(OstrichDifferentiableSimulator):
     """First-order bundled-gradient optimizer for terrain traversal.
 
     N = num_worlds parallel rollouts, each with spline_params + sigma * w_i.
@@ -410,7 +410,7 @@ class TerrainTraversalBundledOptimizer(AxionDifferentiableSimulator):
         )
 
         results = {
-            "simulator": "Axion",
+            "simulator": "Ostrich",
             "problem": "terrain_traversal_bundled",
             "method": "first_order_bundled",
             "seed": self._terrain_seed,
@@ -527,7 +527,7 @@ def run_single(args, seed):
         use_cuda_graph=True,
         headless_steps_per_segment=1,
     )
-    engine_config = AxionEngineConfig(
+    engine_config = OstrichEngineConfig(
         max_newton_iters=14,
         max_linear_iters=16,
         backtrack_min_iter=10,

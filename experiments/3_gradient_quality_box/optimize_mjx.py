@@ -1,6 +1,6 @@
 """Helhest_junior box trajectory optimization using MuJoCo MJX (jax.grad).
 
-MJX counterpart of optimize_axion.py: optimises a K-knot wheel-velocity
+MJX counterpart of optimize_ostrich.py: optimises a K-knot wheel-velocity
 spline so the helhest_junior matches a recorded real trajectory while
 crossing the box. Uses the junior MJCF + yaw-tuned best MuJoCo params from
 experiments/1_sim_to_real_box (μ=1.5, tor=10, condim=6, implicitfast),
@@ -8,9 +8,9 @@ default dt=5e-3 (inside MuJoCo's accuracy plateau on this scene; small
 enough that BPTT memory stays modest — ~0.7 GB at horizon=6 s).
 
 Outputs results/mjx.json with the same per-trial loss-curve schema as
-optimize_axion.py, so plot_results.py overlays them automatically.
+optimize_ostrich.py, so plot_results.py overlays them automatically.
 
-Requires JAX + mujoco-mjx (not installed in axion's main env — install with
+Requires JAX + mujoco-mjx (not installed in ostrich's main env — install with
 ``pip install jax mujoco-mjx`` in a separate venv).
 
 Usage:
@@ -50,7 +50,7 @@ RESULTS_DIR = pathlib.Path(__file__).parent / "results"
 #   qpos[0:3]   chassis position (x, y, z)
 #   qpos[3:7]   chassis orientation quaternion (w, x, y, z)  (MuJoCo's wxyz)
 #   qpos[7:10]  wheel angles (left, right, rear)
-# Loss only consumes qpos[:2] (chassis XY) — same as optimize_axion.py.
+# Loss only consumes qpos[:2] (chassis XY) — same as optimize_ostrich.py.
 
 
 # -------------- box-scene MJCF params (locked to MuJoCo sweep best) ---------
@@ -138,7 +138,7 @@ def rollout_loss_fn(mx, dx0, W, target_xy):
     return loss_fn
 
 
-# -------------- Adam (numpy, like optimize_axion.py) -----------------------
+# -------------- Adam (numpy, like optimize_ostrich.py) -----------------------
 class SplineAdam:
     def __init__(self, K, num_dofs, lr=0.1, lr_min_ratio=0.2, total_steps=50,
                  betas=(0.9, 0.999), eps=1e-8):

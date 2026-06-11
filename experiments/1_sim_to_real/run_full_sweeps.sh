@@ -3,8 +3,8 @@
 #
 # Usage:
 #   ./run_full_sweeps.sh                    # run all
-#   ./run_full_sweeps.sh --axion            # run only Axion
-#   ./run_full_sweeps.sh --axion --mujoco   # run Axion and MuJoCo
+#   ./run_full_sweeps.sh --ostrich            # run only Ostrich
+#   ./run_full_sweeps.sh --ostrich --mujoco   # run Ostrich and MuJoCo
 set -e
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DATA="$DIR/../data"
@@ -14,11 +14,11 @@ mkdir -p "$RESULTS"
 GT="$DATA/right_turn_b.json $DATA/acceleration.json"
 
 # Parse args: if none given, run all
-RUN_AXION=false; RUN_MUJOCO=false; RUN_SEMI=false; RUN_TINY=false; RUN_DOJO=false
+RUN_OSTRICH=false; RUN_MUJOCO=false; RUN_SEMI=false; RUN_TINY=false; RUN_DOJO=false
 RUN_ALL=true
 for arg in "$@"; do
     case $arg in
-        --axion) RUN_AXION=true; RUN_ALL=false;;
+        --ostrich) RUN_OSTRICH=true; RUN_ALL=false;;
         --mujoco) RUN_MUJOCO=true; RUN_ALL=false;;
         --semi-implicit) RUN_SEMI=true; RUN_ALL=false;;
         --tinydiffsim) RUN_TINY=true; RUN_ALL=false;;
@@ -26,15 +26,15 @@ for arg in "$@"; do
     esac
 done
 
-if $RUN_ALL || $RUN_AXION; then
-    echo "=== Axion ==="
-    python "$DIR/sweep_axion.py" \
+if $RUN_ALL || $RUN_OSTRICH; then
+    echo "=== Ostrich ==="
+    python "$DIR/sweep_ostrich.py" \
         --ground-truth $GT \
         --dt 0.05 0.08 \
         --mu 0.1 0.15 \
         --fc 1e-3 5e-3 1.2e-2 2e-2 5e-2 \
         --cc 1e-1 \
-        --save "$RESULTS/sweep_axion.json"
+        --save "$RESULTS/sweep_ostrich.json"
     echo ""
 fi
 

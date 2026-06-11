@@ -1,33 +1,33 @@
 #!/usr/bin/env bash
-# Sweep num_worlds for Axion, MJX, and Semi-Implicit on the box scene.
+# Sweep num_worlds for Ostrich, MJX, and Semi-Implicit on the box scene.
 # Skip-on-OOM (so the sweep continues past the first failure) and skip
 # already-existing result files (so the sweep is resumable).
 #
 # Per-engine compute (3090, dasenka):
-#   - Axion : ~1.5 min/run (~30 min for the full 18-point grid)
+#   - Ostrich : ~1.5 min/run (~30 min for the full 18-point grid)
 #   - MJX   : ~3 min/run   (~25 min for 1..32 grid; OOM expected ~32-64)
 #   - SI    : ~20 min/run (each invocation pays ~20 min cold CUDA-graph
 #             capture; the actual 5-iter measurement is ~30 s)
 #
 # Usage:
 #   bash experiments/4_scalability_box/run_sweep.sh                # all engines
-#   bash experiments/4_scalability_box/run_sweep.sh --axion        # subset
+#   bash experiments/4_scalability_box/run_sweep.sh --ostrich        # subset
 
 set -e
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RESULTS="$DIR/results"
 mkdir -p "$RESULTS"
 
-AXION_WORLDS=(1 2 4 8 16 32 64 128 256 512 1024 2048 4096 8192 16384 32768 65536 131072)
+OSTRICH_WORLDS=(1 2 4 8 16 32 64 128 256 512 1024 2048 4096 8192 16384 32768 65536 131072)
 MJX_WORLDS=(1 2 4 8 16 32 64)
 # SI surprisingly memory-efficient (~26 MB/world at N=32), should scale much
 # higher than the original cap. Extended to 1024 to find the real wall.
 SI_WORLDS=(1 2 4 8 16 32 64 128 256 512 1024)
 
-RUN_ALL=true; RUN_AXION=false; RUN_MJX=false; RUN_SI=false
+RUN_ALL=true; RUN_OSTRICH=false; RUN_MJX=false; RUN_SI=false
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --axion)         RUN_AXION=true; RUN_ALL=false; shift;;
+        --ostrich)         RUN_OSTRICH=true; RUN_ALL=false; shift;;
         --mjx)           RUN_MJX=true;   RUN_ALL=false; shift;;
         --semi-implicit) RUN_SI=true;    RUN_ALL=false; shift;;
         *) echo "Unknown arg: $1"; exit 1;;
@@ -54,10 +54,10 @@ run_sim() {
     fi
 }
 
-if $RUN_ALL || $RUN_AXION; then
-    echo "=== Axion sweep ==="
-    for N in "${AXION_WORLDS[@]}"; do
-        run_sim "$DIR/axion_sim.py" "Axion" "$N" "$RESULTS/axion_${N}.json" || break
+if $RUN_ALL || $RUN_OSTRICH; then
+    echo "=== Ostrich sweep ==="
+    for N in "${OSTRICH_WORLDS[@]}"; do
+        run_sim "$DIR/ostrich_sim.py" "Ostrich" "$N" "$RESULTS/ostrich_${N}.json" || break
     done
 fi
 

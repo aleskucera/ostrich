@@ -1,7 +1,7 @@
 """Scalability benchmark: gradient computation time vs number of parallel environments.
 
 Measures per-iteration wall-clock time (forward + backward) at increasing
-batch sizes for GPU-batched simulators (Axion, MJX) and per-environment
+batch sizes for GPU-batched simulators (Ostrich, MJX) and per-environment
 time for CPU simulators (MuJoCo-FD, Dojo, TinyDiffSim).
 
 Usage:
@@ -29,10 +29,10 @@ WARMUP_ITERS = 3
 BENCH_ITERS = 10
 
 
-# ── Axion ──
+# ── Ostrich ──
 
-def benchmark_axion(batch_sizes):
-    """Run Axion gradient benchmark at each batch size in a subprocess."""
+def benchmark_ostrich(batch_sizes):
+    """Run Ostrich gradient benchmark at each batch size in a subprocess."""
     results = {}
     for B in batch_sizes:
         tmp = tempfile.mktemp(suffix=".json")
@@ -40,12 +40,12 @@ def benchmark_axion(batch_sizes):
 import os, json, time, numpy as np
 os.environ["PYOPENGL_PLATFORM"] = "glx"
 import newton, warp as wp
-from axion import (
-    AxionDifferentiableSimulator, AxionEngineConfig, ComplianceConfig,
+from ostrich import (
+    OstrichDifferentiableSimulator, OstrichEngineConfig, ComplianceConfig,
     ContactsConfig, LinearSolverConfig, LinesearchConfig,
     LoggingConfig, NewtonRaphsonConfig, RenderingConfig, SimulationConfig,
 )
-from axion.simulation.sim_config import SyncMode
+from ostrich.simulation.sim_config import SyncMode
 from examples.helhest.common import create_helhest_model, HelhestConfig
 
 K = 30
@@ -64,7 +64,7 @@ def loss_kernel(body_pose: wp.array(dtype=wp.transform, ndim=3),
     delta = pos - target_pos
     wp.atomic_add(loss, 0, weight * wp.dot(delta, delta))
 
-class Sim(AxionDifferentiableSimulator):
+class Sim(OstrichDifferentiableSimulator):
     def build_model(self):
         self.builder.rigid_gap = 0.1
         self.builder.add_ground_plane(cfg=newton.ModelBuilder.ShapeConfig(mu=0.7, ke=50.0, kd=50.0, kf=50.0))
@@ -87,7 +87,7 @@ sim = Sim(
     SimulationConfig(duration_seconds=3.0, target_timestep_seconds=0.05,
                      num_worlds={B}, sync_mode=SyncMode.ALIGN_FPS_TO_DT, use_cuda_graph=True),
     RenderingConfig(vis_type="null", target_fps=30, usd_file=None, start_paused=False),
-    AxionEngineConfig(
+    OstrichEngineConfig(
         nr=NewtonRaphsonConfig(max_iters=12, backtrack_min_iter=8, atol=1e-1),
         linear=LinearSolverConfig(max_iters=12, tol=1e-3, atol=1e-3, regularization=1e-6),
         compliance=ComplianceConfig(joint=6e-8, contact=1e-6, friction=1e-6),
@@ -164,7 +164,7 @@ except Exception:
 import pathlib
 pathlib.Path("{tmp}").write_text(json.dumps({{"times_ms": [t * 1000 for t in times], "gpu_mem_mb": mem_mb}}))
 '''
-        print(f"  Axion B={B}...", end=" ", flush=True)
+        print(f"  Ostrich B={B}...", end=" ", flush=True)
         result = subprocess.run([sys.executable, "-c", worker],
                                 capture_output=True, text=True, timeout=300)
         if result.returncode != 0:
@@ -365,7 +365,7 @@ def plot_scalability(all_results, output_path):
     fig, (ax_time, ax_mem) = plt.subplots(1, 2, figsize=(7.16, 2.4))
 
     styles = {
-        "Axion": {"color": "tab:blue", "marker": "o", "ls": "-", "lw": 1.5},
+        "Ostrich": {"color": "tab:blue", "marker": "o", "ls": "-", "lw": 1.5},
         "MJX": {"color": "tab:red", "marker": "s", "ls": "--", "lw": 1.5},
     }
 
@@ -411,7 +411,7 @@ def main():
     parser.add_argument("--save", metavar="PATH", help="Save results JSON")
     parser.add_argument("-o", "--output", default="results/scalability_helhest.png",
                         help="Output plot path")
-    parser.add_argument("--axion-only", action="store_true")
+    parser.add_argument("--ostrich-only", action="store_true")
     parser.add_argument("--mjx-only", action="store_true")
     parser.add_argument("--batch-sizes", type=str, default=None,
                         help="Comma-separated batch sizes (default: 1,2,4,8,16,32,64,128)")
@@ -424,10 +424,10 @@ def main():
     all_results = {}
 
     if not args.mjx_only:
-        print("=== Axion ===")
-        all_results["Axion"] = benchmark_axion(BATCH_SIZES)
+        print("=== Ostrich ===")
+        all_results["Ostrich"] = benchmark_ostrich(BATCH_SIZES)
 
-    if not args.axion_only:
+    if not args.ostrich_only:
         print("\n=== MJX (reverse-mode AD) ===")
         all_results["MJX"] = benchmark_mjx(BATCH_SIZES)
 

@@ -30,13 +30,13 @@ CONFIG_PATH = "../examples/conf"
     version_base=None,
 )
 def main(cfg: DictConfig):
-    from axion import (
+    from ostrich import (
         EngineConfig,
         LoggingConfig,
         RenderingConfig,
         SimulationConfig,
     )
-    from axion.optim.preconditioner import JacobiPreconditioner
+    from ostrich.optim.preconditioner import JacobiPreconditioner
 
     sys.path.insert(
         0, os.path.join(os.path.dirname(__file__), "..", "examples", "helhest")

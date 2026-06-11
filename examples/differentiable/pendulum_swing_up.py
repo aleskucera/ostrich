@@ -20,12 +20,12 @@ import hydra
 import newton
 import numpy as np
 import warp as wp
-from axion import AxionDifferentiableSimulator
-from axion import EngineConfig
-from axion import LoggingConfig
-from axion import RenderingConfig
-from axion import SimulationConfig
-from axion.core.types import JointMode
+from ostrich import OstrichDifferentiableSimulator
+from ostrich import EngineConfig
+from ostrich import LoggingConfig
+from ostrich import RenderingConfig
+from ostrich import SimulationConfig
+from ostrich.core.types import JointMode
 from newton import Model
 from omegaconf import DictConfig
 
@@ -91,7 +91,7 @@ def sgd_update_kernel(
     param[sim_step, world_idx, dof_idx] = param[sim_step, world_idx, dof_idx] - lr * g
 
 
-class PendulumSwingUp(AxionDifferentiableSimulator):
+class PendulumSwingUp(OstrichDifferentiableSimulator):
     def __init__(
         self,
         sim_config: SimulationConfig,
@@ -204,7 +204,7 @@ class PendulumSwingUp(AxionDifferentiableSimulator):
                 contacts=self.contacts,
                 dt=self.clock.dt,
             )
-            self.trajectory.save_step(i, self.solver.data, self.solver.axion_contacts)
+            self.trajectory.save_step(i, self.solver.data, self.solver.ostrich_contacts)
 
         self.loss.zero_()
         self.tape.zero()

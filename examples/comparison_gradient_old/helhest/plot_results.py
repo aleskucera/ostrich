@@ -37,7 +37,7 @@ STYLES = {
     "MJX-grad":     {"color": "#FF8A65"},
     "TinyDiffSim":  {"color": "#607D8B"},
     "Brax":         {"color": "#009688"},
-    "Axion":        {"color": "#2196F3"},
+    "Ostrich":        {"color": "#2196F3"},
 }
 LABELS = {
     "Nimble":       "Nimble",
@@ -48,10 +48,10 @@ LABELS = {
     "MJX-grad":     "MJX-grad",
     "TinyDiffSim":  "TinyDiffSim",
     "Brax":         "Brax",
-    "Axion":        r"\textbf{Axion}",
+    "Ostrich":        r"\textbf{Ostrich}",
 }
 SIM_ORDER = list(STYLES.keys())
-AXION_COLOR = "#2196F3"
+OSTRICH_COLOR = "#2196F3"
 
 
 def load_results() -> dict:
@@ -80,14 +80,14 @@ def main():
     if not results:
         print("No results found. Run the benchmark scripts first.")
         return
-    if "Axion" not in results:
-        print("Axion results not found — cannot compute ×N ratios.")
+    if "Ostrich" not in results:
+        print("Ostrich results not found — cannot compute ×N ratios.")
         return
 
-    # Sort ascending by median timing (fastest = Axion at top)
+    # Sort ascending by median timing (fastest = Ostrich at top)
     sims = sorted(results.keys(), key=lambda s: _median(results[s]))
 
-    axion_median = _median(results["Axion"])
+    ostrich_median = _median(results["Ostrich"])
     colors  = [STYLES.get(s, {"color": "gray"})["color"] for s in sims]
     ylabels = [LABELS.get(s, s) for s in sims]
 
@@ -125,20 +125,20 @@ def main():
         label = f"{val:.0f}" if val >= 10 else f"{val:.1f}"
         ax.text(val * 1.5, cy, label, va="center", ha="left", fontsize=7)
 
-        if sim != "Axion":
-            ratio = val / axion_median
+        if sim != "Ostrich":
+            ratio = val / ostrich_median
             ratio_str = (
                 f"$\\times{ratio:.0f}$" if ratio >= 10 else f"$\\times{ratio:.1f}$"
             )
             ax.text(
                 1.04, cy, ratio_str,
                 va="center", ha="left", fontsize=7,
-                color=AXION_COLOR, fontweight="bold",
+                color=OSTRICH_COLOR, fontweight="bold",
                 transform=right_xfm, clip_on=False,
             )
 
     ax.text(
-        1.04, 1.01, r"vs \textbf{Axion}",
+        1.04, 1.01, r"vs \textbf{Ostrich}",
         va="bottom", ha="left", fontsize=6,
         color="gray", transform=ax.transAxes, clip_on=False,
     )

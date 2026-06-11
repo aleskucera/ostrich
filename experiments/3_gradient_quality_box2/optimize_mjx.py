@@ -1,6 +1,6 @@
 """Helhest_junior box random-IC final-pose optimisation — MJX.
 
-MJX counterpart of optimize_axion.py. Same task: random IC + random target +
+MJX counterpart of optimize_ostrich.py. Same task: random IC + random target +
 weighted loss (final pos + final yaw + terminal velocity + smoothness + reg).
 Cylinder wheels are swapped to capsules + wheel↔wheel collisions disabled
 (see experiments/3_gradient_quality_box/optimize_mjx.py — MJX collision
@@ -54,7 +54,7 @@ def make_interp_matrix(T, K):
 
 
 class SplineAdam:
-    """Same hand-rolled Adam as optimize_axion.py (numpy)."""
+    """Same hand-rolled Adam as optimize_ostrich.py (numpy)."""
     def __init__(self, K, num_dofs, lr=0.05, lr_min_ratio=0.2, total_steps=100,
                  betas=(0.9, 0.999), eps=1e-8):
         self.lr_init = lr; self.lr_min = lr * lr_min_ratio
@@ -134,7 +134,7 @@ def make_loss_fn(mx, dx0, W, ic_xy, target_xy, target_yaw, weights, dt, tail_fra
     w_pos = weights["pos"]; w_yaw = weights["yaw"]; w_vel = weights["vel"]
     w_smooth = weights["smooth"]; w_reg = weights["reg"]
 
-    # Linear waypoint reference: same shaping signal as the Axion script's
+    # Linear waypoint reference: same shaping signal as the Ostrich script's
     # chassis_track_loss_kernel. Per-step xy distance to a straight line
     # from ic_xy to target_xy puts gradient signal at EVERY timestep instead
     # of requiring it to compound back from the terminal step.
@@ -147,7 +147,7 @@ def make_loss_fn(mx, dx0, W, ic_xy, target_xy, target_yaw, weights, dt, tail_fra
         xy_traj = traj[:, :2]
         quat_traj = traj[:, 2:]
 
-        # 0. Per-step waypoint tracking — main shaping term (see Axion analog)
+        # 0. Per-step waypoint tracking — main shaping term (see Ostrich analog)
         L_track = (w_track / T) * jnp.sum((xy_traj - ref_xy) ** 2)
 
         # 1. Final position
@@ -252,7 +252,7 @@ def run_trial(seed, K, lr, iterations, horizon, dt, ic, target, weights,
             grad_np = grad_np * (clip_grad_norm / gnorm)
             n_clipped += 1
         losses.append(loss_val); grad_norms.append(gnorm)
-        # Best-iter snapshot (same justification as Axion run_trial)
+        # Best-iter snapshot (same justification as Ostrich run_trial)
         if loss_val < best_loss:
             best_loss = loss_val
             best_iter = it
@@ -313,17 +313,17 @@ def main():
     ap.add_argument("--dt", type=float, default=5e-3)
     ap.add_argument("--ic-xy", type=float, default=0.1,
                     help="±range for IC xy perturbation (m). Default 0.1m — "
-                    "matches Axion side; wider IC made many trials infeasible.")
+                    "matches Ostrich side; wider IC made many trials infeasible.")
     ap.add_argument("--ic-yaw-deg", type=float, default=5.0,
                     help="±range for IC yaw perturbation (deg). Default 5° — "
-                    "matches Axion side.")
+                    "matches Ostrich side.")
     ap.add_argument("--target-x", type=float, default=3.0)
     ap.add_argument("--target-y", type=float, default=0.0)
     ap.add_argument("--target-xy-jitter", type=float, default=0.3)
     ap.add_argument("--target-yaw-deg", type=float, default=15.0)
     ap.add_argument("--w-track", type=float, default=1.0,
                     help="Per-step chassis-xy tracking weight against a linear "
-                    "IC→target reference (shaping signal; matches the Axion side).")
+                    "IC→target reference (shaping signal; matches the Ostrich side).")
     ap.add_argument("--w-pos", type=float, default=1.0)
     ap.add_argument("--w-yaw", type=float, default=0.5)
     ap.add_argument("--w-vel", type=float, default=0.3)

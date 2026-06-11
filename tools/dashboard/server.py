@@ -1,4 +1,4 @@
-"""Tiny FastAPI server that exposes axion HDF5 logs as JSON for the
+"""Tiny FastAPI server that exposes ostrich HDF5 logs as JSON for the
 Observable Plot frontend.
 
 Install:
@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 LOGS_DIR = ROOT / "data" / "logs"
 HERE = Path(__file__).resolve().parent
 
-app = FastAPI(title="axion convergence")
+app = FastAPI(title="ostrich convergence")
 
 
 def _to_jsonable(x):

@@ -3,10 +3,10 @@ set -e
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 mkdir -p "$DIR/results"
 
-# Axion — implicit servo (dt_sweep, gain_sweep, binary_search)
-python "$DIR/axion_sim.py" --experiment dt_sweep   --save "$DIR/results/axion_implicit_dt.json"
-python "$DIR/axion_sim.py" --experiment gain_sweep  --save "$DIR/results/axion_implicit_gain.json"
-python "$DIR/axion_sim.py" --experiment binary_search --save "$DIR/results/axion_threshold.json"
+# Ostrich — implicit servo (dt_sweep, gain_sweep, binary_search)
+python "$DIR/ostrich_sim.py" --experiment dt_sweep   --save "$DIR/results/ostrich_implicit_dt.json"
+python "$DIR/ostrich_sim.py" --experiment gain_sweep  --save "$DIR/results/ostrich_implicit_gain.json"
+python "$DIR/ostrich_sim.py" --experiment binary_search --save "$DIR/results/ostrich_threshold.json"
 
 # Semi-Implicit — explicit PD (binary_search)
 python "$DIR/semi_implicit.py" --experiment binary_search --save "$DIR/results/semi_implicit_threshold.json"

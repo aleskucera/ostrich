@@ -92,8 +92,8 @@
     }
   ],
   "ground_truth": [
-    "/home/kuceral4/projects/axion/experiments/1_sim_to_real/../data/right_turn_b.json",
-    "/home/kuceral4/projects/axion/experiments/1_sim_to_real/../data/acceleration.json"
+    "/home/kuceral4/projects/ostrich/experiments/1_sim_to_real/../data/right_turn_b.json",
+    "/home/kuceral4/projects/ostrich/experiments/1_sim_to_real/../data/acceleration.json"
   ],
   "best_per_trajectory": {
     "helhest_2026_04_10-14_46_18": {

@@ -1,7 +1,7 @@
 """Interactive semi-implicit simulation of Helhest for parameter tuning.
 
 The semi-implicit solver uses penalty-based contacts (ke, kd, kf) and explicit
-PD control (target_ke, target_kd). Very different parameter regime from Axion.
+PD control (target_ke, target_kd). Very different parameter regime from Ostrich.
 
 Usage:
     python examples/comparison_gradient/helhest/parameter_sweep/tune_semi_implicit.py
@@ -20,12 +20,12 @@ from typing import override
 import newton
 import numpy as np
 import warp as wp
-from axion import ExecutionConfig
-from axion import InteractiveSimulator
-from axion import LoggingConfig
-from axion import RenderingConfig
-from axion import SemiImplicitEngineConfig
-from axion import SimulationConfig
+from ostrich import ExecutionConfig
+from ostrich import InteractiveSimulator
+from ostrich import LoggingConfig
+from ostrich import RenderingConfig
+from ostrich import SemiImplicitEngineConfig
+from ostrich import SimulationConfig
 
 from examples.helhest.common import create_helhest_model
 

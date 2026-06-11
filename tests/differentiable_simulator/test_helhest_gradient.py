@@ -13,11 +13,11 @@ wp.init()
 
 import numpy as np
 import newton
-from axion.core.engine import AxionEngine
-from axion.core.engine_config import AxionEngineConfig, LinearSolverConfig, NewtonRaphsonConfig
-from axion.core.logging_config import LoggingConfig
-from axion.core.model_builder import AxionModelBuilder
-from axion.simulation.trajectory_buffer import TrajectoryBuffer
+from ostrich.core.engine import OstrichEngine
+from ostrich.core.engine_config import OstrichEngineConfig, LinearSolverConfig, NewtonRaphsonConfig
+from ostrich.core.logging_config import LoggingConfig
+from ostrich.core.model_builder import OstrichModelBuilder
+from ostrich.simulation.trajectory_buffer import TrajectoryBuffer
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "examples"))
 from helhest.common import HelhestConfig, create_helhest_model
@@ -27,7 +27,7 @@ NUM_WHEEL_DOFS = 3
 
 
 def build_helhest(k_p=150.0, k_d=0.0, friction=0.7):
-    builder = AxionModelBuilder()
+    builder = OstrichModelBuilder()
     builder.rigid_gap = 0.1
     builder.add_ground_plane()
     create_helhest_model(
@@ -45,11 +45,11 @@ def build_helhest(k_p=150.0, k_d=0.0, friction=0.7):
 
 
 def make_engine(model, sim_steps=5):
-    config = AxionEngineConfig(
+    config = OstrichEngineConfig(
         nr=NewtonRaphsonConfig(max_iters=20),
         linear=LinearSolverConfig(max_iters=200, tol=1e-8, atol=1e-8),
     )
-    return AxionEngine(
+    return OstrichEngine(
         model=model,
         sim_steps=sim_steps,
         config=config,
@@ -77,17 +77,17 @@ def compute_wheel_vel_gradient(model, engine, target_vel, w, dt=0.01):
 
     # Backward
     buffer = TrajectoryBuffer(
-        data=engine.data, contacts=engine.axion_contacts,
+        data=engine.data, contacts=engine.ostrich_contacts,
         dims=dims, num_steps=1, device=model.device,
     )
-    buffer.save_step(0, engine.data, engine.axion_contacts)
+    buffer.save_step(0, engine.data, engine.ostrich_contacts)
     buffer.zero_grad()
     wp.copy(
         buffer.body_vel.grad[1],
         wp.array(w.reshape(engine.data.body_vel_grad.numpy().shape),
                  dtype=wp.spatial_vector, device=model.device),
     )
-    buffer.load_step(0, engine.data, engine.axion_contacts)
+    buffer.load_step(0, engine.data, engine.ostrich_contacts)
     engine.data.zero_gradients()
     engine.step_backward()
 
@@ -205,7 +205,7 @@ def test_multi_step():
 
     dt = 0.01
     buffer = TrajectoryBuffer(
-        data=engine.data, contacts=engine.axion_contacts,
+        data=engine.data, contacts=engine.ostrich_contacts,
         dims=dims, num_steps=5, device=model.device,
     )
 
@@ -214,7 +214,7 @@ def test_multi_step():
     for step in range(5):
         contacts = model.collide(state_in)
         engine.step(state_in, state_out, control, contacts, dt)
-        buffer.save_step(step, engine.data, engine.axion_contacts)
+        buffer.save_step(step, engine.data, engine.ostrich_contacts)
         state_in, state_out = state_out, state_in
 
     # Set loss gradient at final velocity
@@ -227,7 +227,7 @@ def test_multi_step():
 
     # Backward
     for step in range(4, -1, -1):
-        buffer.load_step(step, engine.data, engine.axion_contacts)
+        buffer.load_step(step, engine.data, engine.ostrich_contacts)
         engine.data.zero_gradients()
         engine.step_backward()
         if step > 0:

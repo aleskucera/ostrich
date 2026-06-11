@@ -3,9 +3,9 @@
 Mirrors experiments/3_gradient_quality_box/plot_results.py: single-panel
 running-best loss vs wall-clock seconds (log-log), median line + IQR band
 across N trials per engine. Reads results/<engine>*.json files saved by
-optimize_axion.py / optimize_mjx.py / optimize_semi_implicit.py.
+optimize_ostrich.py / optimize_mjx.py / optimize_semi_implicit.py.
 
-Specifically picks `axion_all_fixes.json`, `mjx_all_fixes.json`, etc. when
+Specifically picks `ostrich_all_fixes.json`, `mjx_all_fixes.json`, etc. when
 present (the final tuned runs) and falls back to `<engine>.json` otherwise.
 
 Caveat (inherited from box1): the per-trial wall_s is a single total, so
@@ -27,7 +27,7 @@ import matplotlib.ticker as ticker
 import numpy as np
 
 RESULTS_DIR = pathlib.Path(__file__).parent / "results"
-PAPER_DIR = pathlib.Path(__file__).resolve().parents[2] / ".." / "axion_paper" / "figures"
+PAPER_DIR = pathlib.Path(__file__).resolve().parents[2] / ".." / "ostrich_paper" / "figures"
 
 plt.rcParams.update({
     "text.usetex": True,
@@ -43,16 +43,16 @@ plt.rcParams.update({
 })
 
 STYLES = {
-    "Axion":         {"color": "#2196F3", "marker": "o", "lw": 2.0, "zorder": 5},
+    "Ostrich":         {"color": "#2196F3", "marker": "o", "lw": 2.0, "zorder": 5},
     "MJX":           {"color": "#E91E63", "marker": "s", "lw": 1.8, "zorder": 4},
     "Semi-Implicit": {"color": "#FF9800", "marker": "^", "lw": 1.8, "zorder": 3},
 }
 LABELS = {
-    "Axion":         r"\textbf{Ostrich}",
+    "Ostrich":         r"\textbf{Ostrich}",
     "MJX":           "MJX",
     "Semi-Implicit": "Semi-Impl.",
 }
-SIM_ORDER = ["Axion", "MJX", "Semi-Implicit"]
+SIM_ORDER = ["Ostrich", "MJX", "Semi-Implicit"]
 
 N_GRID = 80
 
@@ -114,7 +114,7 @@ def main():
     ap.add_argument("--engines", nargs="+", default=None,
                     choices=SIM_ORDER,
                     help="subset of engines to plot (default: all available). "
-                    "e.g. --engines Axion MJX")
+                    "e.g. --engines Ostrich MJX")
     ap.add_argument("--show", action="store_true")
     args = ap.parse_args()
 
@@ -122,7 +122,7 @@ def main():
 
     # Engine key (file prefix) ↔ "simulator" string in the JSON.
     engine_file_keys = {
-        "Axion": "axion",
+        "Ostrich": "ostrich",
         "MJX": "mjx",
         "Semi-Implicit": "semi_implicit",
     }

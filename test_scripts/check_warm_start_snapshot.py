@@ -21,7 +21,7 @@ CONFIG_PATH = "../examples/conf"
 
 @hydra.main(config_path=CONFIG_PATH, config_name="helhest_obstacle_benchmark", version_base=None)
 def main(cfg: DictConfig):
-    from axion import (
+    from ostrich import (
         EngineConfig,
         LoggingConfig,
         RenderingConfig,

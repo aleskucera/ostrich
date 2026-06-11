@@ -27,7 +27,7 @@ with the paper's complementarity preconditioner (their Eq. 66):
 r = h² · [J M⁻¹ J^T]_ii
 ```
 
-The implementation in `src/axion/constraints/contact_constraint.py:94-106` matches
+The implementation in `src/ostrich/constraints/contact_constraint.py:94-106` matches
 the paper:
 
 ```python
@@ -236,7 +236,7 @@ Goal: confirm the failure mode before changing anything.
 1. Pick a reproducible scene with the symptom — a resting robot at `dt = 1 ms`
    that visibly jitters. Anything in `experiments/2_dt_stability/` likely fits.
 2. Enable HDF5 logging:
-   - In the relevant `AxionEngineConfig`, set `enable_hdf5_logging = True` and
+   - In the relevant `OstrichEngineConfig`, set `enable_hdf5_logging = True` and
      `log_constraint_data = True`.
 3. Run one short simulation (~1 s of sim time).
 4. Read the log and plot per-step:
@@ -257,7 +257,7 @@ is something else and this fix won't help.**
 
 Goal: confirm the math by trying the simplest possible version.
 
-1. Edit `src/axion/core/engine_config.py`, line 65:
+1. Edit `src/ostrich/core/engine_config.py`, line 65:
    ```python
    contact_compliance: float = 10.0   # was 1e-6
    ```
@@ -277,7 +277,7 @@ about, stop here. Skip Phase 3.
 Goal: make compliance auto-scale so it's silent at large `dt` and active at small
 `dt`.
 
-1. Edit `src/axion/constraints/contact_constraint.py`, replacing line 106:
+1. Edit `src/ostrich/constraints/contact_constraint.py`, replacing line 106:
    ```python
    c_val = dphi_dlambda_n / wp.pow(dt, 2.0) + compliance
    ```
@@ -314,7 +314,7 @@ Skip this phase unless friction shows independent symptoms.
 
 Before merging:
 
-1. Run `experiments/2_dt_stability/sweep_axion.py` (or the closest existing
+1. Run `experiments/2_dt_stability/sweep_ostrich.py` (or the closest existing
    benchmark) for `dt ∈ {50, 10, 5, 1, 0.5} ms`.
 2. Compare:
    - Trajectory quality (visualize a representative scene).

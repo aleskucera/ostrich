@@ -1,7 +1,7 @@
-site_name: Axion Simulator
+site_name: Ostrich Simulator
 site_description: High-performance differentiable physics simulator for robotics and machine learning
-repo_url: https://github.com/aleskucera/axion.git
-repo_name: aleskucera/axion
+repo_url: https://github.com/aleskucera/ostrich.git
+repo_name: aleskucera/ostrich
 
 nav:
   - Home: index.md

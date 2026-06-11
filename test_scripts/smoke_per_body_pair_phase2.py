@@ -31,16 +31,16 @@ CONFIG_PATH = "../examples/conf"
 )
 def main(cfg: DictConfig):
     import warp as wp
-    from axion import (
+    from ostrich import (
         EngineConfig,
         LoggingConfig,
         RenderingConfig,
         SimulationConfig,
     )
-    from axion.optim.per_body_pair_preconditioner import (
+    from ostrich.optim.per_body_pair_preconditioner import (
         PerBodyPairPreconditioner,
     )
-    from axion.optim.preconditioner import JacobiPreconditioner
+    from ostrich.optim.preconditioner import JacobiPreconditioner
 
     sys.path.insert(
         0, os.path.join(os.path.dirname(__file__), "..", "examples", "helhest")
@@ -85,7 +85,7 @@ def main(cfg: DictConfig):
         member_list = precond.pair_member_list.numpy()
         constr_body_idx = engine.data._constr_body_idx.numpy()
         J_values = engine.data._J_values.numpy()  # (W, N_c, 2, 6)
-        body_inv_mass = engine.axion_model.body_inv_mass.numpy()
+        body_inv_mass = engine.ostrich_model.body_inv_mass.numpy()
         body_inv_inertia = engine.data.world_inv_inertia.numpy()
         C_values = engine.data._C_values.numpy()
         # Also pull Jacobi's diag for cross-check

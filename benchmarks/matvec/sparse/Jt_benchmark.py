@@ -2,11 +2,11 @@ import time
 
 import numpy as np
 import warp as wp
-from axion.sparse.Jt_tiled import CONSTRAINTS_PER_BODY
-from axion.sparse.Jt_tiled import kernel_Jt_matvec_scatter
-from axion.sparse.Jt_tiled import kernel_Jt_matvec_tiled
-from axion.sparse.Jt_tiled import NUM_BODIES
-from axion.sparse.Jt_tiled import NUM_CONSTRAINTS
+from ostrich.sparse.Jt_tiled import CONSTRAINTS_PER_BODY
+from ostrich.sparse.Jt_tiled import kernel_Jt_matvec_scatter
+from ostrich.sparse.Jt_tiled import kernel_Jt_matvec_tiled
+from ostrich.sparse.Jt_tiled import NUM_BODIES
+from ostrich.sparse.Jt_tiled import NUM_CONSTRAINTS
 
 wp.init()
 

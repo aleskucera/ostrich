@@ -26,15 +26,15 @@ warp.config.quiet = True
 import newton
 import numpy as np
 import warp as wp
-from axion.core.engine import AxionEngine
-from axion.core.engine_config import AxionEngineConfig
-from axion.core.logging_config import LoggingConfig
-from axion.core.model_builder import AxionModelBuilder
-from axion.logging.hdf5_reader import HDF5Reader
+from ostrich.core.engine import OstrichEngine
+from ostrich.core.engine_config import OstrichEngineConfig
+from ostrich.core.logging_config import LoggingConfig
+from ostrich.core.model_builder import OstrichModelBuilder
+from ostrich.logging.hdf5_reader import HDF5Reader
 
 os.environ.setdefault("PYOPENGL_PLATFORM", "glx")
 
-# Use sweep_axion's tuning (close to user's working config) so we observe the
+# Use sweep_ostrich's tuning (close to user's working config) so we observe the
 # regime they care about — not our test-tuned defaults.
 SIM_DURATION = 0.5
 START_HEIGHT = 0.5
@@ -53,7 +53,7 @@ def build_model() -> newton.Model:
     sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
     from examples.helhest.common import create_helhest_model
 
-    builder = AxionModelBuilder()
+    builder = OstrichModelBuilder()
     builder.rigid_gap = 0.1
     builder.add_ground_plane(
         cfg=newton.ModelBuilder.ShapeConfig(mu=0.0, restitution=0.0)
@@ -76,7 +76,7 @@ def run(dt: float, out_path: pathlib.Path) -> None:
     model = build_model()
     num_steps = int(round(SIM_DURATION / dt))
 
-    config = AxionEngineConfig(
+    config = OstrichEngineConfig(
         max_newton_iters=MAX_NEWTON_ITERS,
         newton_atol=NEWTON_ATOL,
         contact_compliance=CONTACT_COMPLIANCE,
@@ -91,7 +91,7 @@ def run(dt: float, out_path: pathlib.Path) -> None:
         max_simulation_steps=num_steps,
     )
 
-    engine = AxionEngine(model=model, sim_steps=num_steps, config=config, logging_config=logging_config)
+    engine = OstrichEngine(model=model, sim_steps=num_steps, config=config, logging_config=logging_config)
     s_in, s_out = model.state(), model.state()
     ctrl = model.control()
     newton.eval_fk(model, model.joint_q, model.joint_qd, s_in)
