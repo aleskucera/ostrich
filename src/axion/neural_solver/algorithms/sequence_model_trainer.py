@@ -88,7 +88,7 @@ class SequenceModelTrainer:
         self.utils_provider = neural_env.utils_provider
 
         # check if gravity_dir_body is included in input if using body frame
-        if cfg['env']['utils_provider_cfg']['states_frame'] == 'body':
+        if cfg['env']['utils_provider_cfg'].get('states_frame') == 'body':
             if 'gravity_dir' not in cfg['inputs']['low_dim']:
                 cfg['inputs']['low_dim'].append('gravity_dir')
                 print_warning("gravity_dir not included in low_dim inputs, "

@@ -12,6 +12,23 @@ from typing import Literal
 ContactReductionPolicy = Literal["none", "top_k", "fps", "cluster", "hull"]
 
 
+def _cast_scalar(value, field_type):
+    """Cast YAML/Hydra string scalars to the declared field type."""
+    if not isinstance(value, str):
+        return value
+    if field_type is int:
+        return int(value)
+    if field_type is float:
+        return float(value)
+    if field_type is bool:
+        lowered = value.lower()
+        if lowered in ("true", "yes", "1"):
+            return True
+        if lowered in ("false", "no", "0"):
+            return False
+    return value
+
+
 @dataclass(frozen=True)
 class ContactReductionConfig:
     """Per-pair contact reduction settings.
@@ -72,5 +89,10 @@ class ContactReductionConfig:
             items = dict(obj)
         except Exception:
             return cls()
-        valid = {f.name for f in fields(cls)}
-        return cls(**{k: v for k, v in items.items() if k in valid})
+        field_map = {f.name: f for f in fields(cls)}
+        kwargs = {}
+        for k, v in items.items():
+            if k not in field_map:
+                continue
+            kwargs[k] = _cast_scalar(v, field_map[k].type)
+        return cls(**kwargs)

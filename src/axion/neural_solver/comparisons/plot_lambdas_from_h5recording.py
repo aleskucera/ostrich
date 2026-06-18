@@ -163,7 +163,7 @@ def plot_simulator_lambdas(
 
     colors = plt.get_cmap("tab10")(np.linspace(0, 1, max(10, len(indices))))
 
-    fig, ax = plt.subplots(figsize=(12, 5))
+    fig, ax = plt.subplots(figsize=(6, 5))
     if len(indices) <= 4:
         ch_str = ",".join(str(i) for i in indices)
         ax.set_title(rf"Normal contact $\lambda$ values (Axion simulator)")
@@ -191,7 +191,7 @@ def plot_simulator_lambdas(
         )
 
     ax.set_xlabel(x_label)
-    ax.set_ylabel(r"$\lambda$ magnitudes")
+    ax.set_ylabel(r"$\lambda$ [N]")
     ax.grid(True, alpha=GRID_ALPHA)
 
     if y_scale == "symlog":

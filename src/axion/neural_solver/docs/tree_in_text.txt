@@ -1,14 +1,81 @@
 .
 ├── examples
+│   ├── conf
+│   │   ├── axion_w_neural_lambdas_pendulum.yaml
+│   │   ├── config_diff.yaml
+│   │   ├── config_uphill.yaml
+│   │   ├── config.yaml
+│   │   ├── control
+│   │   ├── engine
+│   │   │   ├── axion_profile_e2e.yaml
+│   │   │   ├── axion_profile_per_iter.yaml
+│   │   │   ├── axion_w_neural_lambdas.yaml
+│   │   │   ├── axion.yaml
+│   │   │   ├── featherstone.yaml
+│   │   │   ├── gpt_profile_e2e.yaml
+│   │   │   ├── gpt.yaml
+│   │   │   ├── hybrid_profile_e2e.yaml
+│   │   │   ├── hybrid_profile_per_iter.yaml
+│   │   │   ├── hybrid.yaml
+│   │   │   ├── mujoco.yaml
+│   │   │   ├── repeated.yaml
+│   │   │   ├── semi_implicit.yaml
+│   │   │   ├── teacher_forced_gpt.yaml
+│   │   │   └── xpbd.yaml
+│   │   ├── featherstone.yaml
+│   │   ├── gpt_pendulum.yaml
+│   │   ├── helhest_benchmark.yaml
+│   │   ├── helhest_diagnose.yaml
+│   │   ├── helhest_diff.yaml
+│   │   ├── helhest_featherstone_diff.yaml
+│   │   ├── helhest_flipup.yaml
+│   │   ├── helhest_obstacle_benchmark.yaml
+│   │   ├── helhest.yaml
+│   │   ├── hybrid_gpt_pendulum.yaml
+│   │   ├── logging
+│   │   │   ├── dataset.yaml
+│   │   │   ├── disabled.yaml
+│   │   │   ├── gradient.yaml
+│   │   │   ├── hdf5.yaml
+│   │   │   └── neuralLambdas.yaml
+│   │   ├── marv_tracked.yaml
+│   │   ├── pendulum.yaml
+│   │   ├── rendering
+│   │   │   ├── gl.yaml
+│   │   │   ├── headless.yaml
+│   │   │   └── usd.yaml
+│   │   ├── repeated_pendulum.yaml
+│   │   ├── simulation
+│   │   │   ├── base.yaml
+│   │   │   ├── featherstone.yaml
+│   │   │   ├── helhest_diff.yaml
+│   │   │   ├── helhest_featherstone_diff.yaml
+│   │   │   ├── helhest_flipup.yaml
+│   │   │   ├── helhest.yaml
+│   │   │   ├── marv_tracked.yaml
+│   │   │   ├── pendulum_w_neural_lambdas.yaml
+│   │   │   ├── pendulum.yaml
+│   │   │   ├── taros-4.yaml
+│   │   │   └── uphill.yaml
+│   │   ├── taros-4.yaml
+│   │   └── teacher_forced_gpt_pendulum.yaml
 │   └── double_pendulum
 │       ├── AxioneEngineWithNeuralLambdas_example.py
 │       ├── AxionEngine_example.py
+│       ├── cuda_graph_smoke.py
 │       ├── GPTEngine_example.py
 │       ├── HybridGPTEngine_example.py
+│       ├── log_multiple_rollouts.py
+│       ├── outputs
+│       │   └── 2026-05-19
+│       │       └── 20-49-16
+│       ├── PDgains_search.py
 │       ├── pendulum_articulation_definition.py
 │       ├── pendulum_hdf5Visualizer.py
 │       ├── pendulum_utils.py
 │       ├── RepeatedEngine_example.py
+│       ├── run_AxionEngineNeuralLambdas_multiple_times.py
+│       ├── TeacherForcedGPTEngine_example.py
 │       └── test_engines.py
 └── src
     └── axion
@@ -28,11 +95,21 @@
             ├── compare.py
             ├── comparisons
             │   ├── analyze_engine_test.py
-            │   ├── axion_timing_plot.py
             │   ├── compare_iter_counts.py
+            │   ├── compare_state_logger_hdf5s.py
             │   ├── error_in_lambda_prediciton_between_models.py
             │   ├── per_element_diff.py
-            │   └── plot_hdf5log_from_example.py
+            │   ├── plot_axionEngineNeuralLambdas_multiModel_runs.py
+            │   ├── plot_error_from_multirollouts.py
+            │   ├── plot_hdf5log_from_example.py
+            │   ├── plot_lambdas_from_h5recording.py
+            │   ├── plot_states_from_multirollouts.py
+            │   └── time_profiles
+            │       ├── axion_timing_plot.py
+            │       ├── plot_axion_vs_hybrid_e2e_surrogate_better_vis.py
+            │       ├── plot_axion_vs_hybrid_e2e_surrogate.py
+            │       ├── plot_axion_vs_hybrid_e2e_warmstart.py
+            │       └── plot_time_profiles.py
             ├── datasets
             │   └── split_dataset.py
             ├── docs
@@ -40,16 +117,27 @@
             ├── envs
             │   ├── axion_engine_wrapper.py
             │   └── nn_training_interface.py
+            ├── fast_inference
+            │   ├── build_tensorrt_engine.py
+            │   ├── export_to_onnx.py
+            │   ├── tensorrt_mse_engine.py
+            │   ├── test_onnx.py
+            │   └── test_tensorrt.py
             ├── generate
             │   ├── generate_dataset_pendulum.py
+            │   ├── joint_target_position_error.py
             │   ├── simple_generate_dataset_pendulum.py
             │   ├── simple_trajectory_sampler_pendulum.py
             │   ├── simulation_sampler.py
             │   ├── trajectory_sampler_pendulum.py
             │   └── trajectory_sampler.py
+            ├── logging
+            │   └── state_logger_for_examples.py
             ├── models
             │   ├── base_models.py
             │   ├── contact_mtl_model.py
+            │   ├── fast_model_transformer.py
+            │   ├── fast_mse_model.py
             │   ├── lambda_models.py
             │   ├── models.py
             │   ├── model_transformer.py
@@ -60,6 +148,7 @@
             ├── neural_model_utils_providers
             │   └── transformer_neural_utils_provider_new.py
             ├── standalone
+            │   ├── fast_neural_predictor.py
             │   ├── neural_predictor_helpers.py
             │   ├── neural_predictor.py
             │   └── test_trained_model_cli.py
@@ -86,13 +175,16 @@
             └── utils
                 ├── add_lambda_activity_labels.py
                 ├── add_lambda_labels_size.py
+                ├── check_lambda_size.py
                 ├── commons.py
                 ├── datasets.py
                 ├── differentiable.py
                 ├── evaluator.py
+                ├── legacy_newton_contacts.py
                 ├── logger.py
                 ├── loss_utils.py
                 ├── neural_lambda_hdf5_logger.py
+                ├── pendulum_lambda_layout.py
                 ├── python_utils.py
                 ├── running_mean_std.py
                 ├── time_report.py

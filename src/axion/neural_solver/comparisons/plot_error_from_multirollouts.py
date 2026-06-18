@@ -12,8 +12,8 @@ _LOG_DIR = Path(__file__).resolve().parents[4] / "data/logs/multirollouts"
 # Edit when running via F5: same stem suffix as log_multiple_rollouts_autoregressive._hdf5_filename_stem
 # (only the engine prefix differs between the files: Axion_, GPT_, TeacherForcedGPT_, AxionNeuralLambdas_).
 
-#_SHARED_STEM = ("50roll_seed0_100steps_dt0p01_qm3p14159_3p14159_qdm3_3_pl0_0_1_0") -in thesis
-_SHARED_STEM = ("50roll_seed0_300steps_dt0p01_qm3p14159_3p14159_qdm3_3_pl0_0_1_0_rndplane_dmax2p5")
+_SHARED_STEM = ("50roll_seed0_100steps_dt0p01_qm3p14159_3p14159_qdm3_3_pl0_0_1_0") #-in thesis
+#_SHARED_STEM = ("50roll_seed0_300steps_dt0p01_qm3p14159_3p14159_qdm3_3_pl0_0_1_0_rndplane_dmax2p5")
 
 AXION_H5 = _LOG_DIR / f"Axion_{_SHARED_STEM}.h5"
 GPT_H5 = _LOG_DIR / f"GPT_{_SHARED_STEM}.h5"
@@ -32,6 +32,7 @@ AXES_LABELS_FONTSIZE = BASE_FONTSIZE + 2
 TITLE_FONTSIZE = BASE_FONTSIZE + 2
 LINEWIDTH = 2.5  # Used for every ax.plot linewidth in this script
 GRID_ALPHA = 0.3
+SHADE_ALPHA = 0.25
 
 _ROLLOUT_NAME_RE = re.compile(r"^rollout_(\d+)$")
 
@@ -147,11 +148,12 @@ def _angular_abs_diff(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     return np.abs(diff)
 
 
-def _mean_l1_separation(a: np.ndarray, b: np.ndarray) -> np.ndarray:
-    """Per-time average over rollouts of the wrap-aware L1 state separation.
+def _l1_separation_mean_std(a: np.ndarray, b: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Per-time mean and sample std over rollouts of wrap-aware L1 state separation.
 
-    For each time index ``t``, returns ``(1/R) * sum_r L1(a[r,t,:], b[r,t,:])``
-    where ``a,b`` have shape ``(R, T, 4)``.  Output shape is ``(T,)``.
+    For each time index ``t``, computes L1(a[r,t,:], b[r,t,:]) for every rollout
+    ``r``, then returns the mean and sample standard deviation (``ddof=1``) across
+    ``R`` rollouts.  Both outputs have shape ``(T,)``.
 
     Columns 0–1 (``q0``, ``q1``) use the shortest arc distance
     ``|wrap_to_pi(a - b)|``; columns 2–3 (``qd0``, ``qd1``) use the naive
@@ -164,7 +166,9 @@ def _mean_l1_separation(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     angle_err = _angular_abs_diff(a[..., :2], b[..., :2])  # (R, T, 2)
     vel_err = np.abs(a[..., 2:] - b[..., 2:])              # (R, T, 2)
     l1_per_rollout_and_time = np.sum(angle_err, axis=-1) + np.sum(vel_err, axis=-1)  # (R, T)
-    return np.mean(l1_per_rollout_and_time, axis=0)  # (T,) — mean over rollouts r at each t
+    mean = np.mean(l1_per_rollout_and_time, axis=0)
+    std = np.std(l1_per_rollout_and_time, axis=0, ddof=1)
+    return mean, std
 
 
 def _build_x_axis(t_len: int) -> tuple[np.ndarray, str]:
@@ -211,17 +215,38 @@ def main() -> None:
                 f"Time length mismatch: Axion T={axion.shape[1]}, {name} T={arr.shape[1]}"
             )
 
-    l1_axion_vs_gpt = _mean_l1_separation(axion, gpt)
-    l1_teacher_minus_axion = _mean_l1_separation(teacher_forced, axion)
+    l1_axion_vs_gpt, std_axion_vs_gpt = _l1_separation_mean_std(axion, gpt)
+    l1_teacher_minus_axion, std_teacher_minus_axion = _l1_separation_mean_std(
+        teacher_forced, axion
+    )
     t_len = int(l1_axion_vs_gpt.shape[0])
     x_axis, x_label = _build_x_axis(t_len)
 
     fig, ax = plt.subplots(figsize=(10, 5))
+    ax.fill_between(
+        x_axis,
+        np.maximum(l1_axion_vs_gpt - std_axion_vs_gpt, 0.0),
+        l1_axion_vs_gpt + std_axion_vs_gpt,
+        color="black",
+        alpha=SHADE_ALPHA,
+        linewidth=0,
+        zorder=1,
+    )
+    ax.fill_between(
+        x_axis,
+        np.maximum(l1_teacher_minus_axion - std_teacher_minus_axion, 0.0),
+        l1_teacher_minus_axion + std_teacher_minus_axion,
+        color="red",
+        alpha=SHADE_ALPHA,
+        linewidth=0,
+        zorder=2,
+    )
     ax.plot(
         x_axis,
         l1_axion_vs_gpt,
         linewidth=LINEWIDTH,
         color="black",
+        zorder=3,
         label = (
             "Neural prediction (autoregressive)"
         )
@@ -235,6 +260,7 @@ def main() -> None:
         l1_teacher_minus_axion,
         linewidth=LINEWIDTH,
         color="red",
+        zorder=4,
         label = (
             "Neural prediction (teacher-forced)"
         )
@@ -244,7 +270,7 @@ def main() -> None:
         # ),
     )
     if axion_neural_lambdas is not None:
-        l1_axion_neural_lambdas_minus_axion = _mean_l1_separation(
+        l1_axion_neural_lambdas_minus_axion, _ = _l1_separation_mean_std(
             axion_neural_lambdas, axion
         )
         ax.plot(

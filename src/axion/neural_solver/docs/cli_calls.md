@@ -19,6 +19,15 @@ Generated HDF5 includes:
 
 ## Training
 
+### Begin Simple MLP training
+```
+python src/axion/neural_solver/train/train_simple_mlp.py \
+  --cfg src/axion/neural_solver/train/cfg/Pendulum/simpleMLPNetwork.yaml \
+  --logdir src/axion/neural_solver/train/trained_models/simple_mlp \
+  --device cuda:0
+```
+Optional flags: `--no-time-stamp`, `--checkpoint /path/to/checkpoint.pt`
+
 ### Begin training (example)
 ```
 python src/axion/neural_solver/train/train.py --cfg src/axion/neural_solver/train/cfg/Pendulum/transformer.yaml --logdir src/axion/neural_solver/train/trained_models/

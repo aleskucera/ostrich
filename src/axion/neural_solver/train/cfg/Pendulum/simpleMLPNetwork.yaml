@@ -1,0 +1,65 @@
+env:
+  env_name: Pendulum
+  num_envs: 512
+  utils_provider_cfg:
+    name: MLPNeuralUtilsProvider
+    state_prediction_type: relative
+
+algorithm:
+  name: SimpleMLPTrainer
+  use_energy_loss: false
+  num_epochs: 30
+  num_iters_per_epoch: -1
+  sample_sequence_length: 1
+  batch_size: 512
+  num_valid_batches: 256
+  truncate_grad: true
+  grad_norm: 1.0
+  eval_interval: 0
+  loss:
+    state_loss_weight: 1.0
+    angular_prediction_l2_weight: 0.0
+  optimizer:
+    name: adamw
+    lr_start: 5e-3
+    lr_end: 1e-4
+    lr_schedule: cosine
+    weight_decay: 8e-4
+  dataset:
+    train_dataset_path: [src/axion/neural_solver/datasets/Pendulum/pendulumTrainNew.hdf5]
+    valid_dataset_path: [src/axion/neural_solver/datasets/Pendulum/ValidContacts25klen300envs50seed1.hdf5]
+    max_capacity: 100000000
+    num_data_workers: 4
+  eval:
+    mode: dataset
+    rollout_horizon: 10
+    num_rollouts: 20000
+    passive: true
+
+inputs:
+  low_dim: [
+    states_embedding,
+    contact_normals,
+    contact_points_1,
+    contact_depths,
+    gravity_dir,
+  ]
+
+network:
+  model_impl: simple_mlp
+  normalize_input: true
+  normalize_output: true
+  enable_state_head: true
+  enable_lambda_head: false
+  depth: 3
+  width: 256
+  model:
+    mlp:
+      layer_sizes: []   # auto-derived from depth/width when empty
+      activation: relu
+      layernorm: false
+  encoder:
+    low_dim:
+      layer_sizes: []
+      activation: relu
+      layernorm: false

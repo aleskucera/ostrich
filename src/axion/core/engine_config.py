@@ -34,6 +34,23 @@ from axion.profiling import VALID_MODES as _VALID_PROFILING_MODES
 # -----------------------------------------------------------------------
 
 
+def _cast_scalar(value, field_type):
+    """Cast YAML/Hydra string scalars to the declared field type."""
+    if not isinstance(value, str):
+        return value
+    if field_type is int:
+        return int(value)
+    if field_type is float:
+        return float(value)
+    if field_type is bool:
+        lowered = value.lower()
+        if lowered in ("true", "yes", "1"):
+            return True
+        if lowered in ("false", "no", "0"):
+            return False
+    return value
+
+
 def _coerce(cls, value):
     """Coerce a Hydra DictConfig (or dict-like) into an instance of `cls`.
 
@@ -48,8 +65,19 @@ def _coerce(cls, value):
         items = dict(value)
     except Exception:
         return cls()
-    valid = {f.name for f in fields(cls)}
-    return cls(**{k: v for k, v in items.items() if k in valid})
+    field_map = {f.name: f for f in fields(cls)}
+    kwargs = {}
+    for k, v in items.items():
+        if k not in field_map:
+            continue
+        f = field_map[k]
+        ft = f.type
+        v = _cast_scalar(v, ft)
+        coerce_fn = getattr(ft, "coerce", None)
+        if coerce_fn is not None and not isinstance(v, ft):
+            v = coerce_fn(v)
+        kwargs[k] = v
+    return cls(**kwargs)
 
 
 # -----------------------------------------------------------------------

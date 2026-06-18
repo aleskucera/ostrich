@@ -20,22 +20,22 @@ _TIME_PROFILES_DIR = pathlib.Path(__file__).resolve().parent
 # User configuration
 # ---------------------------------------------------------------------------
 
-PROFILE_PATHS = (
-    _TIME_PROFILES_DIR / "axion_contact.txt",
-    _TIME_PROFILES_DIR / "gpt_contact_sweep_model_no_cuda.txt",
-    _TIME_PROFILES_DIR / "gpt_contact_sweep_model.txt",
-)
-
 # PROFILE_PATHS = (
-#     _TIME_PROFILES_DIR / "axion_no_contact.txt",
-#     _TIME_PROFILES_DIR / "gpt_no_contact_sweep_model_no_cuda.txt",
-#     _TIME_PROFILES_DIR / "gpt_no_contact_sweep_model.txt",
+#     _TIME_PROFILES_DIR / "axion_contact.txt",
+#     _TIME_PROFILES_DIR / "gpt_contact_sweep_model_no_cuda.txt",
+#     _TIME_PROFILES_DIR / "gpt_contact_sweep_model.txt",
 # )
+
+PROFILE_PATHS = (
+    _TIME_PROFILES_DIR / "axion_no_contact.txt",
+    _TIME_PROFILES_DIR / "gpt_no_contact_sweep_model_no_cuda.txt",
+    _TIME_PROFILES_DIR / "gpt_no_contact_sweep_model.txt",
+)
 
 BAR_LABELS = (
     "Axion",
-    "Hybrid (no CUDA graph)",
-    "Hybrid",
+    "Surrogate (no CUDA graph)",
+    "Surrogate",
 )
 
 # None → show interactively; set to save instead.
@@ -134,7 +134,7 @@ def main() -> None:
         ha=ha,
     )
     plt.ylabel("Mean computation time per simulation step [ms]")
-    plt.title("Contacts included in measurements")
+    plt.title("Contact-free measurements")
     ax.grid(axis="y", linestyle=GRID_LINESTYLE, alpha=GRID_ALPHA, color=GRID_COLOR)
     if Y_LIM is not None:
         plt.ylim(*Y_LIM)

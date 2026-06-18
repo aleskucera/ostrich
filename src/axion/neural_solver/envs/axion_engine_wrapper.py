@@ -1,12 +1,13 @@
 import os
 import sys
-from dataclasses import fields
 from typing import Optional, Mapping, Any
 
+import hydra.utils
 import torch
 import warp as wp
 import newton
-import yaml
+from hydra import compose, initialize_config_dir
+from hydra.core.global_hydra import GlobalHydra
 
 # Repo root so that "from examples.*" works when run from any entry point (train.py, generate script, etc.)
 _env_dir = os.path.dirname(os.path.abspath(__file__))
@@ -24,7 +25,8 @@ NUM_CONTACTS_PER_WORLD = 4 # hardcoded for double pendulum
 FRAME_DT = 0.01
 ENGINE_SUBSTEPS = 10
 ENGINE_DT = FRAME_DT/ENGINE_SUBSTEPS
-ENGINE_CONFIG_PATH = os.path.join(_repo_root, "examples", "conf", "engine", "axion.yaml")
+ENGINE_CONF_DIR = os.path.join(_repo_root, "examples", "conf")
+ENGINE_CONFIG_GROUP = "hybrid"
 
 class AxionEngineWrapper:
     """
@@ -69,8 +71,9 @@ class AxionEngineWrapper:
         self.control: newton.Control = self.model.control()
         self.contacts: newton.Contacts = self.model.collide(self.state)
         
-        # Integrator (Axion engine): keep this wrapper aligned with examples/conf/engine/axion.yaml.
-        self.engine_cfg = self._load_engine_config_from_yaml(ENGINE_CONFIG_PATH)
+        # Integrator (Axion engine): load via Hydra (examples/conf/engine/<group>.yaml).
+        engine_group = warp_env_cfg.get("engine", ENGINE_CONFIG_GROUP)
+        self.engine_cfg = self._load_engine_config(engine_group)
         self.engine = AxionEngine(
             model=self.model,
             sim_steps=1,
@@ -240,22 +243,25 @@ class AxionEngineWrapper:
         return
 
     # "Private" methods:
-    def _load_engine_config_from_yaml(self, yaml_path: str) -> AxionEngineConfig:
-        with open(yaml_path, "r", encoding="utf-8") as f:
-            raw_cfg = yaml.safe_load(f) or {}
+    @staticmethod
+    def _load_engine_config(
+        engine_group: str = ENGINE_CONFIG_GROUP,
+    ) -> AxionEngineConfig:
+        """Load and instantiate an engine config via Hydra compose + instantiate."""
+        GlobalHydra.instance().clear()
+        with initialize_config_dir(config_dir=ENGINE_CONF_DIR, version_base=None):
+            cfg = compose(
+                config_name="config",
+                overrides=[f"engine={engine_group}"],
+            )
+            engine_cfg = hydra.utils.instantiate(cfg.engine)
 
-        field_types = {f.name: f.type for f in fields(AxionEngineConfig)}
-        cfg_kwargs = {}
-        for key, value in raw_cfg.items():
-            if key not in field_types or key.startswith("_"):
-                continue
-            # yaml.safe_load can return strings for scientific notation (e.g. "1e-3");
-            # cast to the declared dataclass field type when needed.
-            target = field_types[key]
-            if isinstance(value, str) and target in (int, float):
-                value = target(value)
-            cfg_kwargs[key] = value
-        return AxionEngineConfig(**cfg_kwargs)
+        if not isinstance(engine_cfg, AxionEngineConfig):
+            raise TypeError(
+                f"Engine config group {engine_group!r} instantiated "
+                f"{type(engine_cfg).__name__}, expected AxionEngineConfig subclass."
+            )
+        return engine_cfg
 
     
     def _engine_init_state_fn(

@@ -37,6 +37,31 @@ from axion.neural_solver.envs.axion_engine_wrapper import AxionEngineWrapper
 from axion.neural_solver.neural_model_utils_providers.transformer_neural_utils_provider_new import (
     TransformerNeuralModelUtilsProvider,
 )
+from axion.neural_solver.neural_model_utils_providers.mlp_neural_utils_provider import (
+    MLPNeuralUtilsProvider,
+)
+
+_PROVIDER_REGISTRY = {
+    "TransformerNeuralModelUtilsProvider": TransformerNeuralModelUtilsProvider,
+    "MLPNeuralUtilsProvider": MLPNeuralUtilsProvider,
+}
+
+
+def _build_utils_provider(robot_model, neural_model, utils_provider_cfg: dict, device_str: str):
+    """Instantiate the correct utils provider based on ``utils_provider_cfg.name``."""
+    name = utils_provider_cfg.get("name", "TransformerNeuralModelUtilsProvider")
+    provider_cls = _PROVIDER_REGISTRY.get(name)
+    kwargs = dict(utils_provider_cfg)
+    kwargs.pop("name", None)
+    # num_states_history is only meaningful for the transformer provider; pass it
+    # through kwargs so MLPNeuralUtilsProvider can safely ignore it via **kwargs.
+    return provider_cls(
+        robot_model=robot_model,
+        neural_model=neural_model,
+        cfg=kwargs,
+        num_states_history=utils_provider_cfg.get("num_states_history", 1),
+        device=device_str,
+    )
 
 
 class NnTrainingInterface:
@@ -87,12 +112,11 @@ class NnTrainingInterface:
         utils_provider_cfg = dict(utils_provider_cfg)
         utils_provider_cfg.setdefault("lambda_dim", engine_lambda_dim)
 
-        self.utils_provider = TransformerNeuralModelUtilsProvider(
+        self.utils_provider = _build_utils_provider(
             robot_model=self.simulator_wrapper.model,
             neural_model=neural_model,
-            cfg=utils_provider_cfg,
-            num_states_history=utils_provider_cfg.get("num_states_history", 1),
-            device=device_str,
+            utils_provider_cfg=utils_provider_cfg,
+            device_str=device_str,
         )
 
         assert default_env_mode in ("ground-truth", "neural")

@@ -90,11 +90,11 @@ MSE_STATE_JOINT_LAMBDA_MODELS_MODEL_INFOS = [
 ]
 
 #--------------------------------------------------------
-ACADEMIC_PLOTTING = False
+ACADEMIC_PLOTTING = True
 BASE_FONTSIZE = 13
 AXES_TICKS_FONTSIZE = BASE_FONTSIZE
 LEGEND_FONTSIZE = BASE_FONTSIZE
-AXES_LABELS_FONTSIZE = BASE_FONTSIZE + 2
+AXES_LABELS_FONTSIZE = BASE_FONTSIZE
 TITLE_FONTSIZE = BASE_FONTSIZE + 2
 LINEWIDTH = 2.25  # Used for every ax.plot linewidth in this script
 GRID_ALPHA = 0.3
@@ -103,8 +103,8 @@ GRID_ALPHA = 0.3
 ID = 2
 MODEL_INFO = "mse 32"
 COMPARISON_CSV_PATH = None # Path(__file__).resolve().parent / "mse_state_and_joint_lambdas.csv" # None
-DEFAULT_HDF5_PATH = Path(__file__).resolve().parents[4] / "data/logs" /MODEL_304[1]#MODEL_299[3] #AxioneEngineWithNeuralLambdas_example_2026-05-12_09-07-56.h5"
-DEFAULT_LAMBDA_SLICE = slice(0,24) 
+DEFAULT_HDF5_PATH = Path(__file__).resolve().parents[4] / "data/logs" /MODEL_299[3]#MODEL_299[3] #AxioneEngineWithNeuralLambdas_example_2026-05-12_09-07-56.h5"
+DEFAULT_LAMBDA_SLICE = slice(0,10) 
 ANALYZE_INCOMPLETE_MTL = False
 ANALYZE_CONTACT_MTL_LAMBDA_REGR_ONLY = False
 ANALYZE_CONTACT_MTL_CONDITIONED_LAMBDA_REGR_ONLY = False
@@ -549,7 +549,7 @@ def _plot_single_lambda_on_ax(
         )
     if show_xlabel:
         ax.set_xlabel(x_disp)
-    ax.set_ylabel(rf"$\lambda_{{{lambda_idx}}}$ [N]" if ACADEMIC_PLOTTING else "Value")
+    ax.set_ylabel(rf"$\lambda_{{{lambda_idx}}}$ [Nm]" if ACADEMIC_PLOTTING else "Value")
     if not ACADEMIC_PLOTTING:
         ax.set_title(f"lambda[{lambda_idx}]")
     ax.grid(True, alpha=GRID_ALPHA)

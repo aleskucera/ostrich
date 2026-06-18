@@ -14,6 +14,12 @@ from pathlib import Path
 # - None => no depth limit
 MAX_NESTING_LEVEL = 5
 
+# File extensions to omit from the dirtree (case-insensitive).
+EXCLUDE_EXTENSIONS = {".yaml", ".yml"}
+
+# Directory names whose entire subtree is omitted from the dirtree.
+EXCLUDE_BRANCH_NAMES = {"conf"}
+
 # Branch marker: ├ or └, two horizontal rules, optional space, then the entry name.
 _BRANCH = re.compile(r"(├──|└──)\s*(.*)$")
 
@@ -54,12 +60,32 @@ def _tex_cell(s: str) -> str:
     return _tex_escape_name(s)
 
 
+def _should_include(name: str) -> bool:
+    return Path(name).suffix.lower() not in EXCLUDE_EXTENSIONS
+
+
+def _filter_excluded_branches(parsed: list[tuple[int, str]]) -> list[tuple[int, str]]:
+    out: list[tuple[int, str]] = []
+    skip_depth: int | None = None
+    for depth, name in parsed:
+        if skip_depth is not None and depth > skip_depth:
+            continue
+        skip_depth = None
+        if name in EXCLUDE_BRANCH_NAMES:
+            skip_depth = depth
+            continue
+        out.append((depth, name))
+    return out
+
+
 def tree_lines_to_dirtree(lines: list[str]) -> str:
     parsed: list[tuple[int, str]] = []
     for raw in lines:
         item = _parse_depth_name(raw)
         if item is not None:
             parsed.append(item)
+
+    parsed = _filter_excluded_branches(parsed)
 
     if not parsed:
         return ""
@@ -69,6 +95,8 @@ def tree_lines_to_dirtree(lines: list[str]) -> str:
     out_lines = [r"\dirtree{"]
     last_dt = 0
     for depth, name in parsed:
+        if not _should_include(name):
+            continue
         if depth == 0:
             if MAX_NESTING_LEVEL is not None and 1 > MAX_NESTING_LEVEL:
                 continue
