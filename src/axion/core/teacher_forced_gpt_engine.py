@@ -46,14 +46,14 @@ sys.modules['models'] = models
 sys.modules['utils'] = utils
 
 # state only prediction
-BEST_STATE_ONLY_MODEL = "03-17-2026-15-12-19"
+BEST_STATE_ONLY_MODEL = "03-17-2026-15-12-19"   # best at: outputting states under no contacts
 BEST_TRAINED_FROM_CONTACT_SWEEP = Path("sweep9e86ytgi")/"a4fvu450"    # jumpy
-BEST_STATE_ONLY_MODEL_CONTACT_INTER = "03-25-2026-11-47-56"
+BEST_STATE_ONLY_MODEL_CONTACT_INTER = "03-25-2026-11-47-56" # one of the best at: outputting states under contacts 
 # simultaneuous lambda and state prediciton
 BEST_STATES_AND_JOINT_LAMBDAS = Path("mse") / "04-24-2026-17-02-15"  # best_valid_valid_model.pt
 BEST_STATES_AND_JOINT_LAMBDAS_NEW = Path("mse") / "05-12-2026-17-30-11"
 
-NN_BASE_PATH = Path.cwd() / "src" / "axion" / "neural_solver" / "train" / "trained_models" / BEST_STATES_AND_JOINT_LAMBDAS_NEW
+NN_BASE_PATH = Path.cwd() / "src" / "axion" / "neural_solver" / "train" / "trained_models" / BEST_STATE_ONLY_MODEL_CONTACT_INTER
 NN_PENDULUM_PT_PATH = NN_BASE_PATH / "nn" / "best_valid_valid_model.pt"
 NN_PENDULUM_CFG_PATH = NN_BASE_PATH / "cfg.yaml"
 

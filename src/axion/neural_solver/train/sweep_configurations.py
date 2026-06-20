@@ -41,3 +41,19 @@ sweep_config_1 = {
         "normalize_output": {"values": [True, False]},
     },
 }
+
+"""
+Config for sweeping hyperparameters of Simple MLP network.
+"""
+sweep_config_mlp_0 = {
+    "method": "bayes",
+    "name": "neural-solver-mlp-sweep-0",
+    "metric": {"goal": "minimize", "name": "training/valid_valid_loss/epoch"},
+    "early_terminate": {"type": "hyperband", "min_iter": 5, "eta": 3},
+    "parameters": {
+        "depth": {"values": [1,2,3,4,5]},
+        "width": {"values":[16,32,64,128,256]},
+        "layernorm": {"values": [True, False]},
+        "activation": {"values": ["relu", "gelu", "tanh"]} 
+    },
+}

@@ -13,7 +13,7 @@ from typing import Dict, Optional, Sequence
 from collections import deque
 
 try:
-    from src.axion.neural_solver.neural_model_utils_providers.transformer_neural_utils_provider_new import (
+    from src.axion.neural_solver.neural_model_utils_providers.neural_utils_provider import (
         _resolve_state_and_lambda_prediction_types,
     )
     from src.axion.neural_solver.standalone.neural_predictor_helpers import (
@@ -36,7 +36,7 @@ try:
     )
 
 except ModuleNotFoundError:
-    from axion.neural_solver.neural_model_utils_providers.transformer_neural_utils_provider_new import (
+    from axion.neural_solver.neural_model_utils_providers.neural_utils_provider import (
         _resolve_state_and_lambda_prediction_types,
     )
     from axion.neural_solver.standalone.neural_predictor_helpers import (

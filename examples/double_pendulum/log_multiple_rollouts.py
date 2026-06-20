@@ -5,7 +5,7 @@ conditions and save all trajectories to a single HDF5 file.
 
 Top-level knobs
 ---------------
-ENGINE      : "axion" | "gpt" | "teacher_forced_gpt"   — which physics engine to use
+ENGINE      : "axion" | "gpt" | "teacher_forced_gpt" | "teacher_forced_mlp"   — which physics engine to use
 N_ROLLOUTS  : int                — number of trajectories to collect
 SEED        : int                — RNG seed for reproducible initial conditions
 N_STEPS     : int                — timesteps per rollout (overrides yaml duration)
@@ -33,14 +33,14 @@ from hydra.core.global_hydra import GlobalHydra
 # ---------------------------------------------------------------------------
 # USER-FACING KNOBS — edit these
 # ---------------------------------------------------------------------------
-ENGINE      = "teacher_forced_gpt"           # "axion" | "gpt" | "teacher_forced_gpt" | "axion_neural_lambdas"
-N_ROLLOUTS  = 50
+ENGINE      = "teacher_forced_gpt"           # "axion" | "gpt" | "teacher_forced_gpt" | "teacher_forced_mlp" | "axion_neural_lambdas"
+N_ROLLOUTS  = 25
 SEED        = 0
 N_STEPS     = 300               # timesteps per rollout
 Q_RANGE     = (-np.pi, np.pi)  # q0, q1 sampled uniformly from this range
 QD_RANGE    = (-3.0, 3.0)      # qd0, qd1 sampled uniformly from this range
 PLANE_COEFF = (0.0, 0.0, 1.0, 0.0)  # horizontal ground plane (default)
-RANDOMIZE_PLANES = True
+RANDOMIZE_PLANES = True  # when True, per-rollout randomly sampled plane is used overriding PLANE_COEFF 
 MAX_D_COEFFICIENT_OFFSET_M = 2.5
 # ---------------------------------------------------------------------------
 
@@ -172,6 +172,8 @@ def _load_cfg():
         config_name = "gpt_pendulum"
     elif ENGINE == "teacher_forced_gpt":
         config_name = "teacher_forced_gpt_pendulum"
+    elif ENGINE == "teacher_forced_mlp":
+        config_name = "teacher_forced_mlp_pendulum"
     elif ENGINE == "axion_neural_lambdas":
         config_name = "axion_w_neural_lambdas_pendulum"
     else:
@@ -195,6 +197,8 @@ def _hdf5_filename_stem(dt: float) -> str:
         eng_label = "GPT"
     elif ENGINE == "teacher_forced_gpt":
         eng_label = "TeacherForcedGPT"
+    elif ENGINE == "teacher_forced_mlp":
+        eng_label = "TeacherForcedMLP"
     elif ENGINE == "axion_neural_lambdas":
         eng_label = "AxionNeuralLambdas"
     else:
