@@ -1,0 +1,8 @@
+defaults:
+  - simulation: pendulum
+  - rendering: gl # headless
+  - logging: disabled
+  - engine: teacher_forced_mlp
+  - _self_
+
+project_name: ${hydra:job.name}

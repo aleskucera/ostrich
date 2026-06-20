@@ -684,6 +684,40 @@ class TeacherForcedGPTEngineConfig(AxionEngineConfig):
 
 
 @dataclass(frozen=True)
+class TeacherForcedMLPEngineConfig(AxionEngineConfig):
+    """
+    Configuration for TeacherForcedMLPEngine.
+
+    Single-state variant of TeacherForcedGPTEngineConfig: the Axion
+    Newton-Raphson solver advances a private trajectory every step and always
+    provides the NN's input context (teacher forcing), while the single-step
+    SimpleMlpModel's predictions always drive the simulation output (state_out).
+
+    All standard AxionEngineConfig solver parameters apply to the internal
+    Axion teacher trajectory.  TensorRT is not supported; use execution:
+    no_graph.
+    """
+
+    def create_engine(
+        self,
+        model: Any,
+        sim_steps: Optional[int] = None,
+        logging_config: Optional[Any] = None,
+        differentiable_simulation: bool = False,
+        **kwargs,
+    ) -> Any:
+        from axion.core.teacher_forced_mlp_engine import TeacherForcedMLPEngine
+
+        return TeacherForcedMLPEngine(
+            model=model,
+            sim_steps=int(sim_steps or 0),
+            config=self,
+            logging_config=logging_config,
+            differentiable_simulation=differentiable_simulation,
+        )
+
+
+@dataclass(frozen=True)
 class RepeatedAxionEngineConfig(AxionEngineConfig):
     """
     Configuration for the `RepeatedAxionEngine` backend.

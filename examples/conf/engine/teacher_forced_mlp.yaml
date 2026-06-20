@@ -1,0 +1,31 @@
+# @package engine
+_target_: axion.TeacherForcedMLPEngineConfig
+
+nr:
+  max_iters: 16
+  backtrack_min_iter: 12
+  atol: 1e-3
+
+linear:
+  max_iters: 16
+  tol: 1e-3
+  atol: 1e-3
+  regularization: 1e-6
+
+compliance:
+  joint: 6e-8
+  contact: 1e-6
+  friction: 1e-6
+
+contacts:
+  max_per_world: 4
+
+linesearch:
+  enabled: false
+  conservative_step_count: 16
+  conservative_upper_bound: 5e-2
+  min_step: 1e-6
+  optimistic_step_count: 48
+  optimistic_window: 0.4
+
+differentiable: false
