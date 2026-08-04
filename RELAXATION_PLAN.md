@@ -303,6 +303,46 @@ A `compliance.friction` sweep over 1e-8 → 1e-6 → 1e-4 does not rescue the bi
 The mechanism is active-set churn: an unregularized equality row whose membership is decided
 by a lagged normal load.
 
+### The skid scene (S2) — same verdict, different mechanism
+
+Same protocol, `mu` 0.35, differential drive ±8 rad/s. Friction saturates hard here
+(saturation 755 in the full rung), which is the regime §2 predicts should punish the cone.
+
+| rung | NR/step | PCR/NR | ‖Δ chassis‖ |
+|---|---|---|---|
+| full | **17.77** | 19.58 | — |
+| mu50 | 42.65 | 19.73 | 1.5e-1 |
+| bilateral | 61.52 | 22.58 | 5.3e-2 |
+| bilateral_patch | 49.67 | 22.72 | 5.3e-2 |
+
+The 2×2 reads differently than on cruise, and more damningly. Here the **binding cone is the
+cheapest configuration available**: full costs 17.77, while both ways of un-binding it —
+parametric (μ=50, 42.65) and structural (bilateral_patch, 49.67) — cost 2.4× and 2.8×.
+
+So the cone binding is not a cost, it is a *stabiliser*. When friction saturates, the cone
+caps `λ_f`; remove the cap by any means and the multiplier grows, the block stiffens, and NR
+struggles. §2's claim that stick–slip mode switching is the cost driver has the sign backwards
+in exactly the scene built to showcase it.
+
+Combining the two scenes: **there is no regime in which removing the friction cone helps.**
+On cruise the cone is free (5.22 vs 5.22) and removing it costs 4.7×; on skid the cone is
+actively load-bearing and removing it costs 2.8×. That is a stronger result than cruise alone,
+because cruise on its own is vulnerable to "you only tested where friction doesn't matter".
+
+Note the μ=50 confound this plan flagged in Phase 2 does bite here: on skid, μ=50 is slow, and
+a slow μ=50 is consistent with both "un-binding is expensive" and "μ=50 is just badly
+conditioned". Cruise is what disambiguates — there μ=50 is free, so large μ is not inherently
+expensive, and skid's slowdown is attributable to un-binding.
+
+Two caveats specific to this scene. Every rung hits the 64-iteration cap on some steps, so the
+means are censored and the slow rungs' true cost is understated. And `no_gyro` recorded a
+final-step residual of 3.6 — a convergence failure, not a small error — which needs a look
+before the inertia axis is called settled.
+
+The gyro certificate is the one thing that behaves beautifully across both scenes: 8.5e-4 on
+cruise, 5.2e-2 on skid, i.e. it rises 60× exactly where the trajectory error rises. That is
+the certificate machinery working as designed, on the axis cheap enough to validate it.
+
 ### What this implies for the build order
 
 **R2 should go first, not R1.** The load-carrying set is what the solver is spending its
@@ -315,9 +355,10 @@ The DOF-elimination axis (R3) is untouched by this result and remains conditiona
 
 ### Caveats
 
-Single scene, 40 steps, one world, one GPU, eager mode, no wall-clock (the harness syncs per
-NR iteration by design). The skid scene and the seed sweep are not run. These numbers are
-strong enough to reorder the build order, not to close the question.
+Two scenes, 40 steps each, one world, one GPU, eager mode, no wall-clock (the harness syncs
+per NR iteration by design). No seed sweep, no curb scene, no compound scene. Iteration counts
+on skid are censored by the 64-iteration cap. These numbers are strong enough to reorder the
+build order, not to close the question.
 
 ---
 

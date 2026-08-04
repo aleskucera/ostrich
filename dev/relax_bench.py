@@ -251,7 +251,7 @@ def run(scene: str, relaxation: RelaxationConfig, steps: int, dt: float,
         # newton State arrays are flat over all bodies (not per-world);
         # engine.data arrays are (world, body). Don't index a world here.
         rec["pose"].append(state_out.body_q.numpy().tolist())
-        rec["gyro_cert"].append(gyro_ratio(engine))
+        rec["gyro_cert"].append(float(gyro_ratio(engine)))
 
         n_contacts = int(contacts.rigid_contact_count.numpy()[0])
         lam_n = engine.data.constr_force.n.numpy()[0][:n_contacts]
@@ -377,7 +377,7 @@ def main():
     if args.json:
         pathlib.Path(args.json).write_text(
             json.dumps({"scene": args.scene, "steps": steps, "summary": results,
-                        "raw": raw}, indent=2)
+                        "raw": raw}, indent=2, default=float)
         )
         print(f"wrote {args.json}")
 
