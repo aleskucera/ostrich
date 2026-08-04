@@ -145,6 +145,59 @@ def gyro_ratio(engine) -> float:
     return gyro_mag / max(mom_mag, 1e-12)
 
 
+def contact_spread(engine, lam_floor: float = 1e-3):
+    """Spread of a pair's LOAD-CARRYING contacts, split normal vs tangential.
+
+    Tests the mechanism proposed for bilateral welding: pinning two material
+    points forbids spin only when their separation d has a component along the
+    contact normal, since the obstruction condition is (omega x d) || n.
+    Separation along the axle or along the rolling direction is harmless; a
+    vertical component is not. If that is right, |omega| should collapse with
+    NORMAL spread and be indifferent to TANGENTIAL spread.
+
+    Returns (max normal spread, max tangential spread) in metres over all
+    (shape0, shape1) pairs holding >= 2 contacts with lambda_n > lam_floor.
+    """
+    c = engine.ostrich_contacts
+    n_c = int(c.contact_count.numpy()[0])
+    if n_c == 0:
+        return 0.0, 0.0
+
+    s0 = c.contact_shape0.numpy()[0][:n_c]
+    s1 = c.contact_shape1.numpy()[0][:n_c]
+    p0 = c.contact_point0.numpy()[0][:n_c]
+    nrm = c.contact_normal.numpy()[0][:n_c]
+    lam = engine.data.constr_force.n.numpy()[0][:n_c]
+    shape_body = engine.ostrich_model.shape_body.numpy()[0]
+    pose = engine.data.body_pose.numpy()[0]
+
+    world = np.zeros((n_c, 3))
+    for k in range(n_c):
+        b = shape_body[int(s0[k])] if int(s0[k]) >= 0 else -1
+        if b >= 0:
+            world[k] = _quat_to_mat(pose[b, 3:7]) @ p0[k] + pose[b, :3]
+        else:
+            world[k] = p0[k]
+
+    groups = {}
+    for k in range(n_c):
+        if lam[k] > lam_floor:
+            groups.setdefault((int(s0[k]), int(s1[k])), []).append(k)
+
+    n_spread = t_spread = 0.0
+    for idx in groups.values():
+        if len(idx) < 2:
+            continue
+        n_hat = nrm[idx[0]] / max(np.linalg.norm(nrm[idx[0]]), 1e-12)
+        pts = world[idx]
+        along = pts @ n_hat
+        n_spread = max(n_spread, float(along.max() - along.min()))
+        tang = pts - np.outer(along, n_hat)
+        d = np.linalg.norm(tang[:, None, :] - tang[None, :, :], axis=-1)
+        t_spread = max(t_spread, float(d.max()))
+    return n_spread, t_spread
+
+
 def _quat_to_mat(q):
     x, y, z, w = q
     return np.array([
@@ -209,7 +262,7 @@ def run(scene: str, relaxation: RelaxationConfig, steps: int, dt: float,
     rec = {
         "nr_iters": [], "pcr_iters": [], "res_norm": [], "n_contacts": [],
         "pose": [], "saturation_max": [], "lam_n_min": [], "gyro_cert": [],
-        "wheel_spin": [],
+        "wheel_spin": [], "n_spread": [], "t_spread": [],
     }
 
     # Settle phase: drop-and-impact from the spawn height is a different
@@ -248,6 +301,9 @@ def run(scene: str, relaxation: RelaxationConfig, steps: int, dt: float,
         # to zero (the wheel is welded, not rolling).
         w_bodies = engine.data.body_vel.numpy()[0][1:, 3:6]
         rec["wheel_spin"].append(float(np.abs(w_bodies).max()))
+        ns, ts = contact_spread(engine)
+        rec["n_spread"].append(ns)
+        rec["t_spread"].append(ts)
         rec["pcr_iters"].append(probe.drain())
         rec["res_norm"].append(float(np.sqrt(engine.data.res_norm_sq.numpy()[0])))
         # newton State arrays are flat over all bodies (not per-world);
@@ -286,6 +342,8 @@ def summarize(name: str, rec: dict) -> dict:
         "rung": name,
         "n_contacts_mean": float(nc.mean()),
         "wheel_spin_mean": float(np.array(rec["wheel_spin"]).mean()),
+        "n_spread_max": float(np.array(rec["n_spread"]).max()),
+        "t_spread_max": float(np.array(rec["t_spread"]).max()),
         "settled_z": rec["settled_z"],
         "nr_per_step_mean": float(nr.mean()),
         "nr_per_step_max": int(nr.max()),
@@ -315,6 +373,8 @@ def main():
     ap.add_argument("--settle-steps", type=int, default=40)
     ap.add_argument("--max-per-pair", type=int, default=8)
     ap.add_argument("--rigid-gap", type=float, default=1.0)
+    ap.add_argument("--rungs", type=str, default=None,
+                    help="comma-separated subset of rung names")
     ap.add_argument("--json", type=str, default=None)
     args = ap.parse_args()
 
@@ -341,6 +401,8 @@ def main():
         "full": (RelaxationConfig(), None),
         "mu50": (RelaxationConfig(), 50.0),
         "bilateral": (RelaxationConfig(friction="bilateral"), None),
+        "bilat_gate": (RelaxationConfig(friction="bilateral",
+                                        friction_load_gate=1e-2), None),
         "bilat_patch": (RelaxationConfig(friction="bilateral_patch"), None),
         # R2: normal complementarity -> equality. This is the rung the Phase 1
         # results point at: the load-carrying set is what the solver spends its
@@ -349,8 +411,15 @@ def main():
         # R1+R2 = the "kinematic rolling" rung.
         "kin_roll": (RelaxationConfig(friction="bilateral_patch",
                                       contact="equality"), None),
+        "kin_roll_g": (RelaxationConfig(friction="bilateral_patch",
+                                        contact="equality",
+                                        friction_load_gate=1e-2), None),
         "no_gyro": (RelaxationConfig(gyro=False), None),
     }
+
+    if args.rungs:
+        keep = set(args.rungs.split(','))
+        rungs = {k: v for k, v in rungs.items() if k in keep}
 
     results, raw = [], {}
     for name, (relax, mu_ovr) in rungs.items():
@@ -361,7 +430,7 @@ def main():
         raw[name] = rec
         results.append(summarize(name, rec))
 
-    hdr = f"{'rung':<12}{'NR/step':>9}{'NRmax':>7}{'PCR/NR':>9}{'PCRtot':>9}{'res':>11}{'sat':>11}{'min λn':>10}{'#con':>7}{'|ω|wheel':>10}"
+    hdr = f"{'rung':<12}{'NR/step':>9}{'NRmax':>7}{'PCR/NR':>9}{'PCRtot':>9}{'res':>11}{'sat':>11}{'min λn':>10}{'#con':>7}{'|ω|wheel':>10}{'nSpread':>9}{'tSpread':>9}"
     print(f"\nscene={args.scene} steps={steps} dt={args.dt} "
           f"compliance.friction={args.friction_compliance:g} settle={args.settle_steps} "
           f"max_per_pair={args.max_per_pair} rigid_gap={args.rigid_gap:g} "
@@ -374,7 +443,8 @@ def main():
               f"{r['pcr_per_nr_mean']:>9.2f}{r['pcr_total']:>9d}"
               f"{r['final_res_norm']:>11.2e}{r['saturation_max']:>11.3g}"
               f"{r['lam_n_min']:>10.3f}{r['n_contacts_mean']:>7.1f}"
-              f"{r['wheel_spin_mean']:>10.3f}")
+              f"{r['wheel_spin_mean']:>10.3f}{r['n_spread_max']:>9.4f}"
+              f"{r['t_spread_max']:>9.4f}")
 
     base = np.array(results[0]["final_xyz"])
     print("\nfinal chassis xyz, and displacement from the full rung:")

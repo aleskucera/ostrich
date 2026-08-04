@@ -225,6 +225,20 @@ class RelaxationConfig:
     friction: str = "cone"
     contact: str = "complementarity"
     gyro: bool = True
+    # Minimum mu*lambda_n for a contact to receive a friction row.
+    #
+    # Under the cone this only has to skip exactly-zero contacts: the budget
+    # mu*lambda_n scales continuously with load, so a barely-loaded contact is
+    # automatically barely-relevant and costs nothing to include. 1e-6 is right
+    # there, and is the historical value.
+    #
+    # A bilateral rung has no such scaling. Any contact past this threshold is
+    # enforced with an unbounded multiplier, so this single number IS the
+    # active-set decision. Measured: at rigid_gap >= 0.2 the chassis generates
+    # contacts carrying lambda_n ~ 1e-4 against ~270 for a real wheel contact;
+    # they clear 1e-6, pin the chassis, and the robot stops. Set this between
+    # the two populations (~1e-2) and the gap dependence goes away.
+    friction_load_gate: float = 1e-6
 
     _FRICTION_MODES = ("cone", "bilateral", "bilateral_patch")
     _CONTACT_MODES = ("complementarity", "equality")
@@ -234,6 +248,11 @@ class RelaxationConfig:
             raise ValueError(
                 f"relaxation.friction must be one of {self._FRICTION_MODES}, "
                 f"got {self.friction!r}"
+            )
+        if self.friction_load_gate < 0:
+            raise ValueError(
+                "relaxation.friction_load_gate must be >= 0, "
+                f"got {self.friction_load_gate}"
             )
         if self.contact not in self._CONTACT_MODES:
             raise ValueError(
@@ -260,6 +279,7 @@ class RelaxationConfig:
             self.friction == "cone"
             and self.contact == "complementarity"
             and self.gyro
+            and self.friction_load_gate == 1e-6
         )
 
     @classmethod

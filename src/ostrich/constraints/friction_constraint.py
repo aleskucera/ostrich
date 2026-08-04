@@ -46,17 +46,22 @@ def bilateral_row_is_skipped(
 ):
     """True when this contact must NOT carry a bilateral no-slip constraint.
 
-    A per-contact velocity equality does not say "rolling without slipping",
-    it says "this material point is pinned". Pinning two distinct points of a
-    rigid wheel confines its motion to the axis through them, which forbids
-    spin: the wheel welds to the terrain. Measured on the Helhest cruise scene
-    at the project's contact settings (13 contacts, ~4 per wheel), the rung
-    converges cleanly to |omega_wheel| = 0 and the robot does not move.
+    Keeps only the lowest-indexed contact of each (shape0, shape1) pair, so
+    no-slip is imposed once per contact *patch* rather than once per sampled
+    point.
 
-    So no-slip belongs to the contact *patch*, not to each sampled point --
-    one constraint per (shape0, shape1) pair, which is also why helhest_stack's
-    quasi-static settle is a 3x3 system. FRICTION_BILATERAL_PATCH keeps the
-    lowest-indexed contact of each pair and drops the friction row of the rest.
+    NOTE on why, since an earlier version of this comment was wrong. The
+    motivating guess was that pinning several material points of a rigid wheel
+    over-constrains it and forbids spin. Measured, that is NOT what happens:
+    a wheel resting on a plane carries 2 load-bearing contacts separated by
+    0.11 m *tangentially* (the cylinder touches along a line) with exactly zero
+    separation along the normal, and bilateral friction handles it fine --
+    |omega| unchanged at 1.935. Separation along the axle or along the rolling
+    direction leaves (omega x d) parallel to n, so it obstructs nothing.
+
+    What actually breaks the rung is unloaded contacts, which `load_gate`
+    handles. This per-patch reduction is retained because it is cheap and
+    reduces the friction block, not because multi-point patches are unsound.
 
     O(c_idx) scan per thread; contact counts here are <= contacts.max_per_world.
     """
@@ -416,6 +421,7 @@ def friction_residual_kernel(
     dt: wp.float32,
     compliance: wp.float32,
     friction_mode: wp.int32,
+    load_gate: wp.float32,
     # Outputs
     res_d: wp.array(dtype=wp.spatial_vector, ndim=2),
     res_f: wp.array(dtype=wp.float32, ndim=2),
@@ -460,7 +466,7 @@ def friction_residual_kernel(
     # fully decouple from the normal block. It keeps exactly this lagged
     # dependence on lambda_n for active-set selection, even though the
     # constraint row itself no longer contains lambda_n.
-    if mu_max * force_n_prev <= 1e-6:
+    if mu_max * force_n_prev <= load_gate:
         res_f[world_idx, constr_idx0] = 0.0
         res_f[world_idx, constr_idx1] = 0.0
         return
@@ -586,6 +592,7 @@ def friction_constraint_kernel(
     dt: wp.float32,
     compliance: wp.float32,
     friction_mode: wp.int32,
+    load_gate: wp.float32,
     # Outputs
     constr_active_mask: wp.array(dtype=wp.float32, ndim=2),
     constr_body_idx: wp.array(dtype=wp.int32, ndim=3),
@@ -658,7 +665,7 @@ def friction_constraint_kernel(
     # fully decouple from the normal block. It keeps exactly this lagged
     # dependence on lambda_n for active-set selection, even though the
     # constraint row itself no longer contains lambda_n.
-    if mu_max * force_n_prev <= 1e-6:
+    if mu_max * force_n_prev <= load_gate:
         constr_active_mask[world_idx, constr_idx0] = 0.0
         constr_active_mask[world_idx, constr_idx1] = 0.0
         constr_force[world_idx, constr_idx0] = 0.0
@@ -818,6 +825,7 @@ def batch_friction_residual_kernel(
     dt: wp.float32,
     compliance: wp.float32,
     friction_mode: wp.int32,
+    load_gate: wp.float32,
     # Outputs (3D)
     res_d: wp.array(dtype=wp.spatial_vector, ndim=3),
     res_f: wp.array(dtype=wp.float32, ndim=3),
@@ -862,7 +870,7 @@ def batch_friction_residual_kernel(
     # fully decouple from the normal block. It keeps exactly this lagged
     # dependence on lambda_n for active-set selection, even though the
     # constraint row itself no longer contains lambda_n.
-    if mu_max * force_n_prev <= 1e-6:
+    if mu_max * force_n_prev <= load_gate:
         res_f[batch_idx, world_idx, constr_idx0] = 0.0
         res_f[batch_idx, world_idx, constr_idx1] = 0.0
         return
@@ -988,6 +996,7 @@ def fused_batch_friction_residual_kernel(
     dt: wp.float32,
     compliance: wp.float32,
     friction_mode: wp.int32,
+    load_gate: wp.float32,
     num_batches: int,
     # Outputs (3D)
     res_d: wp.array(dtype=wp.spatial_vector, ndim=3),
@@ -1036,7 +1045,7 @@ def fused_batch_friction_residual_kernel(
     # fully decouple from the normal block. It keeps exactly this lagged
     # dependence on lambda_n for active-set selection, even though the
     # constraint row itself no longer contains lambda_n.
-    if mu_max * force_n_prev <= 1e-6:
+    if mu_max * force_n_prev <= load_gate:
         for b in range(num_batches):
             res_f[b, world_idx, constr_idx0] = 0.0
             res_f[b, world_idx, constr_idx1] = 0.0

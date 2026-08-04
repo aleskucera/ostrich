@@ -239,6 +239,7 @@ def _compute_batched_residual(
             data.dt,
             config.compliance.friction,
             config.relaxation.friction_mode,
+            config.relaxation.friction_load_gate,
             dims.linesearch_step_count,
         ],
         outputs=[

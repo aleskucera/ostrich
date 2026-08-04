@@ -251,87 +251,91 @@ formulation (every rung starts bit-identical), then 40 driven steps. Engine conf
 > use 0.5) and it is wrong for a flat-ground cruise scene. The corrected results are below.
 > What survives from that analysis is marked as such.
 
-### The governing variable the design document never mentions: `rigid_gap`
+### The governing variable: unloaded contacts, not `rigid_gap`
 
-Every relaxation on this branch stands or falls on one thing: **the detected candidate set is
-not the touching set.** Collision proposes contacts out to `rigid_gap`. The full formulation
-ignores the distant ones for free — no normal load means no friction budget, and
-complementarity lets `λ_n = 0`. Neither relaxation can:
+Collision proposes candidates out to `rigid_gap`, and most carry essentially no load. The
+cone formulation absorbs them for free: the friction budget is `mu*lambda_n`, which scales
+*continuously* with load, so a barely-loaded contact is automatically barely-relevant.
 
-- bilateral friction *pins* the chassis to candidates metres away (hence the `mu·λ_n` gate has
-  to stay, so R1 does **not** fully decouple from the normal block);
-- the normal equality `signed_dist = 0` actively *pulls* the robot onto them — measured
-  `λ_n ≈ -2.8e9`, then NaN.
+A bilateral rung has no such scaling. Every contact past the `mu*lambda_n > 1e-6` gate gets an
+**unbounded** multiplier — full-strength no-slip regardless of whether it carries any load.
+Measured directly (cruise, `rigid_gap` 0.1 vs 0.2):
 
-`rigid_gap` is not mentioned anywhere in RELAXATION_BRANCH.md. It should be a first-class
-control in §8 alongside the iteration budget.
+| gap | pairs in contact | lambda_n | clear the 1e-6 gate |
+|---|---|---|---|
+| 0.1 | 3 wheels | 99 – 271 | all |
+| 0.2 | 3 wheels **+ chassis** | chassis **1e-4 – 7e-4** | **all** |
 
-### Cruise (S1), `rigid_gap = 0.1`, 6 contacts — the relaxations work
+At `rigid_gap >= 0.2` the chassis starts generating candidates carrying six orders of
+magnitude less load than a real wheel contact. They are physically irrelevant, they clear the
+gate, and they pin the chassis. The `1e-6` threshold was tuned for a formulation where it only
+had to skip *exactly*-zero contacts; for a bilateral rung it **is** the entire active-set
+decision, and it is ~4 orders of magnitude too permissive.
 
-| rung | NR/step | PCR/NR | PCR total | ‖Δ chassis‖ |
+`relaxation.friction_load_gate` makes it configurable. Setting it to `1e-2` — between the two
+populations, with ~4 orders of margin each way — removes the `rigid_gap` dependence entirely:
+
+| gap | rung | NR/step | `\|omega\|` | ‖Δ chassis‖ |
 |---|---|---|---|---|
-| full | 5.75 | 11.57 | 2660 | — |
-| mu50 | 5.03 | 13.42 | 2697 | 6.7e-4 |
-| bilateral | 5.20 | 10.55 | 2195 | 7.4e-4 |
-| bilateral_patch | 5.00 | 13.38 | 2676 | 7.4e-4 |
-| contact_eq (R2) | 5.38 | 14.07 | 3025 | 5.6e-4 |
-| **kin_roll (R1+R2)** | **4.00** | **9.13** | **1461** | 7.4e-4 |
-| no_gyro | 5.60 | 11.13 | 2494 | 3.9e-7 |
+| 0.2 | full | 5.25 | 1.936 | — |
+| 0.2 | bilateral, gate 1e-6 | 61.23 | 0.743 | 0.835 (welded) |
+| 0.2 | **bilateral, gate 1e-2** | **5.15** | 1.935 | **7.4e-4** |
+| 0.5 | bilateral, gate 1e-2 | 5.17 | 1.935 | 7.4e-4 |
 
-Every rung passes the equivalence test (all within 7.4e-4 m). **The combined rung is the
-cheapest thing on the table**: −30% NR iterations, −45% PCR iterations, at a strikingly
-uniform 4.00 NR/step. Identical at `rigid_gap = 0.02`.
+So `rigid_gap` was a proxy: it controls how many unloaded candidates exist. The real variable
+is that **a relaxed rung needs a load-proportional active-set criterion, because it gave up
+the continuous one the cone provided for free.**
 
-Neither half delivers this alone — bilateral 5.20, contact_eq 5.38, both ≈ baseline. This is
-exactly RELAXATION_BRANCH.md §5's prediction: *"combined with R1 this gives a coherent
-kinematic rolling rung… that combination is the interesting one."* The document was right.
+### Falsified: "per-contact no-slip welds a multi-point wheel"
 
-### Cruise, `rigid_gap = 0.5`, 13 contacts — everything relaxed breaks
+An earlier version of this document claimed that pinning several material points of a rigid
+wheel over-constrains it and forbids spin. **That is wrong**, and the test that killed it is
+worth recording. Instrumenting the separation of each pair's load-carrying contacts, split
+into normal and tangential components:
 
-| rung | NR/step | outcome |
-|---|---|---|
-| full | 5.60 | fine |
-| mu50 | 5.20 | fine |
-| bilateral | 63.45 | welded, `|ω| = 0.9`, robot does not move |
-| bilateral_patch | 30.88 | 4× slower, ‖Δ‖ = 0.64 |
-| contact_eq | 64.00 | diverged — robot at (4.6, −18.9), `|ω| = 2036` |
-| kin_roll | 19.30 | NaN |
+| `rigid_gap` | normal spread | tangential spread | `\|omega\|` bilateral |
+|---|---|---|---|
+| 0.02 | 0.0000 | 0.1100 | 1.935 |
+| 0.1 | 0.0000 | 0.1100 | 1.935 |
+| 0.2 | 0.0000 | 0.1100 | 0.497 |
+| 0.5 | 0.0000 | 0.1100 | 1.180 |
 
-The two unrelaxed rungs are unaffected. The cliff is entirely on the relaxed side, and it is
-`rigid_gap`, not the physics being modelled.
+A wheel resting on a plane carries **two** load-bearing contacts separated by 11 cm, and
+bilateral friction handles them perfectly. Normal spread is zero at every gap, including the
+gaps where the rung breaks — so it is not the discriminator either. The geometry is unchanged
+across the whole sweep; only the contact *count* changes, via the unloaded chassis pair.
 
-### Skid (S2), `rigid_gap = 0.1` — saturation defeats every relaxed rung
+The algebra agrees: pinning two points requires `(omega x d) || n`. Separation along the axle
+or along the rolling direction satisfies this identically, so it obstructs nothing. Only a
+separation with a normal component would obstruct spin, and real ground patches have none.
 
-| rung | NR/step | outcome |
-|---|---|---|
-| full | 14.40 | baseline (saturation 179) |
-| mu50 | 38.25 | 2.7× worse |
-| bilateral | 17.38 | welded, `|ω| = 0.000` |
-| bilateral_patch | 48.55 | residual 1.22 — diverging |
-| contact_eq | 61.60 | `min λ_n = −1.4e5` |
-| kin_roll | 26.82 | NaN |
-| no_gyro | 14.40 | ‖Δ‖ = 0.34, `min λ_n = −189` |
+`bilateral_patch` is retained because one row per patch is cheaper than N, not because
+multi-point patches are unsound.
 
-Under saturation the cone is a **stabiliser**, not a cost: it caps `λ_f`, and every way of
-removing the cap — parametric (μ=50, 2.7×) or structural — is worse. This survives from the
-earlier analysis and is independent of `rigid_gap`.
+### Independent failure: skid-steer is kinematically incompatible with no-slip
 
-### Two findings that hold regardless of `rigid_gap`
+The Helhest has three non-steerable wheels. Commanding (+8, -8, 0) rad/s has **no** no-slip
+solution at all — the three wheels' instantaneous centres cannot agree. Skid-steering *is*
+controlled slipping.
 
-**A per-contact velocity equality is not "rolling without slipping".** It says *this material
-point is pinned*. Pinning two distinct points of a rigid wheel confines its motion to the axis
-through them, which forbids spin. Measured: converges cleanly (6.00 NR/step, residual 7.8e-5,
-better than baseline) to `|ω_wheel| = 0.000` with the robot displacing 1e-6 m. Not a
-conditioning failure — accurate convergence to *welded*. Hence `friction="bilateral_patch"`,
-one no-slip row per `(shape0, shape1)` pair, which is also why `helhest_stack`'s settle is
-3×3: the same constraint, correctly counted. Welding still recurs whenever ≥2 contacts per
-wheel carry load (skid at gap 0.1).
+This is not fixable by any gate, and measurement confirms it: on skid, `friction_load_gate=1e-2`
+leaves `|omega| = 0.000` and ‖Δ‖ = 0.18 (marginally *worse* than ungated, 19.77 vs 17.38
+NR/step). Locking is the correct least-squares response to an infeasible constraint set.
 
-**Removing the friction complementarity alone buys almost nothing.** The μ=50 control — cone
-kept, never binding — costs what the full model costs on cruise at every gap tested, and the
-bilateral rungs are within noise of baseline there too. §2's premise that stick–slip mode
-switching is the cost driver is not supported. The gain in `kin_roll` comes from the
-*combination*, not from deleting the cone.
+**R1 is therefore restricted to near-straight-line motion on this robot, permanently.**
+
+### R2 has the same disease and does not yet have the cure
+
+`friction_load_gate` protects only the friction block. The normal equality still forces
+`signed_dist = 0` on distant candidates, and there is no `mu*lambda_n` analogue to scale them
+down — the constraint is equally strong at 1 mm and at 0.5 m. Measured: `kin_roll` with the
+friction gate applied still diverges at `rigid_gap = 0.5` (`lambda_n ~ -9.7e8`, then NaN).
+
+R2 needs its own gate — a distance predicate, skipping the equality where
+`signed_dist > threshold`. Note this is exactly what §5 warned about ("that's a prediction
+problem, not a constraint swap"), with one mitigating difference: the predicate is evaluated
+fresh from current geometry each iteration rather than carried over from the previous step.
+**Open design decision, not yet implemented.**
 
 ### Where this leaves the branch
 
@@ -340,9 +344,15 @@ unsaturated regimes — and unusable in the demanding scenes the attribution stu
 That is a real result for the ladder (screen cheaply, promote on certificate) and a real
 problem for the study.
 
-Build order stands as originally written (R1, then R2, then combined), **with `rigid_gap`
-pinned low and contacts-per-patch controlled**. The Phase-1-first ordering was never the
-problem; the harness was.
+Build order stands as originally written (R1, then R2, then combined). The Phase-1-first
+ordering was never the problem; the harness was, and then the active-set criterion was.
+
+The one structural lesson that generalises: **every structural relaxation needs to re-supply
+the active-set criterion that the complementarity it deleted was providing implicitly.** The
+cone supplied it via a load-proportional budget; the normal NCP supplies it via
+`lambda_n >= 0`. Delete either and the criterion has to come back explicitly, or unloaded /
+distant candidates are enforced at full strength. That is one line for friction
+(`friction_load_gate`) and an open question for contact.
 
 ### Caveats
 

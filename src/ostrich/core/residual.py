@@ -160,6 +160,7 @@ def compute_residual(
             data.dt,
             config.compliance.friction,
             config.relaxation.friction_mode,
+            config.relaxation.friction_load_gate,
         ],
         outputs=[
             data.res.d_spatial,
