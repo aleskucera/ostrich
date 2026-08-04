@@ -170,6 +170,7 @@ def compute_linear_system(
             model.body_inertia,
             data.dt,
             model.g_accel,
+            config.relaxation.gyro_scale,
         ],
         outputs=[data.res.d_spatial],
         device=data.device,
@@ -301,6 +302,7 @@ def compute_linear_system(
             contacts.contact_normal,
             data.dt,
             config.compliance.friction,
+            config.relaxation.friction_mode,
         ],
         outputs=[
             data.constr_active_mask.f,

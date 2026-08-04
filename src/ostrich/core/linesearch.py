@@ -112,6 +112,7 @@ def _compute_batched_residual(
             model.body_inertia,
             data.dt,
             model.g_accel,
+            config.relaxation.gyro_scale,
             dims.linesearch_step_count,
         ],
         outputs=[data.linesearch_res.d_spatial],
@@ -236,6 +237,7 @@ def _compute_batched_residual(
             contacts.contact_normal,
             data.dt,
             config.compliance.friction,
+            config.relaxation.friction_mode,
             dims.linesearch_step_count,
         ],
         outputs=[

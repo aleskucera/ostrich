@@ -6,6 +6,7 @@ per concern:
   nr            - Newton-Raphson outer loop control
   linear        - PCR linear solver + preconditioner
   compliance    - per-constraint-type compliance values
+  relaxation    - structural relaxations (alternative constraint forms)
   linesearch    - opt-in line search (off by default)
   warm_start    - cross-step contact warm-start + cold-start heuristics
   contacts      - max contacts per world + per-pair reduction policy
@@ -178,6 +179,66 @@ class ComplianceConfig:
             v = getattr(self, name)
             if v < 0:
                 raise ValueError(f"compliance.{name} must be >= 0, got {v}")
+
+    @classmethod
+    def coerce(cls, obj):
+        return _coerce(cls, obj)
+
+
+@dataclass(frozen=True)
+class RelaxationConfig:
+    """Structural physics relaxations — alternative constraint formulations.
+
+    Each field names a *textbook assumption*, not a fudge factor. A rung
+    removes unknowns and/or removes complementarity; it does not merely
+    re-tune stiffness. See RELAXATION_PLAN.md.
+
+        friction  "cone"      — Fisher-Burmeister on the Coulomb cone (full)
+                  "bilateral" — no-slip imposed at EVERY contact point.
+                                Measured to weld a multi-point wheel to the
+                                terrain (|omega| -> 0); kept as the naive
+                                formulation for the attribution study, not
+                                as a usable rung. See
+                                constraints/friction_constraint.py
+                                :bilateral_row_is_skipped.
+                  "bilateral_patch" — no-slip imposed once per contact PAIR
+                                (the patch), which is the well-posed reading
+                                of "rolling without slipping". Unbounded,
+                                sign-free multiplier; no complementarity, no
+                                active set, no dependence on lambda_n.
+
+        gyro      True  — keep the gyroscopic term w x (I w)
+                  False — drop it. Free rung with an exact certificate
+                          ||w x I w||*dt / ||M du||.
+
+    The modes are passed to the kernels as scalars, so every thread in a
+    launch takes the same branch. Rungs are selected per engine build.
+    """
+
+    friction: str = "cone"
+    gyro: bool = True
+
+    _FRICTION_MODES = ("cone", "bilateral", "bilateral_patch")
+
+    def __post_init__(self):
+        if self.friction not in self._FRICTION_MODES:
+            raise ValueError(
+                f"relaxation.friction must be one of {self._FRICTION_MODES}, "
+                f"got {self.friction!r}"
+            )
+
+    @property
+    def friction_mode(self) -> int:
+        return self._FRICTION_MODES.index(self.friction)
+
+    @property
+    def gyro_scale(self) -> float:
+        return 1.0 if self.gyro else 0.0
+
+    @property
+    def is_default(self) -> bool:
+        """True when every axis is at the full (unrelaxed) formulation."""
+        return self.friction == "cone" and self.gyro
 
     @classmethod
     def coerce(cls, obj):
@@ -380,6 +441,7 @@ class OstrichEngineConfig(EngineConfig):
         nr           - NewtonRaphsonConfig — outer NR loop control
         linear       - LinearSolverConfig  — PCR + preconditioner
         compliance   - ComplianceConfig    — joint/contact/friction
+        relaxation   - RelaxationConfig    — structural relaxation rungs
         linesearch   - LinesearchConfig    — backtracking line search
         warm_start   - WarmStartConfig     — cross-step contact warm start
         contacts     - ContactsConfig      — max + per-pair reduction
@@ -392,6 +454,7 @@ class OstrichEngineConfig(EngineConfig):
     nr: NewtonRaphsonConfig = field(default_factory=NewtonRaphsonConfig)
     linear: LinearSolverConfig = field(default_factory=LinearSolverConfig)
     compliance: ComplianceConfig = field(default_factory=ComplianceConfig)
+    relaxation: RelaxationConfig = field(default_factory=RelaxationConfig)
     linesearch: LinesearchConfig = field(default_factory=LinesearchConfig)
     warm_start: WarmStartConfig = field(default_factory=WarmStartConfig)
     contacts: ContactsConfig = field(default_factory=ContactsConfig)
@@ -412,6 +475,15 @@ class OstrichEngineConfig(EngineConfig):
             if differentiable_simulation is None
             else differentiable_simulation
         )
+        if diff and self.relaxation.friction != "cone":
+            raise NotImplementedError(
+                "relaxation.friction='bilateral' has no adjoint yet: the backward "
+                "pass freezes each contact's stick/slip mode against the Coulomb "
+                "limit mu*lambda_n (adjoint/adjoint_friction.py), which is "
+                "meaningless when lambda_f is unbounded — every contact would "
+                "classify as sliding. Gradients would be plausible and wrong. "
+                "Run the bilateral rung forward-only (differentiable=False)."
+            )
         return OstrichEngine(
             model=model,
             sim_steps=sim_steps,
@@ -428,6 +500,7 @@ class OstrichEngineConfig(EngineConfig):
             ("nr", NewtonRaphsonConfig),
             ("linear", LinearSolverConfig),
             ("compliance", ComplianceConfig),
+            ("relaxation", RelaxationConfig),
             ("linesearch", LinesearchConfig),
             ("warm_start", WarmStartConfig),
             ("contacts", ContactsConfig),

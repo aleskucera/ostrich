@@ -8,6 +8,7 @@ from .core import FeatherstoneEngineConfig
 from .core import JointMode
 from .core import LinearSolverConfig
 from .core import LinesearchConfig
+from .core import RelaxationConfig
 from .core import AdjointLoggingConfig
 from .core import DatasetLoggingConfig
 from .core import HDF5LoggingConfig
@@ -36,6 +37,7 @@ __all__ = [
     "ContactsConfig",
     "LinearSolverConfig",
     "LinesearchConfig",
+    "RelaxationConfig",
     "NewtonRaphsonConfig",
     "ProfilingConfig",
     "WarmStartConfig",

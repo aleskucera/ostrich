@@ -16,6 +16,7 @@ def unconstrained_dynamics_kernel(
     # --- Simulation Parameters ---
     dt: wp.float32,
     g_accel: wp.array(dtype=wp.vec3),
+    gyro_scale: wp.float32,
     # --- Output ---
     h_d: wp.array(dtype=wp.spatial_vector, ndim=2),
 ):
@@ -38,9 +39,10 @@ def unconstrained_dynamics_kernel(
     # to_spatial_momentum was used before, which for [g, 0] gives [m*g, I_w*0] = [m*g, 0]
     f_g = wp.spatial_vector(m * g_accel[0], wp.vec3(0.0))
 
-    # Gyroscopic term: w x (I @ w)
+    # Gyroscopic term: w x (I @ w). gyro_scale = 0.0 is the inertia-axis
+    # relaxation rung (RelaxationConfig.gyro=False).
     w = wp.spatial_bottom(u)
-    f_gyro = wp.spatial_vector(wp.vec3(), wp.cross(w, I_world @ w))
+    f_gyro = wp.spatial_vector(wp.vec3(), gyro_scale * wp.cross(w, I_world @ w))
 
     # momentum_diff = M @ (u - u_prev)
     momentum_diff = compute_spatial_momentum(m, I_world, u - u_prev)
@@ -61,6 +63,7 @@ def batch_unconstrained_dynamics_kernel(
     # --- Simulation Parameters ---
     dt: wp.float32,
     g_accel: wp.array(dtype=wp.vec3),
+    gyro_scale: wp.float32,
     # --- Output ---
     h_d: wp.array(dtype=wp.spatial_vector, ndim=3),
 ):
@@ -82,7 +85,7 @@ def batch_unconstrained_dynamics_kernel(
 
     # Gyroscopic term: w x (I @ w)
     w = wp.spatial_bottom(u)
-    f_gyro = wp.spatial_vector(wp.vec3(), wp.cross(w, I_world @ w))
+    f_gyro = wp.spatial_vector(wp.vec3(), gyro_scale * wp.cross(w, I_world @ w))
 
     # momentum_diff = M @ (u - u_prev)
     momentum_diff = compute_spatial_momentum(m, I_world, u - u_prev)
@@ -103,6 +106,7 @@ def fused_batch_unconstrained_dynamics_kernel(
     # --- Params ---
     dt: wp.float32,
     g_accel: wp.array(dtype=wp.vec3),
+    gyro_scale: wp.float32,
     num_batches: int,
     # --- Output ---
     h_d: wp.array(dtype=wp.spatial_vector, ndim=3),  # [Batch, World, Body]
@@ -131,7 +135,7 @@ def fused_batch_unconstrained_dynamics_kernel(
 
         # Gyroscopic term
         w = wp.spatial_bottom(u)
-        f_gyro = wp.spatial_vector(wp.vec3(), wp.cross(w, I_world @ w))
+        f_gyro = wp.spatial_vector(wp.vec3(), gyro_scale * wp.cross(w, I_world @ w))
 
         # momentum_diff = M @ (u - u_prev)
         momentum_diff = compute_spatial_momentum(m, I_world, u - u_prev)

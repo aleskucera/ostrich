@@ -9,6 +9,7 @@ from .engine_config import EngineConfig
 from .engine_config import FeatherstoneEngineConfig
 from .engine_config import LinearSolverConfig
 from .engine_config import LinesearchConfig
+from .engine_config import RelaxationConfig
 from .engine_config import MuJoCoEngineConfig
 from .engine_config import NewtonRaphsonConfig
 from .engine_config import ProfilingConfig
@@ -31,6 +32,7 @@ __all__ = [
     "ContactsConfig",
     "LinearSolverConfig",
     "LinesearchConfig",
+    "RelaxationConfig",
     "NewtonRaphsonConfig",
     "ProfilingConfig",
     "WarmStartConfig",

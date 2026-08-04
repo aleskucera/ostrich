@@ -4,6 +4,14 @@ from ostrich.mechanics import scaled_fisher_burmeister
 
 from .utils import compute_effective_mass
 
+# Values for the `friction_mode` kernel argument. The integers must match the
+# index order of `RelaxationConfig._FRICTION_MODES` in core/engine_config.py;
+# `tests/test_relaxation.py::test_friction_mode_ints_match_config` pins that.
+# Defined here rather than imported to keep constraints/ free of a core/ import.
+FRICTION_CONE = wp.constant(0)
+FRICTION_BILATERAL = wp.constant(1)
+FRICTION_BILATERAL_PATCH = wp.constant(2)
+
 # -----------------------------------------------------------------------------
 # 1. Low-Level Helpers
 # -----------------------------------------------------------------------------
@@ -26,6 +34,41 @@ def resolve_body_indices(
         body1 = shape_body[world_idx, shape1]
 
     return body0, body1
+
+
+@wp.func
+def bilateral_row_is_skipped(
+    friction_mode: wp.int32,
+    world_idx: int,
+    c_idx: int,
+    contact_shape0: wp.array(dtype=wp.int32, ndim=2),
+    contact_shape1: wp.array(dtype=wp.int32, ndim=2),
+):
+    """True when this contact must NOT carry a bilateral no-slip constraint.
+
+    A per-contact velocity equality does not say "rolling without slipping",
+    it says "this material point is pinned". Pinning two distinct points of a
+    rigid wheel confines its motion to the axis through them, which forbids
+    spin: the wheel welds to the terrain. Measured on the Helhest cruise scene
+    at the project's contact settings (13 contacts, ~4 per wheel), the rung
+    converges cleanly to |omega_wheel| = 0 and the robot does not move.
+
+    So no-slip belongs to the contact *patch*, not to each sampled point --
+    one constraint per (shape0, shape1) pair, which is also why helhest_stack's
+    quasi-static settle is a 3x3 system. FRICTION_BILATERAL_PATCH keeps the
+    lowest-indexed contact of each pair and drops the friction row of the rest.
+
+    O(c_idx) scan per thread; contact counts here are <= contacts.max_per_world.
+    """
+    if friction_mode != FRICTION_BILATERAL_PATCH:
+        return False
+
+    s0 = contact_shape0[world_idx, c_idx]
+    s1 = contact_shape1[world_idx, c_idx]
+    for j in range(c_idx):
+        if contact_shape0[world_idx, j] == s0 and contact_shape1[world_idx, j] == s1:
+            return True
+    return False
 
 
 @wp.func
@@ -122,8 +165,12 @@ def compute_friction_model(
     force_n_prev: wp.float32,
     dt: wp.float32,
     precond: wp.float32,
+    friction_mode: wp.int32,
 ):
     """Impulse-level Fisher-Burmeister for the (elliptical) Coulomb cone.
+
+    ``friction_mode == FRICTION_BILATERAL`` selects the structural
+    relaxation instead: rolling without slipping. See the branch below.
 
     Two regimes:
 
@@ -149,6 +196,17 @@ def compute_friction_model(
     v_t_0 = wp.dot(J_t1_0, vel0) + wp.dot(J_t1_1, vel1)
     v_t_1 = wp.dot(J_t2_0, vel0) + wp.dot(J_t2_1, vel1)
     v_t = wp.vec2(v_t_0, v_t_1)
+
+    if friction_mode != FRICTION_CONE:
+        # ---- Structural relaxation: rolling without slipping ----
+        # The weight w is the only route by which complementarity enters the
+        # friction block: the caller forms res_f = v_t + w*lambda and
+        # C_f = w/dt + compliance. Setting w = 0 turns the row into the
+        # bilateral equality v_t + alpha*lambda_f = 0 (alpha = compliance),
+        # with an unbounded, sign-free multiplier. mu, mu_perp and
+        # force_n_prev all drop out, so the row is linear in body velocity
+        # and carries no dependence on the normal block.
+        return v_t, 0.0, 0.0
 
     eps = 1e-8
     r = precond
@@ -264,11 +322,16 @@ def compute_friction_core(
     force_n_prev: float,
     dt: float,
     compliance: float,
+    friction_mode: wp.int32,
 ):
     """
     Computes all Jacobians and friction residuals dynamically. Per-direction
     friction coefficients (mu_x along t1, mu_y along t2) define the elliptical
     Coulomb cone; the residual and compliance are emitted per-direction.
+
+    Everything here except `compute_friction_model` is shared by both
+    relaxation rungs: the tangent Jacobians, the effective-mass weights and
+    the force application back into `d_spatial` are formulation-independent.
     """
     J_t1_0 = wp.spatial_vector()
     J_t2_0 = wp.spatial_vector()
@@ -304,7 +367,8 @@ def compute_friction_core(
     force_f_prev = wp.vec2(lambda_t1_prev, lambda_t2_prev)
 
     v_t, w_x, w_y = compute_friction_model(
-        mu_x, mu_y, J_t1_0, J_t2_0, J_t1_1, J_t2_1, vel0, vel1, force_f_prev, force_n_prev, dt, precond
+        mu_x, mu_y, J_t1_0, J_t2_0, J_t1_1, J_t2_1, vel0, vel1, force_f_prev, force_n_prev, dt, precond,
+        friction_mode,
     )
 
     d_res_d0 = -dt * (J_t1_0 * lambda_t1 + J_t2_0 * lambda_t2)
@@ -351,6 +415,7 @@ def friction_residual_kernel(
     # Simulation parameters
     dt: wp.float32,
     compliance: wp.float32,
+    friction_mode: wp.int32,
     # Outputs
     res_d: wp.array(dtype=wp.spatial_vector, ndim=2),
     res_f: wp.array(dtype=wp.float32, ndim=2),
@@ -367,7 +432,13 @@ def friction_residual_kernel(
     shape0 = contact_shape0[world_idx, contact_idx]
     shape1 = contact_shape1[world_idx, contact_idx]
 
-    if shape0 == shape1:
+    skip = shape0 == shape1
+    if bilateral_row_is_skipped(
+        friction_mode, world_idx, contact_idx, contact_shape0, contact_shape1
+    ):
+        skip = True
+
+    if skip:
         res_f[world_idx, constr_idx0] = 0.0
         res_f[world_idx, constr_idx1] = 0.0
         return
@@ -378,6 +449,17 @@ def friction_residual_kernel(
 
     # EARLY EXIT: skip when the cone budget is essentially zero in both shapes.
     mu_max = wp.max(mu0, mu1)
+    # This gate applies to EVERY rung, including the bilateral ones, and the
+    # reason is not the cone budget — it is that collision proposes candidates
+    # out to `rigid_gap`, most of which are not touching. The cone rung ignores
+    # them for free (zero normal force => zero friction budget). A bilateral
+    # rung has no such budget, so without this gate it pins the body to
+    # contacts that are metres away and the robot cannot move at all.
+    #
+    # The consequence is worth stating plainly: bilateral friction does NOT
+    # fully decouple from the normal block. It keeps exactly this lagged
+    # dependence on lambda_n for active-set selection, even though the
+    # constraint row itself no longer contains lambda_n.
     if mu_max * force_n_prev <= 1e-6:
         res_f[world_idx, constr_idx0] = 0.0
         res_f[world_idx, constr_idx1] = 0.0
@@ -462,6 +544,7 @@ def friction_residual_kernel(
         force_n_prev,
         dt,
         compliance,
+        friction_mode,
     )
 
     if body0 >= 0:
@@ -502,6 +585,7 @@ def friction_constraint_kernel(
     # Simulation parameters
     dt: wp.float32,
     compliance: wp.float32,
+    friction_mode: wp.int32,
     # Outputs
     constr_active_mask: wp.array(dtype=wp.float32, ndim=2),
     constr_body_idx: wp.array(dtype=wp.int32, ndim=3),
@@ -535,7 +619,13 @@ def friction_constraint_kernel(
     shape0 = contact_shape0[world_idx, contact_idx]
     shape1 = contact_shape1[world_idx, contact_idx]
 
-    if shape0 == shape1:
+    skip = shape0 == shape1
+    if bilateral_row_is_skipped(
+        friction_mode, world_idx, contact_idx, contact_shape0, contact_shape1
+    ):
+        skip = True
+
+    if skip:
         constr_active_mask[world_idx, constr_idx0] = 0.0
         constr_active_mask[world_idx, constr_idx1] = 0.0
         constr_force[world_idx, constr_idx0] = 0.0
@@ -557,6 +647,17 @@ def friction_constraint_kernel(
     force_n_prev = constr_force_n_prev[world_idx, contact_idx]
 
     mu_max = wp.max(mu0, mu1)
+    # This gate applies to EVERY rung, including the bilateral ones, and the
+    # reason is not the cone budget — it is that collision proposes candidates
+    # out to `rigid_gap`, most of which are not touching. The cone rung ignores
+    # them for free (zero normal force => zero friction budget). A bilateral
+    # rung has no such budget, so without this gate it pins the body to
+    # contacts that are metres away and the robot cannot move at all.
+    #
+    # The consequence is worth stating plainly: bilateral friction does NOT
+    # fully decouple from the normal block. It keeps exactly this lagged
+    # dependence on lambda_n for active-set selection, even though the
+    # constraint row itself no longer contains lambda_n.
     if mu_max * force_n_prev <= 1e-6:
         constr_active_mask[world_idx, constr_idx0] = 0.0
         constr_active_mask[world_idx, constr_idx1] = 0.0
@@ -662,6 +763,7 @@ def friction_constraint_kernel(
         force_n_prev,
         dt,
         compliance,
+        friction_mode,
     )
 
     if body0 >= 0:
@@ -715,6 +817,7 @@ def batch_friction_residual_kernel(
     # Simulation parameters
     dt: wp.float32,
     compliance: wp.float32,
+    friction_mode: wp.int32,
     # Outputs (3D)
     res_d: wp.array(dtype=wp.spatial_vector, ndim=3),
     res_f: wp.array(dtype=wp.float32, ndim=3),
@@ -732,7 +835,13 @@ def batch_friction_residual_kernel(
     shape0 = contact_shape0[world_idx, contact_idx]
     shape1 = contact_shape1[world_idx, contact_idx]
 
-    if shape0 == shape1:
+    skip = shape0 == shape1
+    if bilateral_row_is_skipped(
+        friction_mode, world_idx, contact_idx, contact_shape0, contact_shape1
+    ):
+        skip = True
+
+    if skip:
         res_f[batch_idx, world_idx, constr_idx0] = 0.0
         res_f[batch_idx, world_idx, constr_idx1] = 0.0
         return
@@ -742,6 +851,17 @@ def batch_friction_residual_kernel(
     force_n_prev = constr_force_n_prev[world_idx, contact_idx]
 
     mu_max = wp.max(mu0, mu1)
+    # This gate applies to EVERY rung, including the bilateral ones, and the
+    # reason is not the cone budget — it is that collision proposes candidates
+    # out to `rigid_gap`, most of which are not touching. The cone rung ignores
+    # them for free (zero normal force => zero friction budget). A bilateral
+    # rung has no such budget, so without this gate it pins the body to
+    # contacts that are metres away and the robot cannot move at all.
+    #
+    # The consequence is worth stating plainly: bilateral friction does NOT
+    # fully decouple from the normal block. It keeps exactly this lagged
+    # dependence on lambda_n for active-set selection, even though the
+    # constraint row itself no longer contains lambda_n.
     if mu_max * force_n_prev <= 1e-6:
         res_f[batch_idx, world_idx, constr_idx0] = 0.0
         res_f[batch_idx, world_idx, constr_idx1] = 0.0
@@ -826,6 +946,7 @@ def batch_friction_residual_kernel(
         force_n_prev,
         dt,
         compliance,
+        friction_mode,
     )
 
     if body0 >= 0:
@@ -866,6 +987,7 @@ def fused_batch_friction_residual_kernel(
     # Simulation parameters
     dt: wp.float32,
     compliance: wp.float32,
+    friction_mode: wp.int32,
     num_batches: int,
     # Outputs (3D)
     res_d: wp.array(dtype=wp.spatial_vector, ndim=3),
@@ -885,7 +1007,13 @@ def fused_batch_friction_residual_kernel(
     shape0 = contact_shape0[world_idx, contact_idx]
     shape1 = contact_shape1[world_idx, contact_idx]
 
-    if shape0 == shape1:
+    skip = shape0 == shape1
+    if bilateral_row_is_skipped(
+        friction_mode, world_idx, contact_idx, contact_shape0, contact_shape1
+    ):
+        skip = True
+
+    if skip:
         for b in range(num_batches):
             res_f[b, world_idx, constr_idx0] = 0.0
             res_f[b, world_idx, constr_idx1] = 0.0
@@ -897,6 +1025,17 @@ def fused_batch_friction_residual_kernel(
     force_n_prev = constr_force_n_prev[world_idx, contact_idx]
 
     mu_max = wp.max(mu0, mu1)
+    # This gate applies to EVERY rung, including the bilateral ones, and the
+    # reason is not the cone budget — it is that collision proposes candidates
+    # out to `rigid_gap`, most of which are not touching. The cone rung ignores
+    # them for free (zero normal force => zero friction budget). A bilateral
+    # rung has no such budget, so without this gate it pins the body to
+    # contacts that are metres away and the robot cannot move at all.
+    #
+    # The consequence is worth stating plainly: bilateral friction does NOT
+    # fully decouple from the normal block. It keeps exactly this lagged
+    # dependence on lambda_n for active-set selection, even though the
+    # constraint row itself no longer contains lambda_n.
     if mu_max * force_n_prev <= 1e-6:
         for b in range(num_batches):
             res_f[b, world_idx, constr_idx0] = 0.0
@@ -983,6 +1122,7 @@ def fused_batch_friction_residual_kernel(
                 force_n_prev,
                 dt,
                 compliance,
+                friction_mode,
             )
         )
 
