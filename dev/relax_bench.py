@@ -52,9 +52,9 @@ SCENES = {
 }
 
 
-def build_model(mu: float, ground_mu: float) -> newton.Model:
+def build_model(mu: float, ground_mu: float, rigid_gap: float = 1.0) -> newton.Model:
     builder = OstrichModelBuilder()
-    builder.rigid_gap = 1.0
+    builder.rigid_gap = rigid_gap
     create_helhest_model(
         builder,
         xform=wp.transform((0.0, 0.0, 0.6), wp.quat_identity()),
@@ -162,10 +162,12 @@ def _quat_to_mat(q):
 def run(scene: str, relaxation: RelaxationConfig, steps: int, dt: float,
         nr_max_iters: int, backtrack_min_iter: int, nr_atol: float,
         friction_compliance: float = 1e-8, settle_steps: int = 40,
-        max_per_pair: int = 8, mu_override: float | None = None) -> dict:
+        max_per_pair: int = 8, mu_override: float | None = None,
+        rigid_gap: float = 1.0) -> dict:
     cfg = SCENES[scene]
     mu = cfg["mu"] if mu_override is None else mu_override
-    model = build_model(mu, cfg["ground_mu"] if mu_override is None else mu_override)
+    model = build_model(mu, cfg["ground_mu"] if mu_override is None else mu_override,
+                        rigid_gap)
 
     # Mirrors examples/conf/engine/ostrich.yaml — the configuration the
     # project actually runs. The dataclass defaults differ substantially
@@ -312,6 +314,7 @@ def main():
     ap.add_argument("--friction-compliance", type=float, default=1e-8)
     ap.add_argument("--settle-steps", type=int, default=40)
     ap.add_argument("--max-per-pair", type=int, default=8)
+    ap.add_argument("--rigid-gap", type=float, default=1.0)
     ap.add_argument("--json", type=str, default=None)
     args = ap.parse_args()
 
@@ -339,6 +342,13 @@ def main():
         "mu50": (RelaxationConfig(), 50.0),
         "bilateral": (RelaxationConfig(friction="bilateral"), None),
         "bilat_patch": (RelaxationConfig(friction="bilateral_patch"), None),
+        # R2: normal complementarity -> equality. This is the rung the Phase 1
+        # results point at: the load-carrying set is what the solver spends its
+        # iterations on, and this is what removes that decision.
+        "contact_eq": (RelaxationConfig(contact="equality"), None),
+        # R1+R2 = the "kinematic rolling" rung.
+        "kin_roll": (RelaxationConfig(friction="bilateral_patch",
+                                      contact="equality"), None),
         "no_gyro": (RelaxationConfig(gyro=False), None),
     }
 
@@ -347,14 +357,14 @@ def main():
         rec = run(args.scene, relax, steps, args.dt,
                   nr_max_iters, args.backtrack_min_iter, nr_atol,
                   args.friction_compliance, args.settle_steps, args.max_per_pair,
-                  mu_ovr)
+                  mu_ovr, args.rigid_gap)
         raw[name] = rec
         results.append(summarize(name, rec))
 
     hdr = f"{'rung':<12}{'NR/step':>9}{'NRmax':>7}{'PCR/NR':>9}{'PCRtot':>9}{'res':>11}{'sat':>11}{'min λn':>10}{'#con':>7}{'|ω|wheel':>10}"
     print(f"\nscene={args.scene} steps={steps} dt={args.dt} "
           f"compliance.friction={args.friction_compliance:g} settle={args.settle_steps} "
-          f"max_per_pair={args.max_per_pair} "
+          f"max_per_pair={args.max_per_pair} rigid_gap={args.rigid_gap:g} "
           f"protocol={args.protocol} nr.max_iters={nr_max_iters} nr.atol={nr_atol:g} "
           f"backtrack_min_iter={args.backtrack_min_iter}")
     print(hdr)

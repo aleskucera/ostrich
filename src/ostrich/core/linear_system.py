@@ -264,6 +264,7 @@ def compute_linear_system(
             data.dt,
             config.compliance.contact,
             config.compliance.contact_fb_smooth_eps_sq,
+            config.relaxation.contact_mode,
         ],
         outputs=[
             data.constr_active_mask.n,

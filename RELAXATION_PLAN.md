@@ -237,128 +237,119 @@ early read on it.
 
 ---
 
-## 3.5 Results so far — Phases 0, 0.5 and 1
+## 3.5 Results — Phases 0 through 3
 
-Harness: `dev/relax_bench.py`. Scene: Helhest on flat ground, `mu` 0.9, 40-step settle under
-the full formulation (so every rung starts from a bit-identical state), then 40 driven steps
-at 2 rad/s on all three wheels. Engine config mirrors `examples/conf/engine/ostrich.yaml`,
-`dt=3e-2`, forward-only, eager mode, 1 world, RTX A500. `converge` protocol
-(`nr.atol=1e-3`, `max_iters=64`) — iterations-to-convergence.
+Harness: `dev/relax_bench.py`. Helhest on flat ground, 40-step settle under the full
+formulation (every rung starts bit-identical), then 40 driven steps. Engine config mirrors
+`examples/conf/engine/ostrich.yaml`, `dt=3e-2`, forward-only, eager mode, 1 world, RTX A500,
+`converge` protocol (`nr.atol=1e-3`, `max_iters=64`).
 
-### Phase 0.5 — dropping `f_gyro`: confirmed negligible, as predicted
+> **Correction.** An earlier version of this section concluded that removing the friction cone
+> never helps and that R2 should be built before R1. Both claims were artefacts of running the
+> harness at `builder.rigid_gap = 1.0`, copied from `examples/helhest/obstacle_benchmark.py`.
+> That is the top of the project's range (newton's default is 0.1; the helhest *drive* scenes
+> use 0.5) and it is wrong for a flat-ground cruise scene. The corrected results are below.
+> What survives from that analysis is marked as such.
 
-| | NR/step | PCR/NR | certificate | ‖Δ chassis‖ |
+### The governing variable the design document never mentions: `rigid_gap`
+
+Every relaxation on this branch stands or falls on one thing: **the detected candidate set is
+not the touching set.** Collision proposes contacts out to `rigid_gap`. The full formulation
+ignores the distant ones for free — no normal load means no friction budget, and
+complementarity lets `λ_n = 0`. Neither relaxation can:
+
+- bilateral friction *pins* the chassis to candidates metres away (hence the `mu·λ_n` gate has
+  to stay, so R1 does **not** fully decouple from the normal block);
+- the normal equality `signed_dist = 0` actively *pulls* the robot onto them — measured
+  `λ_n ≈ -2.8e9`, then NaN.
+
+`rigid_gap` is not mentioned anywhere in RELAXATION_BRANCH.md. It should be a first-class
+control in §8 alongside the iteration budget.
+
+### Cruise (S1), `rigid_gap = 0.1`, 6 contacts — the relaxations work
+
+| rung | NR/step | PCR/NR | PCR total | ‖Δ chassis‖ |
 |---|---|---|---|---|
-| full | 5.22 | 12.06 | — | — |
-| no_gyro | 6.55 | 15.32 | 8.5e-4 | 1.6e-5 |
+| full | 5.75 | 11.57 | 2660 | — |
+| mu50 | 5.03 | 13.42 | 2697 | 6.7e-4 |
+| bilateral | 5.20 | 10.55 | 2195 | 7.4e-4 |
+| bilateral_patch | 5.00 | 13.38 | 2676 | 7.4e-4 |
+| contact_eq (R2) | 5.38 | 14.07 | 3025 | 5.6e-4 |
+| **kin_roll (R1+R2)** | **4.00** | **9.13** | **1461** | 7.4e-4 |
+| no_gyro | 5.60 | 11.13 | 2494 | 3.9e-7 |
 
-The certificate `‖ω × Iω‖·dt / ‖M·Δu‖` reports ~1e-3 and the trajectory delta is ~1e-5, i.e.
-the certificate correctly predicts its own irrelevance. That is the false-positive check S1
-exists for, and it passes. The NR/step difference is run-to-run noise in when the tail
-iterations trip `atol`, not a real cost difference.
+Every rung passes the equivalence test (all within 7.4e-4 m). **The combined rung is the
+cheapest thing on the table**: −30% NR iterations, −45% PCR iterations, at a strikingly
+uniform 4.00 NR/step. Identical at `rigid_gap = 0.02`.
 
-### Phase 1 — R1 does not work as specified, for two separate reasons
+Neither half delivers this alone — bilateral 5.20, contact_eq 5.38, both ≈ baseline. This is
+exactly RELAXATION_BRANCH.md §5's prediction: *"combined with R1 this gives a coherent
+kinematic rolling rung… that combination is the interesting one."* The document was right.
 
-**(a) A per-contact velocity equality is not "rolling without slipping".** It says *this
-material point is pinned*. Pinning two distinct points of a rigid wheel confines its motion to
-the axis through them, which forbids spin. Measured: the rung converges cleanly — 6.00
-NR/step, residual 7.8e-5, better than baseline — to `|ω_wheel| = 0.000` with the robot
-displacing 1e-6 m. It is not a conditioning failure. It converges accurately to welded.
+### Cruise, `rigid_gap = 0.5`, 13 contacts — everything relaxed breaks
 
-No-slip therefore belongs to the contact *patch*, not to each sampled point. `friction=
-"bilateral_patch"` imposes one no-slip row per `(shape0, shape1)` pair. This is also why
-`helhest_stack`'s settle is a 3×3 system — the same constraint, correctly counted.
-
-**(b) Bilateral friction does NOT decouple from the normal block.** Collision proposes
-candidates out to `rigid_gap` (1.0 m in these scenes), most of them not touching. The cone
-rung ignores them for free — zero normal force means zero friction budget. A bilateral rung
-has no budget to be zero, so without the `mu·λ_n ≤ 1e-6` gate it pins the chassis to contacts
-that are metres away, and the robot cannot move at all. The gate has to stay.
-
-That gate is a lagged dependence on `λ_n`. So R1 removes `λ_n` from the constraint *row* but
-keeps it for *active-set selection* — and the active set is what the iteration count actually
-responds to. §4's "decouples from the normal block" does not survive contact with the
-collision pipeline.
-
-### Phase 2 — the attribution control refutes the branch's central hypothesis
-
-The 2×2 from §2, run as config only:
-
-| | cone kept | cone removed |
+| rung | NR/step | outcome |
 |---|---|---|
-| **cone binds** (μ=0.9, saturation 2.6) | full — **5.22** NR/step, 12.06 PCR/NR | — |
-| **cone never binds** | μ=50 — **5.22** NR/step, 11.27 PCR/NR | bilateral_patch — **24.45** NR/step, 23.09 PCR/NR |
+| full | 5.60 | fine |
+| mu50 | 5.20 | fine |
+| bilateral | 63.45 | welded, `|ω| = 0.9`, robot does not move |
+| bilateral_patch | 30.88 | 4× slower, ‖Δ‖ = 0.64 |
+| contact_eq | 64.00 | diverged — robot at (4.6, −18.9), `|ω| = 2036` |
+| kin_roll | 19.30 | NaN |
 
-μ=50 costs *exactly* what the full model costs and lands within 6.6e-4 m of its trajectory.
-Making the cone never bind is free. Removing it structurally costs **4.7× more NR iterations**
-and 9× more total PCR iterations.
+The two unrelaxed rungs are unaffected. The cliff is entirely on the relaxed side, and it is
+`rigid_gap`, not the physics being modelled.
 
-**Stick–slip mode switching is not the cost driver in this engine.** RELAXATION_BRANCH.md §2
-states it is ("per the author") and builds the whole build order on it. The FB cone is
-approximately free here; what costs is selecting which contacts carry load, and that is the
-*normal* complementarity, not the friction cone.
+### Skid (S2), `rigid_gap = 0.1` — saturation defeats every relaxed rung
 
-A `compliance.friction` sweep over 1e-8 → 1e-6 → 1e-4 does not rescue the bilateral rungs
-(24–60 NR/step throughout), so §0.4's conditioning hypothesis is also not the explanation.
-The mechanism is active-set churn: an unregularized equality row whose membership is decided
-by a lagged normal load.
+| rung | NR/step | outcome |
+|---|---|---|
+| full | 14.40 | baseline (saturation 179) |
+| mu50 | 38.25 | 2.7× worse |
+| bilateral | 17.38 | welded, `|ω| = 0.000` |
+| bilateral_patch | 48.55 | residual 1.22 — diverging |
+| contact_eq | 61.60 | `min λ_n = −1.4e5` |
+| kin_roll | 26.82 | NaN |
+| no_gyro | 14.40 | ‖Δ‖ = 0.34, `min λ_n = −189` |
 
-### The skid scene (S2) — same verdict, different mechanism
+Under saturation the cone is a **stabiliser**, not a cost: it caps `λ_f`, and every way of
+removing the cap — parametric (μ=50, 2.7×) or structural — is worse. This survives from the
+earlier analysis and is independent of `rigid_gap`.
 
-Same protocol, `mu` 0.35, differential drive ±8 rad/s. Friction saturates hard here
-(saturation 755 in the full rung), which is the regime §2 predicts should punish the cone.
+### Two findings that hold regardless of `rigid_gap`
 
-| rung | NR/step | PCR/NR | ‖Δ chassis‖ |
-|---|---|---|---|
-| full | **17.77** | 19.58 | — |
-| mu50 | 42.65 | 19.73 | 1.5e-1 |
-| bilateral | 61.52 | 22.58 | 5.3e-2 |
-| bilateral_patch | 49.67 | 22.72 | 5.3e-2 |
+**A per-contact velocity equality is not "rolling without slipping".** It says *this material
+point is pinned*. Pinning two distinct points of a rigid wheel confines its motion to the axis
+through them, which forbids spin. Measured: converges cleanly (6.00 NR/step, residual 7.8e-5,
+better than baseline) to `|ω_wheel| = 0.000` with the robot displacing 1e-6 m. Not a
+conditioning failure — accurate convergence to *welded*. Hence `friction="bilateral_patch"`,
+one no-slip row per `(shape0, shape1)` pair, which is also why `helhest_stack`'s settle is
+3×3: the same constraint, correctly counted. Welding still recurs whenever ≥2 contacts per
+wheel carry load (skid at gap 0.1).
 
-The 2×2 reads differently than on cruise, and more damningly. Here the **binding cone is the
-cheapest configuration available**: full costs 17.77, while both ways of un-binding it —
-parametric (μ=50, 42.65) and structural (bilateral_patch, 49.67) — cost 2.4× and 2.8×.
+**Removing the friction complementarity alone buys almost nothing.** The μ=50 control — cone
+kept, never binding — costs what the full model costs on cruise at every gap tested, and the
+bilateral rungs are within noise of baseline there too. §2's premise that stick–slip mode
+switching is the cost driver is not supported. The gain in `kin_roll` comes from the
+*combination*, not from deleting the cone.
 
-So the cone binding is not a cost, it is a *stabiliser*. When friction saturates, the cone
-caps `λ_f`; remove the cap by any means and the multiplier grows, the block stiffens, and NR
-struggles. §2's claim that stick–slip mode switching is the cost driver has the sign backwards
-in exactly the scene built to showcase it.
+### Where this leaves the branch
 
-Combining the two scenes: **there is no regime in which removing the friction cone helps.**
-On cruise the cone is free (5.22 vs 5.22) and removing it costs 4.7×; on skid the cone is
-actively load-bearing and removing it costs 2.8×. That is a stronger result than cruise alone,
-because cruise on its own is vulnerable to "you only tested where friction doesn't matter".
+The rungs are usable exactly where the runtime ladder needs them — benign, few-contact,
+unsaturated regimes — and unusable in the demanding scenes the attribution study cares about.
+That is a real result for the ladder (screen cheaply, promote on certificate) and a real
+problem for the study.
 
-Note the μ=50 confound this plan flagged in Phase 2 does bite here: on skid, μ=50 is slow, and
-a slow μ=50 is consistent with both "un-binding is expensive" and "μ=50 is just badly
-conditioned". Cruise is what disambiguates — there μ=50 is free, so large μ is not inherently
-expensive, and skid's slowdown is attributable to un-binding.
-
-Two caveats specific to this scene. Every rung hits the 64-iteration cap on some steps, so the
-means are censored and the slow rungs' true cost is understated. And `no_gyro` recorded a
-final-step residual of 3.6 — a convergence failure, not a small error — which needs a look
-before the inertia axis is called settled.
-
-The gyro certificate is the one thing that behaves beautifully across both scenes: 8.5e-4 on
-cruise, 5.2e-2 on skid, i.e. it rises 60× exactly where the trajectory error rises. That is
-the certificate machinery working as designed, on the axis cheap enough to validate it.
-
-### What this implies for the build order
-
-**R2 should go first, not R1.** The load-carrying set is what the solver is spending its
-iterations on, and R2 is the rung that eliminates the question — under a normal equality every
-detected contact carries load by fiat, which also removes the ambiguity that forces R1 to keep
-its `λ_n` gate. R1 is only coherent *after* R2, as part of the combined kinematic-rolling rung
-(§4 of the source document, Phase 4 here) — not as the standalone first rung.
-
-The DOF-elimination axis (R3) is untouched by this result and remains conditional.
+Build order stands as originally written (R1, then R2, then combined), **with `rigid_gap`
+pinned low and contacts-per-patch controlled**. The Phase-1-first ordering was never the
+problem; the harness was.
 
 ### Caveats
 
-Two scenes, 40 steps each, one world, one GPU, eager mode, no wall-clock (the harness syncs
-per NR iteration by design). No seed sweep, no curb scene, no compound scene. Iteration counts
-on skid are censored by the 64-iteration cap. These numbers are strong enough to reorder the
-build order, not to close the question.
+Two scenes, 40 steps, one world, one GPU, eager mode, no wall-clock (the harness syncs per NR
+iteration by design). No seed sweep, no curb scene. Iteration counts are censored by the
+64-iteration cap wherever a rung reports 64. `no_gyro` showed a convergence failure on skid
+(residual 3.6 at `rigid_gap=1.0`) that is still unexplained.
 
 ---
 

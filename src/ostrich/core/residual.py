@@ -124,6 +124,7 @@ def compute_residual(
             data.dt,
             config.compliance.contact,
             config.compliance.contact_fb_smooth_eps_sq,
+            config.relaxation.contact_mode,
         ],
         outputs=[
             data.res.d_spatial,

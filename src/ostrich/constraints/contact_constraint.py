@@ -3,6 +3,12 @@ from ostrich.mechanics import scaled_fisher_burmeister_diff
 
 from .utils import compute_effective_mass
 
+# Values for the `contact_mode` kernel argument. Must match the index order of
+# `RelaxationConfig._CONTACT_MODES` in core/engine_config.py; pinned by
+# tests/test_relaxation.py::test_contact_mode_ints_match_config.
+CONTACT_COMPLEMENTARITY = wp.constant(0)
+CONTACT_EQUALITY = wp.constant(1)
+
 # -----------------------------------------------------------------------------
 # 1. Low-Level Helpers
 # -----------------------------------------------------------------------------
@@ -55,6 +61,7 @@ def compute_contact_core(
     dt: float,
     compliance: float,
     fb_eps_sq: float,
+    contact_mode: wp.int32,
 ):
     """
     Computes all Jacobians and contact residuals dynamically.
@@ -95,7 +102,22 @@ def compute_contact_core(
     precond = wp.pow(dt, 2.0) * effective_mass
 
     # --- 3. Fisher-Burmeister Complementarity ---
-    phi_n, dphi_dc_n, dphi_dlambda_n = scaled_fisher_burmeister_diff(signed_dist, f_n, 1.0, precond, fb_eps_sq)
+    if contact_mode == CONTACT_EQUALITY:
+        # Structural relaxation: persistent contact. The complementarity
+        # FB(signed_dist, lambda_n) >= 0 is replaced by the bilateral equality
+        # signed_dist + alpha*lambda_n = 0, i.e. phi = signed_dist with
+        # dphi/d(signed_dist) = 1 and dphi/d(lambda_n) = 0. The collision set
+        # is untouched (RELAXATION_BRANCH.md §5): what is removed is the
+        # decision about which detected contacts are active, not the detection.
+        #
+        # lambda_n becomes sign-free, and lambda_n < 0 is the certificate --
+        # "this contact should have separated", i.e. a wheel that ought to be
+        # airborne. Exact and discrete, computable from this rung's own output.
+        phi_n = signed_dist
+        dphi_dc_n = 1.0
+        dphi_dlambda_n = 0.0
+    else:
+        phi_n, dphi_dc_n, dphi_dlambda_n = scaled_fisher_burmeister_diff(signed_dist, f_n, 1.0, precond, fb_eps_sq)
 
     # --- 4. Final Solver Terms ---
     J_hat_0 = dphi_dc_n * J0
@@ -141,6 +163,7 @@ def contact_residual_kernel(
     dt: wp.float32,
     compliance: wp.float32,
     fb_eps_sq: wp.float32,
+    contact_mode: wp.int32,
     # Outputs
     res_d: wp.array(dtype=wp.spatial_vector, ndim=2),
     res_n: wp.array(dtype=wp.float32, ndim=2),
@@ -207,6 +230,7 @@ def contact_residual_kernel(
         dt,
         compliance,
         fb_eps_sq,
+        contact_mode,
     )
 
     if body0 >= 0:
@@ -244,6 +268,7 @@ def contact_constraint_kernel(
     dt: wp.float32,
     compliance: wp.float32,
     fb_eps_sq: wp.float32,
+    contact_mode: wp.int32,
     # Outputs
     constr_active_mask: wp.array(dtype=wp.float32, ndim=2),
     constr_body_idx: wp.array(dtype=wp.int32, ndim=3),
@@ -324,6 +349,7 @@ def contact_constraint_kernel(
         dt,
         compliance,
         fb_eps_sq,
+        contact_mode,
     )
 
     constr_active_mask[world_idx, contact_idx] = 1.0
@@ -373,6 +399,7 @@ def batch_contact_residual_kernel(
     dt: wp.float32,
     compliance: wp.float32,
     fb_eps_sq: wp.float32,
+    contact_mode: wp.int32,
     # Outputs (3D)
     res_d: wp.array(dtype=wp.spatial_vector, ndim=3),
     res_n: wp.array(dtype=wp.float32, ndim=3),
@@ -439,6 +466,7 @@ def batch_contact_residual_kernel(
         dt,
         compliance,
         fb_eps_sq,
+        contact_mode,
     )
 
     if body0 >= 0:
@@ -476,6 +504,7 @@ def fused_batch_contact_residual_kernel(
     dt: wp.float32,
     compliance: wp.float32,
     fb_eps_sq: wp.float32,
+    contact_mode: wp.int32,
     num_batches: int,
     # Outputs (3D)
     res_d: wp.array(dtype=wp.spatial_vector, ndim=3),
@@ -554,6 +583,7 @@ def fused_batch_contact_residual_kernel(
             dt,
             compliance,
             fb_eps_sq,
+            contact_mode,
         )
 
         if body0 >= 0:

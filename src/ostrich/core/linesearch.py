@@ -202,6 +202,7 @@ def _compute_batched_residual(
             data.dt,
             config.compliance.contact,
             config.compliance.contact_fb_smooth_eps_sq,
+            config.relaxation.contact_mode,
             dims.linesearch_step_count,
         ],
         outputs=[

@@ -207,6 +207,13 @@ class RelaxationConfig:
                                 sign-free multiplier; no complementarity, no
                                 active set, no dependence on lambda_n.
 
+        contact   "complementarity" — Fisher-Burmeister on (signed_dist, lambda_n)
+                  "equality"        — persistent contact: signed_dist = 0 is
+                                imposed on the DETECTED set (detection itself
+                                is unchanged). lambda_n becomes sign-free, and
+                                lambda_n < 0 is the certificate "this contact
+                                should have separated".
+
         gyro      True  — keep the gyroscopic term w x (I w)
                   False — drop it. Free rung with an exact certificate
                           ||w x I w||*dt / ||M du||.
@@ -216,9 +223,11 @@ class RelaxationConfig:
     """
 
     friction: str = "cone"
+    contact: str = "complementarity"
     gyro: bool = True
 
     _FRICTION_MODES = ("cone", "bilateral", "bilateral_patch")
+    _CONTACT_MODES = ("complementarity", "equality")
 
     def __post_init__(self):
         if self.friction not in self._FRICTION_MODES:
@@ -226,10 +235,19 @@ class RelaxationConfig:
                 f"relaxation.friction must be one of {self._FRICTION_MODES}, "
                 f"got {self.friction!r}"
             )
+        if self.contact not in self._CONTACT_MODES:
+            raise ValueError(
+                f"relaxation.contact must be one of {self._CONTACT_MODES}, "
+                f"got {self.contact!r}"
+            )
 
     @property
     def friction_mode(self) -> int:
         return self._FRICTION_MODES.index(self.friction)
+
+    @property
+    def contact_mode(self) -> int:
+        return self._CONTACT_MODES.index(self.contact)
 
     @property
     def gyro_scale(self) -> float:
@@ -238,7 +256,11 @@ class RelaxationConfig:
     @property
     def is_default(self) -> bool:
         """True when every axis is at the full (unrelaxed) formulation."""
-        return self.friction == "cone" and self.gyro
+        return (
+            self.friction == "cone"
+            and self.contact == "complementarity"
+            and self.gyro
+        )
 
     @classmethod
     def coerce(cls, obj):
@@ -475,14 +497,15 @@ class OstrichEngineConfig(EngineConfig):
             if differentiable_simulation is None
             else differentiable_simulation
         )
-        if diff and self.relaxation.friction != "cone":
+        if diff and not self.relaxation.is_default:
             raise NotImplementedError(
                 "relaxation.friction='bilateral' has no adjoint yet: the backward "
                 "pass freezes each contact's stick/slip mode against the Coulomb "
                 "limit mu*lambda_n (adjoint/adjoint_friction.py), which is "
                 "meaningless when lambda_f is unbounded — every contact would "
-                "classify as sliding. Gradients would be plausible and wrong. "
-                "Run the bilateral rung forward-only (differentiable=False)."
+                "classify as sliding — and it is derived from the FB branch the "
+                "contact-equality rung removes. Gradients would be plausible and "
+                "wrong. Run relaxed rungs forward-only (differentiable=False)."
             )
         return OstrichEngine(
             model=model,
