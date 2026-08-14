@@ -246,7 +246,11 @@ class OstrichDifferentiableSimulator(DifferentiableSimulator, ABC):
             )
             self.trajectory.save_step(i, self.solver.data, self.solver.ostrich_contacts)
 
-        self.tape.zero()
+        # reset() (not zero()) — zero() only clears gradients but keeps the
+        # recorded launch list, so each diff_step call would append another
+        # copy of the loss kernels and tape.backward() would replay all of
+        # them, scaling the gradients by the number of calls.
+        self.tape.reset()
         with self.tape:
             self.compute_loss()
 
@@ -312,7 +316,11 @@ class NewtonDifferentiableSimulator(DifferentiableSimulator, ABC):
         """
         Standard explicit differentiation (unrolling loop on tape).
         """
-        self.tape.zero()
+        # reset() (not zero()) — zero() keeps the recorded launch list, so each
+        # diff_step call would append another full copy of the forward rollout
+        # to the tape: gradients scale with the call count and backward cost
+        # grows linearly across optimizer iterations.
+        self.tape.reset()
 
         # --- FORWARD PASS ---
         for i in range(self.clock.total_sim_steps):
