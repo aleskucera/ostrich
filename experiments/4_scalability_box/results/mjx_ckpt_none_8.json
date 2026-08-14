@@ -1,0 +1,21 @@
+{
+  "simulator": "MJX-grad-ckpt-none",
+  "checkpoint": "none",
+  "num_worlds": 8,
+  "median_time_ms": 48536.15861828439,
+  "peak_gpu_mb": 11494.85107421875,
+  "peak_gpu_mb_nvml_absolute": 18894.6875,
+  "peak_gpu_mb_nvml": 18150.0,
+  "compile_s": 85.54638994997367,
+  "time_ms": [
+    48798.161793034524,
+    48533.288661856204,
+    48410.61801975593,
+    48426.43823521212,
+    48645.87900135666
+  ],
+  "K": 10,
+  "dt": 0.005,
+  "duration_s": 6.0,
+  "iterations": 5
+}
