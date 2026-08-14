@@ -4,7 +4,17 @@
 # between models with different topologies.
 
 set -e
+# pipefail is essential: each test is piped through grep below, and without it
+# the pipeline's exit status is grep's, not python's — assertion failures were
+# silently reported as passes for months.
+set -o pipefail
 cd "$(dirname "$0")"
+
+# The gradient-correctness fixes (complete pose pull-back + true friction
+# linearization, 2026-08-14) are engine config defaults. To run the suite
+# against the legacy adjoint for comparison:
+#   OSTRICH_POSE_VJP=0 OSTRICH_FRICTION_ADJOINT=frozen bash run_all.sh
+# (expect the contact/wheeled tests to fail — they document the old errors).
 
 TESTS=(
     test_zero_gradient.py
