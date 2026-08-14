@@ -70,8 +70,11 @@ class EngineData:
         self.ext_force = _alloc((dims.body_count,), wp.spatial_vector, alloc_grad_arrays)
 
         # State of bodies (q - position, u - velocity)
-        self.body_pose = _alloc((dims.body_count,), wp.transform)
-        self.body_vel = _alloc((dims.body_count,), wp.spatial_vector)
+        # requires_grad in differentiable mode so the tape-VJP pose pull-back
+        # (base_engine.step_backward) can harvest w^T dR/dq+ from body_pose;
+        # body_vel.grad is scratch there (the u+ pull-back is discarded).
+        self.body_pose = _alloc((dims.body_count,), wp.transform, alloc_grad_arrays)
+        self.body_vel = _alloc((dims.body_count,), wp.spatial_vector, alloc_grad_arrays)
 
         # State at previous timestep
         self.body_pose_prev = _alloc((dims.body_count,), wp.transform, alloc_grad_arrays)

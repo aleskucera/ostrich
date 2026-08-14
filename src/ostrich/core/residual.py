@@ -344,20 +344,26 @@ def compute_residual_gradient(
     data: EngineData,
     config: EngineConfig,
     dims: EngineDimensions,
+    pose_vjp: bool = False,
 ):
-
-    wp.launch(
-        kernel=body_vel_prev_grad_kernel,
+    # When the tape-VJP pose pull-back is active (base_engine.step_backward),
+    # w^T dR/du- and w^T dR/dtargets are produced by the kernel-adjoint sweep
+    # through compute_residual; the two hand-written kernels below would
+    # double-count them. Only the explicit kinematic carry
+    # (body_pose_prev_grad_kernel) remains hand-written in that mode.
+    if not pose_vjp:
+        wp.launch(
+            kernel=body_vel_prev_grad_kernel,
         dim=(dims.num_worlds, dims.body_count),
-        inputs=[
-            data.body_pose,
-            model.body_mass,
-            model.body_inertia,
-            data.w.d_spatial,
-        ],
-        outputs=[data.body_vel_prev.grad],
-        device=data.device,
-    )
+            inputs=[
+                data.body_pose,
+                model.body_mass,
+                model.body_inertia,
+                data.w.d_spatial,
+            ],
+            outputs=[data.body_vel_prev.grad],
+            device=data.device,
+        )
 
     wp.launch(
         kernel=body_pose_prev_grad_kernel,
@@ -370,6 +376,9 @@ def compute_residual_gradient(
         outputs=[data.body_pose_prev.grad],
         device=data.device,
     )
+
+    if pose_vjp:
+        return
 
     wp.launch(
         kernel=control_target_grad_kernel,

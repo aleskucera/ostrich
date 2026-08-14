@@ -404,12 +404,33 @@ class ContactsConfig:
 class AdjointConfig:
     """Adjoint backward-pass interventions for differentiable simulation."""
 
+    # Complete pose pull-back (2026-08-14): one kernel-adjoint sweep through
+    # the residual assembly supplies w^T dR/dxi for every input, restoring the
+    # implicit branch of dq+/dq- that the hand-written kernels missed
+    # (position-loss gradients were ~2x low without it). Env override for
+    # comparison: OSTRICH_POSE_VJP=0/1.
+    pose_vjp: bool = True
+
+    # Friction linearization in the adjoint solve. "true" (default) uses the
+    # FB-derived linearization assembled at the converged state — the frozen
+    # stick/slip surrogate below turned out to be a workaround for
+    # since-fixed bugs, and the true linearization validates to <=7% on the
+    # full gradient suite. "frozen" restores the legacy mode-classified
+    # surrogate (soft_blending then applies). Env override for comparison:
+    # OSTRICH_FRICTION_ADJOINT=true/frozen.
+    friction_linearization: str = "true"
+
     soft_blending: bool = True
     soft_blending_temperature: float = 0.05
     regularization: float = 0.0
     gradient_normalization: bool = False
 
     def __post_init__(self):
+        if self.friction_linearization not in ("true", "frozen"):
+            raise ValueError(
+                "adjoint.friction_linearization must be 'true' or 'frozen', "
+                f"got {self.friction_linearization!r}"
+            )
         if self.soft_blending_temperature <= 0:
             raise ValueError(
                 "adjoint.soft_blending_temperature must be > 0, "

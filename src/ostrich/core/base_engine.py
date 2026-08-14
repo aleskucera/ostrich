@@ -16,6 +16,7 @@ from newton.solvers import SolverBase
 
 from ostrich.adjoint import compute_adjoint_rhs_kernel
 from ostrich.adjoint import compute_body_adjoint_init_kernel
+from ostrich.adjoint import constraint_pose_prev_feedback_kernel
 from ostrich.adjoint import subtract_constraint_feedback_kernel
 from ostrich.logging import AdjointHDF5Logger
 from ostrich.logging import DatasetHDF5Logger
@@ -78,6 +79,15 @@ def _update_newton_iter_kernel(
     # AND the min-iter override above.
     if current_iter >= max_iters:
         keep_running[0] = 0
+
+
+@wp.kernel
+def _add_transform_grad_kernel(
+    src: wp.array(dtype=wp.transform, ndim=2),
+    dst: wp.array(dtype=wp.transform, ndim=2),
+):
+    world_idx, body_idx = wp.tid()
+    dst[world_idx, body_idx] = dst[world_idx, body_idx] + src[world_idx, body_idx]
 
 
 @wp.kernel
@@ -528,7 +538,16 @@ class OstrichEngineBase(SolverBase):
         # with linearized values based on the converged contact mode (sticking
         # vs sliding). Normal contacts are kept as-is (they converge well).
         # See docs/adjoint_warm_start_issue.md
-        if self.config.adjoint.soft_blending:
+        # Friction linearization for the adjoint solve: config default is the
+        # true FB-derived linearization; "frozen" restores the legacy
+        # stick/slip surrogate for comparison. The env var, when set,
+        # overrides the config either way.
+        friction_adjoint = __import__("os").environ.get(
+            "OSTRICH_FRICTION_ADJOINT",
+            self.config.adjoint.friction_linearization)
+        if friction_adjoint == "true":
+            pass
+        elif self.config.adjoint.soft_blending:
             wp.launch(
                 kernel=freeze_contact_mode_soft_kernel,
                 dim=(self.dims.num_worlds, self.dims.contact_count),
@@ -654,8 +673,61 @@ class OstrichEngineBase(SolverBase):
 
         self.data.w.sync_to_float()
 
+        # --- Complete pose pull-back via tape-VJP through the residual ---
+        # The converged residual R(q+, q-, u-, lambda, targets) is assembled by
+        # ordinary Warp kernels, so w^T dR/dxi for EVERY input xi is one
+        # kernel-adjoint sweep: re-record the assembly at the converged state,
+        # seed the residual gradients with w (friction rows excluded to stay
+        # consistent with the frozen-mode adjoint linearization), and
+        # backpropagate. This supplies the previously-missing implicit branch
+        # of dq+/dq- (constraint-row position dependence AND the dynamics-row
+        # force-Jacobian curvature -h*(dJ^T/dq)*lambda), and subsumes the
+        # hand-written body_vel_prev / control_target gradient kernels.
+        # The u+ pull-back (body_vel.grad) is discarded: by the adjoint
+        # construction it is already accounted for.
+        _pose_vjp_env = __import__("os").environ.get("OSTRICH_POSE_VJP")
+        pose_vjp = (self.config.adjoint.pose_vjp if _pose_vjp_env is None
+                    else _pose_vjp_env == "1")
+        if pose_vjp:
+            self.data.body_pose.grad.zero_()
+            self.data.body_vel.grad.zero_()
+            self.data._res.grad.zero_()
+            self.data._res_spatial.grad.zero_()
+
+            vjp_tape = wp.Tape()
+            with vjp_tape:
+                compute_residual(
+                    self.ostrich_model, self.ostrich_contacts, self.data,
+                    self.config, self.dims,
+                )
+
+            # Seed constraint rows (joints + ctrl + normals; friction zeroed)
+            # and the spatial dynamics rows with the adjoint solution.
+            N_u = self.dims.N_u
+            seed_rows = (self.dims.N_c if friction_adjoint == "true"
+                         else self.dims.offset_f)
+            wp.copy(
+                self.data._res.grad[:, N_u : N_u + seed_rows],
+                self.data.w.c.full[:, 0 : seed_rows],
+            )
+            wp.copy(self.data._res_spatial.grad, self.data.w.d_spatial)
+            vjp_tape.backward()
+
+            # Fold w^T dR/dq+ into the incoming pose gradient so the explicit
+            # carry kernel maps it through dq+/dq- alongside the loss terms.
+            # (w^T dR/dq- landed directly in body_pose_prev.grad; w^T dR/du-,
+            # dR/dtargets landed in their grad arrays, consumed downstream.)
+            wp.launch(
+                kernel=_add_transform_grad_kernel,
+                dim=(self.dims.num_worlds, self.dims.body_count),
+                inputs=[self.data.body_pose.grad],
+                outputs=[self.data.body_pose_grad],
+                device=self.device,
+            )
+
         compute_residual_gradient(
-            self.ostrich_model, self.ostrich_contacts, self.data, self.config, self.dims
+            self.ostrich_model, self.ostrich_contacts, self.data, self.config,
+            self.dims, pose_vjp=pose_vjp,
         )
 
         if self.adjoint_logger:

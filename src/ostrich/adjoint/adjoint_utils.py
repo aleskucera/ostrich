@@ -167,3 +167,74 @@ def subtract_constraint_feedback_kernel(
         accel_2 = compute_spatial_momentum(m_inv_2, I_w_inv_2, f_c_2)
 
         wp.atomic_add(w_u, world_idx, body_2, -accel_2)
+
+
+# -----------------------------------------------------------------------------
+# 4. Constraint Pose-Prev Feedback Kernel (implicit branch of dq+/dq-)
+#    Computes: grad_q- += (1/h) * G^-T * (J^T * w_lambda)
+#
+#    Position-level constraint rows (bilateral joints, contact normals) are
+#    evaluated at q+ = q- + h*G(q-)*u+, so q- perturbs the residual not only
+#    through the explicit kinematic carry (body_pose_prev_grad_kernel) but
+#    also directly through the constraint functions. For the stored velocity
+#    Jacobian J = dR/du+, the identity-carry part of dR/dq- is (1/h)*J*G^-1
+#    uniformly across row scalings, giving the adjoint pull-back
+#      grad_p-  += (1/h) * f_lin,      f = w_lambda * J_row
+#      grad_r-  += (2/h) * Q(r) * f_ang
+#    with Q(r) the quaternion rate matrix (q_dot = 0.5*Q(r)*omega). Friction
+#    and velocity-servo rows are excluded: their residuals' q+-dependence is a
+#    higher-order Jacobian-curvature term that the frozen-mode adjoint
+#    linearization already drops. Without this term, position-loss gradients
+#    lose the implicit-solve pathway (measured ~2x deficit; velocity losses
+#    are unaffected). See docs/adjoint_warm_start_issue.md.
+# -----------------------------------------------------------------------------
+@wp.kernel
+def constraint_pose_prev_feedback_kernel(
+    w_lambda: wp.array(dtype=wp.float32, ndim=2),
+    J_values: wp.array(dtype=wp.spatial_vector, ndim=3),
+    constraint_body_idx: wp.array(dtype=wp.int32, ndim=3),
+    constraint_active_mask: wp.array(dtype=wp.float32, ndim=2),
+    body_q: wp.array(dtype=wp.transform, ndim=2),
+    n_position_rows: int,
+    scale: wp.float32,
+    # Output (In-Place Accumulate)
+    body_pose_prev_grad: wp.array(dtype=wp.transform, ndim=2),
+):
+    world_idx, constraint_idx = wp.tid()
+
+    if constraint_idx >= n_position_rows:
+        return
+    if constraint_active_mask[world_idx, constraint_idx] == 0.0:
+        return
+
+    lam = w_lambda[world_idx, constraint_idx]
+    inv_h = scale
+
+    for slot in range(2):
+        body = constraint_body_idx[world_idx, constraint_idx, slot]
+        if body >= 0:
+            f = lam * J_values[world_idx, constraint_idx, slot]
+            f_lin = wp.spatial_top(f)
+            a = wp.spatial_bottom(f)
+
+            r = wp.transform_get_rotation(body_q[world_idx, body])
+            rx = r[0]
+            ry = r[1]
+            rz = r[2]
+            rw = r[3]
+
+            # (2/h) * Q(r) * a, Q the 4x3 quaternion rate matrix
+            s = 2.0 * inv_h
+            g_r = wp.quat(
+                s * (rw * a[0] + rz * a[1] - ry * a[2]),
+                s * (-rz * a[0] + rw * a[1] + rx * a[2]),
+                s * (ry * a[0] - rx * a[1] + rw * a[2]),
+                s * (-rx * a[0] - ry * a[1] - rz * a[2]),
+            )
+
+            wp.atomic_add(
+                body_pose_prev_grad,
+                world_idx,
+                body,
+                wp.transform(inv_h * f_lin, g_r),
+            )

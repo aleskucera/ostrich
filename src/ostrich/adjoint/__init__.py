@@ -17,6 +17,7 @@ from .adjoint_friction import freeze_contact_mode_soft_kernel
 from .adjoint_utils import compute_adjoint_rhs_kernel
 from .adjoint_utils import compute_body_adjoint_init_kernel
 from .adjoint_utils import subtract_constraint_feedback_kernel
+from .adjoint_utils import constraint_pose_prev_feedback_kernel
 
 
 __all__ = [
@@ -26,4 +27,5 @@ __all__ = [
     "freeze_contact_mode_kernel",
     "freeze_contact_mode_soft_kernel",
     "subtract_constraint_feedback_kernel",
+    "constraint_pose_prev_feedback_kernel",
 ]
