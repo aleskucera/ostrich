@@ -36,6 +36,50 @@ def _patched_init(self, *a, **kw):
 rr.HelhestJuniorReplaySimulator.__init__ = _patched_init
 
 
+def _run_mj_c3(gt):
+    """MuJoCo at the campaign-3-identified config (rear 0.6, tor 0.05)."""
+    import mujoco
+    import numpy as _np
+    from sweep_mujoco import BASE_PARAMS, JUNIOR_BOX_XML, _patch_wheel_geom
+    p = ec.C1_MUJOCO
+    dt, dur = p["dt"], float(gt["duration_s"])
+    box = gt["box"]
+    params = {**BASE_PARAMS, "dt": dt, "kv": p["kv"],
+              "ground_friction": 0.3, "box_friction": 0.3,
+              "front_friction": 1.2, "rear_friction": 0.6,
+              "ground_torsional": 0.05, "front_torsional": 0.05,
+              "rear_torsional": 0.05,
+              "solref0": p["solref0"], "condim": p["condim"],
+              "integrator": p["integrator"],
+              "box_x": ec.sim_box_center(gt)[0],
+              "box_y": ec.sim_box_center(gt)[1],
+              "box_z": box["center"][2],
+              "box_hx": box["half_extents"][0],
+              "box_hy": box["half_extents"][1],
+              "box_hz": box["half_extents"][2]}
+    xml = JUNIOR_BOX_XML.format(**params)
+    yaw_deg = _np.degrees(box.get("yaw", 0.0))
+    xml = xml.replace('<geom name="box" type="box"',
+                      f'<geom name="box" type="box" euler="0 0 {yaw_deg:.3f}"')
+    xml = _patch_wheel_geom(xml, p["wheel_geom"])
+    model = mujoco.MjModel.from_xml_string(xml)
+    data = mujoco.MjData(model)
+    mujoco.mj_forward(model, data)
+    T = int(dur / dt)
+    pose = _np.zeros((T, 7), dtype=_np.float32)
+    ts_t, cmd = gt["control"]["t"], gt["control"]["lrr"]
+    for step in range(T):
+        t = (step + 1) * dt
+        for c in range(3):
+            data.ctrl[c] = 0.9448 * _np.interp(t, ts_t, cmd[:, c])
+        mujoco.mj_step(model, data)
+        q = data.qpos
+        pose[step, 0:3] = q[0:3]
+        pose[step, 3:6] = q[4:7]
+        pose[step, 6] = q[3]
+    return pose, dt
+
+
 def main():
     runs = [f"ostrich{i}" for i in range(14)]
     fig, axes = plt.subplots(7, 2, figsize=(13, 26))
@@ -61,7 +105,7 @@ def main():
         sim = s["sim_rel"]
         ax.plot(sim[:, 0], sim[:, 1], "-", c="#C43131", lw=1.4,
                 label="Ostrich (Stribeck)")
-        sm = ec._score_run(*ec.run_mujoco(gt, 0.9448), gt)
+        sm = ec._score_run(*_run_mj_c3(gt), gt)
         mj = sm["sim_rel"]
         ax.plot(mj[:, 0], mj[:, 1], "-", c="#3562D6", lw=1.2, alpha=0.85,
                 label="MuJoCo")
