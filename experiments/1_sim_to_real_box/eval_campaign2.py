@@ -275,7 +275,10 @@ def main():
             "pass1": {n: _row(s) for n, s in pass1.items()},
             "pass2": {n: _row(s) for n, s in pass2.items()},
             "pass2_traj": {n: {"sim_rel": s["sim_rel"].tolist(),
-                               "sim_t_aligned": s["sim_t_aligned"].tolist()}
+                               "sim_t_aligned": s["sim_t_aligned"].tolist(),
+                               "sim_yaw_rel_on_real_t":
+                                   s["sim_yaw_rel_on_real_t"].tolist(),
+                               "real_t_used": s["real_t_used"].tolist()}
                            for n, s in pass2.items()},
             "mean_combined_with_yaw": {"pass1": mean1, "pass2": mean2},
         }

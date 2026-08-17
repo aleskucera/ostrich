@@ -133,6 +133,7 @@ def score(sim_pose: np.ndarray, sim_dt: float, gt: dict, prism_offset=PRISM_OFFS
     # don't pollute the comparison).
     yaw_rmse_rad = float("nan")
     combined_with_yaw = combined
+    sim_yaw_interp = None
     if "yaw_rel" in gt["real"]:
         sim_yaw = _yaw_from_quat_xyzw(sim_pose[:, 3:7])
         sim_yaw_rel = sim_yaw - sim_yaw[0]
@@ -151,4 +152,7 @@ def score(sim_pose: np.ndarray, sim_dt: float, gt: dict, prism_offset=PRISM_OFFS
         "shift": float(shift),
         "sim_rel": sim,
         "sim_t_aligned": sta,
+        # sim yaw sampled on the real timestamps rtt (for yaw-trace overlays)
+        "sim_yaw_rel_on_real_t": sim_yaw_interp,
+        "real_t_used": rtt,
     }

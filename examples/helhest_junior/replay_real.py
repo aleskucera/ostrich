@@ -190,6 +190,7 @@ class HelhestJuniorReplaySimulator(InteractiveSimulator):
                  k_p=250.0, k_d=0.0,
                  box_center=BOX_CENTER, box_half_extents=BOX_HALF_EXTENTS,
                  box_yaw=0.0,
+                 mu_long_front=None, mu_long_rear=None,
                  **kwargs):
         self.control_mode = control_mode
         # Box obstacle pose/size (campaign-2 GT carries a per-run fitted
@@ -212,6 +213,12 @@ class HelhestJuniorReplaySimulator(InteractiveSimulator):
         # mu_rolling is the wheel's resistance to free spin / sideways torsion.
         # It's the closest Ostrich analog to MuJoCo's torsional friction.
         self.mu_rolling = mu_rolling
+        # Anisotropic wheel friction (Ostrich solver only): when set, mu_front/
+        # mu_rear become the LATERAL (skid) coefficients and these the
+        # longitudinal (rolling-direction) ones — the physical decoupling a
+        # skid-steer needs (drive grip vs turn resistance).
+        self.mu_long_front = mu_long_front
+        self.mu_long_rear = mu_long_rear
         self.ground_cfg_kwargs = dict(ke=ground_ke, kd=ground_kd, kf=ground_kf)
         self.box_cfg_kwargs = dict(ke=box_ke, kd=box_kd, kf=box_kf)
         # Wheel contact stiffness. Ostrich solver ignores ShapeConfig.ke/kd/kf;
@@ -251,6 +258,8 @@ class HelhestJuniorReplaySimulator(InteractiveSimulator):
             friction_rear=self.mu_rear,
             mu_rolling=self.mu_rolling,
             ke=self.wheel_ke, kd=self.wheel_kd, kf=self.wheel_kf,
+            friction_long_left_right=self.mu_long_front,
+            friction_long_rear=self.mu_long_rear,
         )
 
         return self.builder.finalize_replicated(num_worlds=self.simulation_config.num_worlds)

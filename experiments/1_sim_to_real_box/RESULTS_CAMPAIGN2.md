@@ -58,6 +58,31 @@ SI 11.5 (diverges), SI-rescue 0.155.
    real robot rides level at z≈0.13 m (soft tires climb earlier, pallet
    presses into the grass). z RMSE stays ≤ 0.04 m everywhere.
 
+## Yaw analysis and motor/turn-resistance identification (ident_motor_turn.py)
+
+The residual error is heading: the commands carry large differential content
+(ideal skid-steer predicts 16–32° net yaw), the real robot executes ~30 % of
+it, and at frozen params the sims execute almost none
+(`results/eval_campaign2_yaw.png`). The causal chain, none of it identifiable
+from campaign-1's near-straight runs:
+
+1. At k_p=250 the sim wheels do not track the commanded differential at all
+   (−3 %): the soft velocity servo lets the yaw-resisting load drag both
+   wheels to a common speed. `mu_rear` is a dead knob in this regime.
+2. A stiff servo (k_p=4000, ~80 % differential tracking) makes the sim
+   OVER-turn — turn resistance must then come from friction.
+3. Anisotropic wheel friction decouples it: longitudinal grip stays at the
+   campaign-1 values (0.8/1.2), lateral (skid) mu is identified from
+   turn-content data. Isotropic refits can't do this without corrupting the
+   drive behavior.
+
+Train on ostrich0+1, test on ostrich2+3 (contact params frozen):
+identified **k_p=4000, mu_lateral=2.0** → train 0.17 m, **test 0.13 m,
+all-4 0.15 m, yaw RMSE 2.4°** (frozen baseline 0.19 m / 3.7°). Before/after
+heading traces: `results/eval_campaign2_yaw_ident.png`. MuJoCo would need the
+symmetric treatment (its kv=1000 is already stiff; its yaw response is also
+low) — not done yet.
+
 ## Files
 
 - `eval_campaign2.py` — the harness (frozen params, motor calibration, both
