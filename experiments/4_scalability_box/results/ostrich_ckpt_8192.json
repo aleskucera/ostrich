@@ -1,0 +1,20 @@
+{
+  "simulator": "Ostrich-ckpt",
+  "ckpt_window": 8,
+  "num_worlds": 8192,
+  "median_time_ms": 47929.19234279543,
+  "peak_gpu_mb": 5420.386645317078,
+  "peak_gpu_mb_nvml_absolute": 6434.6875,
+  "peak_gpu_mb_nvml": 5967.3125,
+  "time_ms": [
+    48755.37002785131,
+    47385.53281733766,
+    47783.77316193655,
+    47839.842333924025,
+    48018.54235166684
+  ],
+  "K": 10,
+  "dt": 0.1,
+  "duration_s": 6.0,
+  "iterations": 5
+}
