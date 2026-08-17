@@ -23,6 +23,7 @@ def main():
     job = json.loads(pathlib.Path(sys.argv[1]).read_text())
     out_path = sys.argv[2]
     params, runs, cmd_scale = job["params"], job["runs"], job["cmd_scale"]
+    llc = job.get("llc")  # optional {"deficit": float, "omega0": float}
 
     _orig_init = rr.HelhestJuniorReplaySimulator.__init__
 
@@ -37,6 +38,10 @@ def main():
     for n in runs:
         try:
             gt = gts[n]
+            if llc is not None:
+                from common_box import llc_transform
+                gt["control"]["lrr"] = llc_transform(
+                    gt["control"]["lrr"], llc["deficit"], llc["omega0"])
             s = ec._score_run(*ec.run_ostrich(gt, cmd_scale), gt)
             scores[n] = {"combined_with_yaw": float(s["combined_with_yaw"]),
                          "yaw_rmse_deg": float(s["yaw_rmse_deg"])}
