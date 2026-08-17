@@ -13,10 +13,16 @@ trajectories, new start poses, a re-measured obstacle, and 3x speed range
   lidar clouds (`fit_pallet.py`: sharpest-edge RANSAC yaw + density-coverage
   translation; edge RMS 3–7 mm). Independent validation: the real climb onset
   lands on the fitted near face to ±1.5 cm on all four runs.
-- **Frame registration**: the real `base_link` rides **+0.23 m ahead** of the
-  sim chassis origin (front axle), measured by registering sim-vs-real climb
-  onset against the fitted near face (spread ±0.015 m over 4 runs). Carried
-  by `prism_offset` (sim tracks that point; scene box shifts by it).
+- **Frame registration (CORRECTED 2026-08-17)**: `base_link` sits AT the
+  chassis origin (front axle) — proven by the crossing pitch trace (z stays
+  at pallet height under ~9 deg pitch, i.e. no forward lever). The +0.23 m
+  climb-onset offset (spread ±0.015 m over 4 runs) is a CLIMB-KINEMATICS
+  calibration — the rigid sim cylinder edge-pivots ~0.24 m before the face
+  while the real wheel gains height only near it — applied to BOX PLACEMENT
+  only (`box_shift`); the tracked point is the origin (`prism_offset` = 0).
+  The earlier tracked-point interpretation inflated sim z by a false pitch
+  lever (~0.19 vs real 0.145 plateau) and flattered xy via lateral sweep;
+  all identified configs re-fit under the corrected metric.
 - **Motor tracking**: the only re-fit quantity (the LLC firmware changed
   2026-07-27). One scalar command scale per engine, calibrated on the pre-box
   flat cruise only: sim pre-box speed matched to real (identical smoothing

@@ -33,7 +33,7 @@ import warp as wp
 
 from common_box import DATA_DIR, RESULTS_DIR, load_gt, resample_setpoints, score
 
-RUNS = ["ostrich0", "ostrich1", "ostrich2", "ostrich3"]
+RUNS = [f"ostrich{i}" for i in range(14)]
 
 # Campaign-1 best parameters (results/sweep_*.json best_params) — FROZEN.
 C1_OSTRICH = dict(dt=0.05, mu_front=0.8, mu_rear=1.2, mu_rolling=0.7,
@@ -69,12 +69,15 @@ def prebox_speed(t, x, y, gt):
 
 
 def sim_box_center(gt):
-    """Box center in the SIM world frame. The GT frame is anchored at the real
-    base_link start pose, which sits prism_offset ahead of the sim chassis
-    (front-axle) origin; initial heading is +X in both, so the scene shifts by
-    the offset's xy."""
+    """Box center in the SIM world frame. box_shift is the climb-onset
+    calibration: the rigid sim cylinder begins rising ~0.24 m before the
+    pallet face (edge pivot) while the real wheel gains height only near the
+    face, so the sim box is shifted forward to align climb onsets. The
+    tracked point is the chassis origin itself (prism_offset = 0); the real
+    base_link sits at the front axle (confirmed by the crossing pitch trace,
+    which shows no forward-lever z amplification)."""
     c = gt["box"]["center"]
-    off = gt["prism_offset"]
+    off = gt.get("box_shift", gt["prism_offset"])
     return [c[0] + off[0], c[1] + off[1], c[2]]
 
 

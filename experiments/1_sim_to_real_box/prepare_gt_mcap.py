@@ -160,12 +160,15 @@ def build_gt(bag_dir: pathlib.Path) -> dict:
         "dt_record": DT_RECORD,
         "duration_s": duration,
         "box": {"center": [box_x, box_y, hz], "half_extents": BOX_HALF_EXTENTS},
-        # base_link expressed in the sim chassis (front-axle) frame: the tf
-        # base_link rides ~0.23 m AHEAD of the front axle (Odin nose mast).
-        # Measured by registering sim-vs-real climb onset against the
-        # lidar-fitted pallet near face over ostrich0-3 (dx = +0.217..+0.245,
-        # +-0.015). The sim must track this point AND shift the box by it.
-        "prism_offset": [0.23, 0.0, 0.0],
+        # base_link sits AT the chassis origin (front axle): confirmed by the
+        # crossing pitch trace (z stays ~pallet height at ~9 deg pitch => no
+        # forward lever). The tracked point is therefore the origin itself.
+        "prism_offset": [0.0, 0.0, 0.0],
+        # Climb-onset calibration applied to BOX PLACEMENT only: the rigid
+        # sim cylinder edge-pivots ~0.24 m before the face while the real
+        # wheel gains height only near it (measured dx = +0.217..+0.245 over
+        # ostrich0-3). Consumed by eval scripts as a scene shift.
+        "box_shift": [0.23, 0.0, 0.0],
         "control": {"t": t_grid.tolist(), "lrr": lrr.tolist()},
         "real": {
             "t": T.tolist(),
