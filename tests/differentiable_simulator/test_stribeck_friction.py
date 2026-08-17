@@ -10,6 +10,10 @@
    `compute_friction_model`, so no extra arithmetic executes when the
    sentinel -1.0 defaults are in effect) and empirically, by checking the
    disabled-feature scene is deterministic across repeated runs on CPU.
+3. `stribeck_lateral_only`: on an anisotropic (wheel-like) shape, the
+   slow/fast deceleration asymmetry from (2) shows up only along the
+   resolved LATERAL (friction-axis) direction; the longitudinal direction
+   (mu_y per `resolve_friction_frame`) is unaffected.
 """
 
 import sys
@@ -53,6 +57,46 @@ def build_stribeck_box(mu=0.5, mu_stiction_scale=2.0, v_stribeck=0.2, height=0.6
     return builder.finalize_replicated(num_worlds=1, gravity=-9.81)
 
 
+def build_aniso_box(mu=0.5, mu_perp=0.3, height=0.6, stribeck=None):
+    """Box on ground with an anisotropic (wheel-like) friction axis along
+    world X.
+
+    Per `resolve_friction_frame`: `friction_axis_local` (here world/body X,
+    identity orientation) becomes t1 = LATERAL direction -> mu_x = mu
+    (averaged with the ground's isotropic mu). t2 = n x t1 = world Y =
+    LONGITUDINAL direction -> mu_y = mu_perp (averaged with ground's mu).
+    Ground mu == box's own mu so mu_x resolves to exactly `mu`; mu_perp !=
+    mu keeps mu_x != mu_y (a genuinely anisotropic contact, required for
+    `stribeck_lateral_only` to take effect rather than falling back to
+    scaling both axes).
+
+    `stribeck` is an optional dict of Stribeck custom attributes
+    (mu_stiction_scale / v_stribeck / stribeck_lateral_only) to add on top;
+    None means Stribeck is completely off — the pure-anisotropic baseline.
+    """
+    builder = OstrichModelBuilder()
+    builder.rigid_gap = 0.05
+    builder.add_ground_plane(cfg=newton.ModelBuilder.ShapeConfig(mu=mu))
+    body = builder.add_body(
+        xform=wp.transform(wp.vec3(0.0, 0.0, height), wp.quat_identity()),
+    )
+    custom_attrs = {
+        "friction_axis_local": wp.vec3(1.0, 0.0, 0.0),
+        "mu_perp": mu_perp,
+    }
+    if stribeck is not None:
+        custom_attrs.update(stribeck)
+    builder.add_shape_box(
+        body=body,
+        hx=0.5,
+        hy=0.5,
+        hz=0.5,
+        cfg=newton.ModelBuilder.ShapeConfig(density=100.0, mu=mu),
+        custom_attributes=custom_attrs,
+    )
+    return builder.finalize_replicated(num_worlds=1, gravity=-9.81)
+
+
 def make_engine(model, sim_steps):
     config = OstrichEngineConfig(
         nr=NewtonRaphsonConfig(max_iters=20),
@@ -67,13 +111,15 @@ def make_engine(model, sim_steps):
 
 
 def measure_deceleration(
-    model, vx0, settle_dt=0.01, settle_steps=50, measure_dt=0.005, measure_steps=1
+    model, vx0, axis=0, settle_dt=0.01, settle_steps=50, measure_dt=0.005, measure_steps=1
 ):
     """Settle the box at rest (settle_dt, large enough for the compliant
-    contact to converge without bouncing), kick it to vx0, then measure
-    -dvx/dt over `measure_steps` implicit-Euler steps at a finer `measure_dt`
-    (fine enough that the slow-slip case doesn't fully stick within the
-    measurement window, which would otherwise confound the reading)."""
+    contact to converge without bouncing), kick it to vx0 along `axis`
+    (0=world X, 1=world Y; body_qd layout is [0:3]=linear vel, [3:6]=angular
+    vel), then measure -dv/dt over `measure_steps` implicit-Euler steps at a
+    finer `measure_dt` (fine enough that the slow-slip case doesn't fully
+    stick within the measurement window, which would otherwise confound the
+    reading)."""
     engine = make_engine(model, sim_steps=settle_steps + measure_steps)
 
     state_in = model.state()
@@ -87,15 +133,15 @@ def measure_deceleration(
         state_in, state_out = state_out, state_in
 
     qd = state_in.body_qd.numpy().copy()
-    qd[0, 0] = vx0  # body_qd layout: [0:3]=linear vel, [3:6]=angular vel
+    qd[0, axis] = vx0
     wp.copy(state_in.body_qd, wp.array(qd, dtype=wp.spatial_vector, device=model.device))
 
-    v_start = state_in.body_qd.numpy()[0, 0]
+    v_start = state_in.body_qd.numpy()[0, axis]
     for _ in range(measure_steps):
         contacts = model.collide(state_in)
         engine.step(state_in, state_out, control, contacts, measure_dt)
         state_in, state_out = state_out, state_in
-    v_end = state_in.body_qd.numpy()[0, 0]
+    v_end = state_in.body_qd.numpy()[0, axis]
 
     assert v_end > 0.0, f"box stopped within the measurement window (v_end={v_end})"
     return (v_start - v_end) / (measure_steps * measure_dt)
@@ -166,6 +212,60 @@ def test_stribeck_disabled_is_deterministic():
     print("  PASSED")
 
 
+def test_stribeck_lateral_only():
+    """On an anisotropic (wheel-like) shape with `stribeck_lateral_only` set,
+    enabling Stribeck must measurably raise the slow/fast deceleration ratio
+    along the LATERAL (friction-axis, mu_x) direction, while leaving the
+    LONGITUDINAL (mu_y) direction's ratio unchanged.
+
+    NOTE: the elliptical-cone (anisotropic) branch has its own, higher
+    Stribeck-independent slow/fast ratio (~1.8-2.1 here) than the isotropic
+    branch's ~1.2 baseline (`measure_deceleration`'s implicit-Euler / FB
+    discretization is more speed-sensitive there) — a pre-existing solver
+    characteristic, not something introduced by this feature. So instead of
+    an absolute ratio threshold, we compare each axis's ratio WITH Stribeck
+    enabled against the SAME anisotropic scene's ratio with Stribeck
+    completely off, isolating Stribeck's actual contribution.
+    """
+    print("\n=== Test: stribeck_lateral_only restricts the asymmetry to the lateral axis ===")
+
+    stribeck_kwargs = {
+        "mu_stiction_scale": 2.0,
+        "v_stribeck": 0.2,
+        "stribeck_lateral_only": 1.0,
+    }
+
+    def ratio(model, axis):
+        fast = measure_deceleration(model, vx0=2.0, axis=axis)
+        slow = measure_deceleration(model, vx0=0.05, axis=axis)
+        return fast, slow, slow / fast
+
+    # axis=0 (world X) is the resolved LATERAL direction (mu_x, Stribeck-scaled).
+    lat_fast_off, lat_slow_off, lat_ratio_off = ratio(build_aniso_box(), axis=0)
+    lat_fast_on, lat_slow_on, lat_ratio_on = ratio(build_aniso_box(stribeck=stribeck_kwargs), axis=0)
+    print(f"  lateral   (X): off ratio={lat_ratio_off:.4f}  on ratio={lat_ratio_on:.4f}")
+
+    # axis=1 (world Y) is the resolved LONGITUDINAL direction (mu_y, unscaled).
+    long_fast_off, long_slow_off, long_ratio_off = ratio(build_aniso_box(), axis=1)
+    long_fast_on, long_slow_on, long_ratio_on = ratio(build_aniso_box(stribeck=stribeck_kwargs), axis=1)
+    print(f"  longitudinal (Y): off ratio={long_ratio_off:.4f}  on ratio={long_ratio_on:.4f}")
+
+    # mu_x (lateral) IS Stribeck-scaled: enabling it measurably raises the
+    # slow/fast ratio above the Stribeck-off anisotropic baseline.
+    assert lat_ratio_on > lat_ratio_off + 0.05, (
+        f"lateral ratio did not increase with Stribeck enabled: "
+        f"off={lat_ratio_off:.4f} on={lat_ratio_on:.4f}"
+    )
+    # mu_y (longitudinal) is NOT Stribeck-scaled: its ratio with
+    # stribeck_lateral_only enabled must match the Stribeck-off baseline.
+    assert abs(long_ratio_on - long_ratio_off) < 0.02, (
+        f"longitudinal ratio changed with lateral-only Stribeck enabled "
+        f"(should be untouched): off={long_ratio_off:.4f} on={long_ratio_on:.4f}"
+    )
+    print("  PASSED")
+
+
 if __name__ == "__main__":
     test_stribeck_deceleration_ratio()
     test_stribeck_disabled_is_deterministic()
+    test_stribeck_lateral_only()

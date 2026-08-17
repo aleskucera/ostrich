@@ -192,6 +192,7 @@ class HelhestJuniorReplaySimulator(InteractiveSimulator):
                  box_yaw=0.0,
                  mu_long_front=None, mu_long_rear=None,
                  mu_stiction_scale=None, v_stribeck=None,
+                 stribeck_lateral_only=None,
                  **kwargs):
         self.control_mode = control_mode
         # Box obstacle pose/size (campaign-2 GT carries a per-run fitted
@@ -231,6 +232,7 @@ class HelhestJuniorReplaySimulator(InteractiveSimulator):
         # None (either one) disables the feature.
         self.mu_stiction_scale = mu_stiction_scale
         self.v_stribeck = v_stribeck
+        self.stribeck_lateral_only = stribeck_lateral_only
         super().__init__(*args, **kwargs)
         # [left, right, rear] velocity command consumed by control_policy.
         self.target_velocities = wp.zeros(3, dtype=wp.float32, device=self.model.device)
@@ -267,6 +269,7 @@ class HelhestJuniorReplaySimulator(InteractiveSimulator):
             friction_long_rear=self.mu_long_rear,
             mu_stiction_scale=self.mu_stiction_scale,
             v_stribeck=self.v_stribeck,
+            stribeck_lateral_only=self.stribeck_lateral_only,
         )
 
         return self.builder.finalize_replicated(num_worlds=self.simulation_config.num_worlds)

@@ -122,6 +122,7 @@ def _add_wheel(
     mu_long: float = None,
     mu_stiction_scale: float = None,
     v_stribeck: float = None,
+    stribeck_lateral_only: float = None,
 ) -> int:
     """Adds a wheel link, shapes, and returns the link index.
 
@@ -180,6 +181,8 @@ def _add_wheel(
         shape_custom_attrs["mu_stiction_scale"] = mu_stiction_scale
     if v_stribeck is not None:
         shape_custom_attrs["v_stribeck"] = v_stribeck
+    if stribeck_lateral_only is not None:
+        shape_custom_attrs["stribeck_lateral_only"] = stribeck_lateral_only
 
     builder.add_shape_cylinder(
         body=wheel_link,
@@ -209,6 +212,7 @@ def create_helhest_junior_model(
     mu_rolling: float = 0.7,
     mu_stiction_scale: float = None,
     v_stribeck: float = None,
+    stribeck_lateral_only: float = None,
 ):
     """
     Creates a Helhest Junior robot model — a smaller variant of the Helhest
@@ -234,6 +238,9 @@ def create_helhest_junior_model(
             collision shapes. None disables the feature.
         v_stribeck: Stribeck slip-speed scale (m/s) for the wheel collision
             shapes. None disables the feature.
+        stribeck_lateral_only: When set (> 0), restricts the Stribeck factor to
+            the wheel's lateral (skid) axis, leaving the longitudinal
+            (rolling) coefficient unscaled. None disables (scales both axes).
     """
 
     wheel_mesh_render = _load_wheel_mesh()
@@ -258,6 +265,7 @@ def create_helhest_junior_model(
         mu_long=friction_long_left_right,
         mu_stiction_scale=mu_stiction_scale,
         v_stribeck=v_stribeck,
+        stribeck_lateral_only=stribeck_lateral_only,
     )
     right_wheel = _add_wheel(
         builder,
@@ -274,6 +282,7 @@ def create_helhest_junior_model(
         mu_long=friction_long_left_right,
         mu_stiction_scale=mu_stiction_scale,
         v_stribeck=v_stribeck,
+        stribeck_lateral_only=stribeck_lateral_only,
     )
     rear_wheel = _add_wheel(
         builder,
@@ -290,6 +299,7 @@ def create_helhest_junior_model(
         mu_long=friction_long_rear,
         mu_stiction_scale=mu_stiction_scale,
         v_stribeck=v_stribeck,
+        stribeck_lateral_only=stribeck_lateral_only,
     )
 
     # 3. Wheel Joints
