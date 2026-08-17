@@ -121,3 +121,28 @@ needs slip-speed-dependent (Stribeck-like) lateral friction in the engine.
 - `plot_campaign2.py` -> `results/eval_campaign2.png`.
 - GT JSONs in `data/` (untracked): box pose from `fit_pallet.py`,
   `prism_offset=[0.23,0,0]` frame registration.
+
+## Stribeck velocity-dependent friction: breaking the constant-mu plateau (2026-08-17)
+
+Engine feature (branch `stribeck-friction`, merged): per-shape
+mu_stiction_scale / v_stribeck; mu multiplied by 1+(scale-1)*exp(-|v_t|/v_s)
+inline in the friction residual (Picard in Newton; adjoint picks up d(mu)/dv
+via tape-VJP automatically; sentinel-gated, bit-exact off).
+
+Identification on the 14-run dataset (train ostrich0/1/10/13, test = other
+10, mu_long pinned 0.8/1.2, cmd_scale 0.937), `ident_stribeck.py`:
+
+| config | test comb | all-14 comb | all-14 yaw |
+|---|---|---|---|
+| constant-mu best (k_p=10000, mu_lat=0.8) | 0.202 | 0.236 | 7.37 deg |
+| **Stribeck best (k_p=4000, mu_lat=0.4, scale=4.0, v_s=0.3)** | **0.197** | **0.189 (-20%)** | **5.65 deg (-23%)** |
+
+The winning corner is exactly the predicted shape: LOW base lateral mu (0.4,
+governs turns at slip speed) with STRONG low-speed stiction (x4 = 1.6
+effective at rest, matches the straight-run constant-mu identification) and
+v_s=0.3 m/s — i.e. the model now spans the measured 0.11-0.30 per-run turn
+efficiency that no constant mu could. Gains come almost entirely from yaw.
+
+Note: the replay path leaks ~35-40 MB GPU per simulator construction;
+`ident_stribeck.py` isolates each config in a subprocess
+(`_stribeck_worker.py`) as a workaround. Leak is a separate cleanup TODO.
