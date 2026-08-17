@@ -86,8 +86,11 @@ def compose(mo, mo_t, ob_rec, ts):
     return p1 + q_rot(q1, p2), q_mul(q1, q2)
 
 
-def largest_cluster(pts, cell=0.15):
-    """Grid connected-components; returns points of the largest component."""
+def largest_cluster(pts, cell=0.15, anchor=None):
+    """Grid connected-components. With ``anchor`` (x, y) set, returns the
+    component nearest to it (the z-bump puts the robot ON the pallet, so the
+    pallet is the cluster at that spot — the globally largest blob can be a
+    vegetation bank at the field edge). Without anchor: largest component."""
     if len(pts) == 0:
         return pts
     ij = np.floor(pts[:, :2] / cell).astype(np.int64)
@@ -97,7 +100,7 @@ def largest_cluster(pts, cell=0.15):
     # density gate: sparse bridge cells (vegetation fringes) must not connect
     # the pallet to neighboring structures
     keys = {c: v for c, v in keys.items() if len(v) >= 8}
-    seen, best = set(), []
+    seen, best, comps = set(), [], []
     for start in list(keys):
         if start in seen:
             continue
@@ -114,6 +117,19 @@ def largest_cluster(pts, cell=0.15):
                         stack.append(nb)
         if sum(len(keys[c]) for c in comp) > sum(len(keys[c]) for c in best):
             best = comp
+        comps.append(comp)
+    if anchor is not None:
+        ax, ay = anchor
+        scored = []
+        for comp in comps:
+            n = sum(len(keys[c]) for c in comp)
+            if n < 300:
+                continue
+            d = min(np.hypot((c[0] + 0.5) * cell - ax, (c[1] + 0.5) * cell - ay)
+                    for c in comp)
+            scored.append((d, comp))
+        if scored:
+            best = min(scored, key=lambda t: t[0])[1]
     idx = [k for c in best for k in keys[c]]
     return pts[idx]
 
@@ -312,9 +328,11 @@ def main():
         # z-bump estimate recomputed from the climb interval so the script
         # stays idempotent (the JSON box center may hold a previous fit)
         _rx = np.array(gt["real"]["x"])
+        _ry = np.array(gt["real"]["y"])
         _rz = np.array(gt["real"]["z"])
         _on = _rz > 0.06
         box_est_x = float(np.mean(_rx[_on])) if _on.any() else gt["box"]["center"][0]
+        box_est_y = float(np.mean(_ry[_on])) if _on.any() else 0.0
         mo, ob, mount_t, mount_q, clouds = read_poses_and_clouds(
             args.bags_dir / run)
         mo_t = np.array(sorted(mo))
@@ -415,14 +433,14 @@ def main():
             al_z = pts_m[:, 2] - P0[2]
             m = ((al_z > z_lo) & (al_z < z_hi)
                  & (np.abs(al_xy[:, 0] - box_est_x) < 1.3)
-                 & (np.abs(al_xy[:, 1]) < 1.3))
+                 & (np.abs(al_xy[:, 1] - box_est_y) < 1.3))
             if m.any():
                 agg.append(np.column_stack([al_xy[m], al_z[m]]))
         if not agg:
             print(f"{run}: no approach-phase pallet points, skipping")
             continue
         pts = np.concatenate(agg)
-        cluster = largest_cluster(pts)
+        cluster = largest_cluster(pts, anchor=(box_est_x, box_est_y))
         # no trim-refit here: re-fitting a trimmed cluster would trace the
         # artificial (perfectly straight) cut boundary as the sharpest edge
         cx, cy, yaw, dims, err, edge_pts = fit_sharpest_edge(cluster[:, :2])
