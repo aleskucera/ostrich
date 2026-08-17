@@ -84,6 +84,24 @@ identified **k_p=4000, mu_lateral=2.0, compliance.friction=1e-3** → train
 treatment (its kv=1000 is already stiff; its yaw response is also low) — not
 done yet.
 
+**MuJoCo, symmetric treatment:** same train/test protocol over its turn
+knobs (rear sliding mu x torsional; ground/box mu dropped to 0.4 so the
+wheel values bind under MuJoCo's elementwise-max friction combine). The
+identification CONVERGES BACK to the frozen campaign-1 config (rear mu=1.2,
+tor=0.3) — every lower-resistance setting over-turns and scores worse.
+MuJoCo's stiff kv=1000 servo meant it already sat at the constant-mu plateau
+that Ostrich needed the k_p + anisotropic-lateral fix to reach.
+
+**Final identified head-to-head (held-out ostrich2+3 / all-4):**
+
+| engine  | test mean | all-4 mean | yaw RMSE |
+|---------|-----------|------------|----------|
+| Ostrich (k_p=4000, aniso lat=2.0, fc=1e-3) | 0.133 | ~0.15 | 2.2–2.4° |
+| MuJoCo (= frozen c1)                        | 0.122 | 0.144 | 2.8°     |
+
+Statistically indistinguishable at n=2 test runs with ±0.01–0.02 run
+structure: both engines land on the same constant-efficiency floor.
+
 **Why the remaining under-turn is structural, not a parameter:** the real
 per-run turn efficiency (real yaw regressed on the ideal skid-steer
 prediction) is 0.11 / 0.21 / 0.13 / 0.30 across the four runs — a 3x spread
