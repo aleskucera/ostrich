@@ -146,3 +146,14 @@ efficiency that no constant mu could. Gains come almost entirely from yaw.
 Note: the replay path leaks ~35-40 MB GPU per simulator construction;
 `ident_stribeck.py` isolates each config in a subprocess
 (`_stribeck_worker.py`) as a workaround. Leak is a separate cleanup TODO.
+
+## Publication decision (2026-08-17)
+
+The RA-L resubmission reports HONEST PARITY: constant-mu identified configs
+for both engines (Ostrich 0.202/0.236/7.4deg vs MuJoCo 0.246/0.279/6.9deg,
+same train/test protocol) + the residual-floor analysis (turn-efficiency
+spread 0.11-0.30, knob saturation, repeat-pair real-vs-real 0.38 m).
+Stribeck mu(v) is rebuttal-letter-only (preliminary demonstration, -23% yaw)
+and reserved for a follow-up paper. Rationale: held-out gain within run
+variance; feature too fresh to defend under review; revisions should
+converge, not expand.
