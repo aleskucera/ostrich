@@ -191,6 +191,7 @@ class HelhestJuniorReplaySimulator(InteractiveSimulator):
                  box_center=BOX_CENTER, box_half_extents=BOX_HALF_EXTENTS,
                  box_yaw=0.0,
                  mu_long_front=None, mu_long_rear=None,
+                 ground_mu=0.8, box_mu=0.8,
                  mu_stiction_scale=None, v_stribeck=None,
                  **kwargs):
         self.control_mode = control_mode
@@ -220,6 +221,10 @@ class HelhestJuniorReplaySimulator(InteractiveSimulator):
         # skid-steer needs (drive grip vs turn resistance).
         self.mu_long_front = mu_long_front
         self.mu_long_rear = mu_long_rear
+        # Surface friction: the pallet (wood) and the ground (grass) are
+        # different materials; identifiable separately from campaign-3 data.
+        self.ground_mu = ground_mu
+        self.box_mu = box_mu
         self.ground_cfg_kwargs = dict(ke=ground_ke, kd=ground_kd, kf=ground_kf)
         self.box_cfg_kwargs = dict(ke=box_ke, kd=box_kd, kf=box_kf)
         # Wheel contact stiffness. Ostrich solver ignores ShapeConfig.ke/kd/kf;
@@ -239,7 +244,7 @@ class HelhestJuniorReplaySimulator(InteractiveSimulator):
     def build_model(self) -> newton.Model:
         self.builder.rigid_gap = 0.2
 
-        ground_cfg = newton.ModelBuilder.ShapeConfig(mu=0.8, **self.ground_cfg_kwargs)
+        ground_cfg = newton.ModelBuilder.ShapeConfig(mu=self.ground_mu, **self.ground_cfg_kwargs)
         self.builder.add_ground_plane(cfg=ground_cfg)
 
         self.builder.add_shape_box(
@@ -250,7 +255,7 @@ class HelhestJuniorReplaySimulator(InteractiveSimulator):
             hx=self.box_half_extents[0],
             hy=self.box_half_extents[1],
             hz=self.box_half_extents[2],
-            cfg=newton.ModelBuilder.ShapeConfig(mu=0.8, **self.box_cfg_kwargs),
+            cfg=newton.ModelBuilder.ShapeConfig(mu=self.box_mu, **self.box_cfg_kwargs),
         )
 
         create_helhest_junior_model(

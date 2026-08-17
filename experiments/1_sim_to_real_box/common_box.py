@@ -81,6 +81,22 @@ def resample_setpoints(gt: dict, dt: float, duration: float) -> np.ndarray:
     return out
 
 
+def llc_transform(setpoints: np.ndarray, deficit: float, omega0: float) -> np.ndarray:
+    """Speed-dependent low-level-controller tracking model applied to wheel
+    commands: real motor regulators track poorly at low wheel speeds and well
+    at high speeds, so the executed speed is
+        cmd' = cmd * (1 - deficit * exp(-|cmd| / omega0)).
+    deficit in [0,1) is the zero-speed fractional tracking loss; omega0 [rad/s]
+    the speed scale over which tracking recovers. (deficit=0 -> identity.)
+    Identified from the longitudinal commanded-distance ratios (slow runs
+    under-execute more than fast runs), disentangling actuator tracking from
+    tire friction, which acts laterally."""
+    if deficit <= 0.0:
+        return setpoints
+    eff = 1.0 - deficit * np.exp(-np.abs(setpoints) / omega0)
+    return (setpoints * eff).astype(setpoints.dtype)
+
+
 def score(sim_pose: np.ndarray, sim_dt: float, gt: dict, prism_offset=PRISM_OFFSET,
           yaw_lever_arm: float = YAW_LEVER_ARM):
     """Position + yaw error of an engine's chassis trajectory vs the real one,
