@@ -281,6 +281,11 @@ def main():
         }
 
     pathlib.Path(args.save).parent.mkdir(parents=True, exist_ok=True)
+    # merge into an existing results file so engines can be run separately
+    if pathlib.Path(args.save).exists():
+        prev = json.load(open(args.save))
+        prev.update(results)
+        results = prev
     with open(args.save, "w") as f:
         json.dump(results, f)
     print(f"\nSaved -> {args.save}")
