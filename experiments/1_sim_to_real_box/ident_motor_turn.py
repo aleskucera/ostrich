@@ -22,7 +22,20 @@ k_p x mu_lateral with longitudinal pinned at (front 0.8, rear 1.2).
 Identified (2026-08-17): k_p=4000 (~80 % differential tracking),
 mu_lat=2.0 (interior optimum; ground-mu combine rule dilutes it to ~1.4
 effective). Train 0.164 m, TEST 0.136 m, all-4 0.152 m, yaw RMSE 2.41 deg
-(frozen campaign-1 baseline: 0.190 m / 3.66 deg).
+(frozen campaign-1 baseline: 0.190 m / 3.66 deg). A follow-up sweep found
+compliance.friction=1e-3 marginally better (test 0.133; creep instead of a
+hard stiction plateau); 1e-2 degrades.
+
+SATURATION: every further yaw knob (front/rear lateral split, mu_rolling,
+k_p=12000, friction compliance) lands on the same ~0.13-0.16 plateau, and
+for a fundamental reason: the REAL per-run turn efficiency (real yaw
+regressed on the ideal skid-steer prediction) spans 0.11/0.21/0.13/0.30
+across the four runs, correlated with speed - while constant-mu Coulomb
+friction realizes exactly one efficiency. The identified sim's yaw RMSE
+(2.2-2.4 deg) already matches the residual of the best per-run LINEAR gain
+fit (1.0-3.0 deg), i.e. the constant-efficiency noise floor. Fixing the
+rest requires slip-speed-dependent (Stribeck-like) lateral friction in the
+engine - future work, not a parameter.
 
     .venv/bin/python experiments/1_sim_to_real_box/ident_motor_turn.py
 """

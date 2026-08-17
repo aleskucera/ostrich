@@ -77,11 +77,23 @@ from campaign-1's near-straight runs:
    drive behavior.
 
 Train on ostrich0+1, test on ostrich2+3 (contact params frozen):
-identified **k_p=4000, mu_lateral=2.0** → train 0.17 m, **test 0.13 m,
-all-4 0.15 m, yaw RMSE 2.4°** (frozen baseline 0.19 m / 3.7°). Before/after
-heading traces: `results/eval_campaign2_yaw_ident.png`. MuJoCo would need the
-symmetric treatment (its kv=1000 is already stiff; its yaw response is also
-low) — not done yet.
+identified **k_p=4000, mu_lateral=2.0, compliance.friction=1e-3** → train
+0.16 m, **test 0.13 m, all-4 0.15 m, yaw RMSE 2.2–2.4°** (frozen baseline
+0.19 m / 3.7°). Before/after heading traces:
+`results/eval_campaign2_yaw_ident.png`. MuJoCo would need the symmetric
+treatment (its kv=1000 is already stiff; its yaw response is also low) — not
+done yet.
+
+**Why the remaining under-turn is structural, not a parameter:** the real
+per-run turn efficiency (real yaw regressed on the ideal skid-steer
+prediction) is 0.11 / 0.21 / 0.13 / 0.30 across the four runs — a 3x spread
+correlated with driving speed (grass-tire lateral resistance falls with slip
+speed). Constant-mu Coulomb friction realizes exactly one efficiency, and
+every knob (front/rear lateral split, torsional, k_p up to 12000, friction
+compliance) saturates at the same ~0.13–0.16 m plateau. The identified sim's
+yaw RMSE (2.2–2.4°) already equals the residual of the best per-run linear
+gain fit (1.0–3.0°) — the constant-efficiency noise floor. Going further
+needs slip-speed-dependent (Stribeck-like) lateral friction in the engine.
 
 ## Files
 
