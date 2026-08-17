@@ -92,6 +92,10 @@ def _aggregate_on_grid(curves, n_grid=N_GRID):
 def _pick_json_for_engine(engine_key):
     """Prefer ``<engine>_all_fixes.json`` (the final tuned runs); fall back
     to ``<engine>.json`` if the fix-tagged file isn't there yet."""
+    for tag in ("_postfix_vjp", "_postfix"):
+        cand = RESULTS_DIR / f"{engine_key}{tag}.json"
+        if cand.exists():
+            return cand
     preferred = RESULTS_DIR / f"{engine_key}_all_fixes.json"
     if preferred.is_file():
         return preferred
