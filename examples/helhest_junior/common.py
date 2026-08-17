@@ -119,8 +119,15 @@ def _add_wheel(
     kd: float = None,
     kf: float = None,
     mu_rolling: float = 0.7,
+    mu_long: float = None,
 ) -> int:
-    """Adds a wheel link, shapes, and returns the link index."""
+    """Adds a wheel link, shapes, and returns the link index.
+
+    With ``mu_long`` set, the wheel gets anisotropic friction (same wiring as
+    examples/helhest/common.py): ``friction_axis_local`` is the body-local spin
+    axis (0,1,0), so ``mu`` becomes the LATERAL (skid) coefficient and
+    ``mu_long`` the longitudinal (rolling-direction) one. Requires an
+    OstrichModelBuilder (registers the mu_perp/friction_axis_local attributes)."""
     pos_world = wp.transform_point(parent_xform, pos_local)
     rot_world = parent_xform.q
 
@@ -159,12 +166,20 @@ def _add_wheel(
     if kf is not None:
         collision_cfg_kwargs["kf"] = kf
 
+    shape_custom_attrs = None
+    if mu_long is not None:
+        shape_custom_attrs = {
+            "friction_axis_local": wp.vec3(0.0, 1.0, 0.0),
+            "mu_perp": mu_long,
+        }
+
     builder.add_shape_cylinder(
         body=wheel_link,
         xform=wp.transform(wp.vec3(0.0, 0.0, 0.0), HelhestJuniorConfig.WHEEL_ROT),
         radius=HelhestJuniorConfig.WHEEL_RADIUS,
         half_height=HelhestJuniorConfig.WHEEL_WIDTH / 2.0,
         cfg=newton.ModelBuilder.ShapeConfig(**collision_cfg_kwargs),
+        custom_attributes=shape_custom_attrs,
     )
     return wheel_link
 
@@ -182,6 +197,8 @@ def create_helhest_junior_model(
     kd: float = None,
     kf: float = None,
     mu_rolling: float = 0.7,
+    friction_long_left_right: float = None,
+    friction_long_rear: float = None,
 ):
     """
     Creates a Helhest Junior robot model — a smaller variant of the Helhest
@@ -218,6 +235,7 @@ def create_helhest_junior_model(
         kd=kd,
         kf=kf,
         mu_rolling=mu_rolling,
+        mu_long=friction_long_left_right,
     )
     right_wheel = _add_wheel(
         builder,
@@ -231,6 +249,7 @@ def create_helhest_junior_model(
         kd=kd,
         kf=kf,
         mu_rolling=mu_rolling,
+        mu_long=friction_long_left_right,
     )
     rear_wheel = _add_wheel(
         builder,
@@ -244,6 +263,7 @@ def create_helhest_junior_model(
         kd=kd,
         kf=kf,
         mu_rolling=mu_rolling,
+        mu_long=friction_long_rear,
     )
 
     # 3. Wheel Joints
