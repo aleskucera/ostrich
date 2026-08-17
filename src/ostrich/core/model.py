@@ -285,6 +285,7 @@ class OstrichModel:
         self.shape_mu_perp = self._broadcast_shape_array(model.mu_perp)
         self.shape_mu_stiction_scale = self._broadcast_shape_array(model.mu_stiction_scale)
         self.shape_v_stribeck = self._broadcast_shape_array(model.v_stribeck)
+        self.shape_stribeck_lateral_only = self._broadcast_shape_array(model.stribeck_lateral_only)
         self.shape_body = self._build_shape_body_array(model.shape_body)
 
         self.joint_constraint_offsets, self.num_joint_constraints = (

@@ -177,11 +177,30 @@ def resolve_stribeck_params(
 
 
 @wp.func
+def resolve_stribeck_lateral_only(
+    lateral_only_0: wp.float32,
+    lateral_only_1: wp.float32,
+):
+    """Resolves the per-contact `stribeck_lateral_only` flag from the two shapes.
+
+    Shape0 wins if set (> 0); otherwise falls back to shape1. Sentinel -1.0
+    (neither shape opts in) means "scale both axes", `mu_stiction_scale`'s
+    default behavior.
+    """
+    if lateral_only_0 > 0.0:
+        return lateral_only_0
+    if lateral_only_1 > 0.0:
+        return lateral_only_1
+    return wp.float32(-1.0)
+
+
+@wp.func
 def compute_friction_model(
     mu_x: wp.float32,
     mu_y: wp.float32,
     mu_stiction_scale: wp.float32,
     v_stribeck: wp.float32,
+    stribeck_lateral_only: wp.float32,
     J_t1_0: wp.spatial_vector,
     J_t2_0: wp.spatial_vector,
     J_t1_1: wp.spatial_vector,
@@ -221,12 +240,21 @@ def compute_friction_model(
     it.
 
     Stribeck (velocity-dependent) friction, when enabled (``mu_stiction_scale``
-    and ``v_stribeck`` both > 0), uniformly rescales ``mu_x``/``mu_y`` by a
-    factor computed from the slip speed before either regime consumes them —
-    a uniform scale preserves the ``mu_x == mu_y`` equality, so branch
-    selection above is unaffected. When disabled (either sentinel <= 0) this
-    is a no-op and the arithmetic below is bit-identical to the pre-Stribeck
-    code.
+    and ``v_stribeck`` both > 0), rescales mu by a factor computed from the
+    slip speed before either regime (isotropic/anisotropic) consumes it. When
+    disabled (either sentinel <= 0) this is a no-op and the arithmetic below
+    is bit-identical to the pre-Stribeck code.
+
+    ``stribeck_lateral_only`` (> 0) restricts that factor to ``mu_x`` only —
+    per `resolve_friction_frame`, ``mu_x`` is the coefficient along the
+    resolved friction axis (a wheel's LATERAL/skid direction), ``mu_y`` the
+    perpendicular one (longitudinal/rolling) — leaving ``mu_y`` unscaled.
+    EXCEPT when the contact is isotropic (``mu_x == mu_y`` going in, i.e. no
+    anisotropic friction axis resolved): there the axes carry no physical
+    lateral/longitudinal meaning, so `stribeck_lateral_only` is ignored and
+    both are scaled together, exactly as the "off" (both-axes) behavior —
+    this also preserves the ``mu_x == mu_y`` isotropic-branch invariant,
+    which an asymmetric scale would otherwise break.
     """
     v_t_0 = wp.dot(J_t1_0, vel0) + wp.dot(J_t1_1, vel1)
     v_t_1 = wp.dot(J_t2_0, vel0) + wp.dot(J_t2_1, vel1)
@@ -241,8 +269,16 @@ def compute_friction_model(
     if mu_stiction_scale > 0.0 and v_stribeck > 0.0:
         s = wp.length(v_t)
         factor = 1.0 + (mu_stiction_scale - 1.0) * wp.exp(-s / v_stribeck)
-        mu_x = mu_x * factor
-        mu_y = mu_y * factor
+        if stribeck_lateral_only > 0.0 and mu_x != mu_y:
+            # Lateral-only: mu_x is the lateral/skid axis (see docstring); mu_y
+            # (longitudinal/rolling) stays unscaled. Only meaningful when the
+            # contact is already anisotropic (mu_x != mu_y going in) — an
+            # isotropic contact has no lateral/longitudinal axis to restrict
+            # to, so it falls through to scaling both below.
+            mu_x = mu_x * factor
+        else:
+            mu_x = mu_x * factor
+            mu_y = mu_y * factor
 
     if friction_mode != FRICTION_CONE:
         # ---- Structural relaxation: rolling without slipping ----
@@ -351,6 +387,7 @@ def compute_friction_core(
     mu_y: float,
     mu_stiction_scale: float,
     v_stribeck: float,
+    stribeck_lateral_only: float,
     p0_local: wp.vec3,
     p1_local: wp.vec3,
     thickness0: float,
@@ -417,7 +454,7 @@ def compute_friction_core(
     force_f_prev = wp.vec2(lambda_t1_prev, lambda_t2_prev)
 
     v_t, w_x, w_y = compute_friction_model(
-        mu_x, mu_y, mu_stiction_scale, v_stribeck,
+        mu_x, mu_y, mu_stiction_scale, v_stribeck, stribeck_lateral_only,
         J_t1_0, J_t2_0, J_t1_1, J_t2_1, vel0, vel1, force_f_prev, force_n_prev, dt, precond,
         friction_mode,
     )
@@ -456,6 +493,7 @@ def friction_residual_kernel(
     shape_mu_perp: wp.array(dtype=wp.float32, ndim=2),
     shape_mu_stiction_scale: wp.array(dtype=wp.float32, ndim=2),
     shape_v_stribeck: wp.array(dtype=wp.float32, ndim=2),
+    shape_stribeck_lateral_only: wp.array(dtype=wp.float32, ndim=2),
     # Contact properties
     contact_count: wp.array(dtype=wp.int32, ndim=1),
     contact_shape0: wp.array(dtype=wp.int32, ndim=2),
@@ -567,6 +605,10 @@ def friction_residual_kernel(
         stiction_scale_0, v_stribeck_0, stiction_scale_1, v_stribeck_1
     )
 
+    lateral_only_0 = shape_stribeck_lateral_only[world_idx, shape0]
+    lateral_only_1 = shape_stribeck_lateral_only[world_idx, shape1]
+    stribeck_lateral_only = resolve_stribeck_lateral_only(lateral_only_0, lateral_only_1)
+
     lam_t1 = constr_force[world_idx, constr_idx0]
     lam_t2 = constr_force[world_idx, constr_idx1]
     lam_t1_p = constr_force_prev[world_idx, constr_idx0]
@@ -587,6 +629,7 @@ def friction_residual_kernel(
         mu_y,
         mu_stiction_scale,
         v_stribeck,
+        stribeck_lateral_only,
         p0,
         p1,
         thickness0,
@@ -639,6 +682,7 @@ def friction_constraint_kernel(
     shape_mu_perp: wp.array(dtype=wp.float32, ndim=2),
     shape_mu_stiction_scale: wp.array(dtype=wp.float32, ndim=2),
     shape_v_stribeck: wp.array(dtype=wp.float32, ndim=2),
+    shape_stribeck_lateral_only: wp.array(dtype=wp.float32, ndim=2),
     # Contact properties
     contact_count: wp.array(dtype=wp.int32, ndim=1),
     contact_shape0: wp.array(dtype=wp.int32, ndim=2),
@@ -799,6 +843,10 @@ def friction_constraint_kernel(
         stiction_scale_0, v_stribeck_0, stiction_scale_1, v_stribeck_1
     )
 
+    lateral_only_0 = shape_stribeck_lateral_only[world_idx, shape0]
+    lateral_only_1 = shape_stribeck_lateral_only[world_idx, shape1]
+    stribeck_lateral_only = resolve_stribeck_lateral_only(lateral_only_0, lateral_only_1)
+
     lam_t1 = constr_force[world_idx, constr_idx0]
     lam_t2 = constr_force[world_idx, constr_idx1]
     lam_t1_p = constr_force_prev[world_idx, constr_idx0]
@@ -819,6 +867,7 @@ def friction_constraint_kernel(
         mu_y,
         mu_stiction_scale,
         v_stribeck,
+        stribeck_lateral_only,
         p0,
         p1,
         thickness0,
@@ -884,6 +933,7 @@ def batch_friction_residual_kernel(
     shape_mu_perp: wp.array(dtype=wp.float32, ndim=2),
     shape_mu_stiction_scale: wp.array(dtype=wp.float32, ndim=2),
     shape_v_stribeck: wp.array(dtype=wp.float32, ndim=2),
+    shape_stribeck_lateral_only: wp.array(dtype=wp.float32, ndim=2),
     # Contact properties
     contact_count: wp.array(dtype=wp.int32, ndim=1),
     contact_shape0: wp.array(dtype=wp.int32, ndim=2),
@@ -995,6 +1045,10 @@ def batch_friction_residual_kernel(
         stiction_scale_0, v_stribeck_0, stiction_scale_1, v_stribeck_1
     )
 
+    lateral_only_0 = shape_stribeck_lateral_only[world_idx, shape0]
+    lateral_only_1 = shape_stribeck_lateral_only[world_idx, shape1]
+    stribeck_lateral_only = resolve_stribeck_lateral_only(lateral_only_0, lateral_only_1)
+
     lam_t1 = constr_force[batch_idx, world_idx, constr_idx0]
     lam_t2 = constr_force[batch_idx, world_idx, constr_idx1]
     lam_t1_p = constr_force_prev[world_idx, constr_idx0]
@@ -1015,6 +1069,7 @@ def batch_friction_residual_kernel(
         mu_y,
         mu_stiction_scale,
         v_stribeck,
+        stribeck_lateral_only,
         p0,
         p1,
         thickness0,
@@ -1067,6 +1122,7 @@ def fused_batch_friction_residual_kernel(
     shape_mu_perp: wp.array(dtype=wp.float32, ndim=2),
     shape_mu_stiction_scale: wp.array(dtype=wp.float32, ndim=2),
     shape_v_stribeck: wp.array(dtype=wp.float32, ndim=2),
+    shape_stribeck_lateral_only: wp.array(dtype=wp.float32, ndim=2),
     # Contact properties
     contact_count: wp.array(dtype=wp.int32, ndim=1),
     contact_shape0: wp.array(dtype=wp.int32, ndim=2),
@@ -1177,6 +1233,10 @@ def fused_batch_friction_residual_kernel(
         stiction_scale_0, v_stribeck_0, stiction_scale_1, v_stribeck_1
     )
 
+    lateral_only_0 = shape_stribeck_lateral_only[world_idx, shape0]
+    lateral_only_1 = shape_stribeck_lateral_only[world_idx, shape1]
+    stribeck_lateral_only = resolve_stribeck_lateral_only(lateral_only_0, lateral_only_1)
+
     lam_t1_p = constr_force_prev[world_idx, constr_idx0]
     lam_t2_p = constr_force_prev[world_idx, constr_idx1]
 
@@ -1204,6 +1264,7 @@ def fused_batch_friction_residual_kernel(
                 mu_y,
                 mu_stiction_scale,
                 v_stribeck,
+                stribeck_lateral_only,
                 p0,
                 p1,
                 thickness0,

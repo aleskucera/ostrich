@@ -112,6 +112,20 @@ class OstrichModelBuilder(newton.ModelBuilder):
             )
         )
 
+        # Restricts the Stribeck factor to the LATERAL (skid) axis only —
+        # mu_x per resolve_friction_frame — leaving mu_y (longitudinal /
+        # rolling) unscaled. Sentinel -1.0 = off (scale both axes, the
+        # mu_stiction_scale default). See resolve_stribeck_lateral_only.
+        self.add_custom_attribute(
+            newton.ModelBuilder.CustomAttribute(
+                name="stribeck_lateral_only",
+                frequency=Model.AttributeFrequency.SHAPE,
+                dtype=wp.float32,
+                default=-1.0,
+                assignment=Model.AttributeAssignment.MODEL,
+            )
+        )
+
     def add_track(
         self,
         parent_body: int,

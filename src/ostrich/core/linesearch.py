@@ -230,6 +230,7 @@ def _compute_batched_residual(
             model.shape_mu_perp,
             model.shape_mu_stiction_scale,
             model.shape_v_stribeck,
+            model.shape_stribeck_lateral_only,
             contacts.contact_count,
             contacts.contact_shape0,
             contacts.contact_shape1,
