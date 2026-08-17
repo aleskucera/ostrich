@@ -188,8 +188,15 @@ class HelhestJuniorReplaySimulator(InteractiveSimulator):
                  box_ke=150.0, box_kd=150.0, box_kf=500.0,
                  wheel_ke=None, wheel_kd=None, wheel_kf=None,
                  k_p=250.0, k_d=0.0,
+                 box_center=BOX_CENTER, box_half_extents=BOX_HALF_EXTENTS,
+                 box_yaw=0.0,
                  **kwargs):
         self.control_mode = control_mode
+        # Box obstacle pose/size (campaign-2 GT carries a per-run fitted
+        # pallet pose incl. yaw; defaults reproduce the campaign-1 scene).
+        self.box_center = tuple(box_center)
+        self.box_half_extents = tuple(box_half_extents)
+        self.box_yaw = float(box_yaw)
         # Wheel actuator gains. With TARGET_VELOCITY mode, different solvers
         # consume these differently: Ostrich drives well from k_p alone, while
         # SemiImplicit needs a non-zero k_d (velocity-feedback gain) to apply
@@ -225,10 +232,12 @@ class HelhestJuniorReplaySimulator(InteractiveSimulator):
 
         self.builder.add_shape_box(
             body=-1,
-            xform=wp.transform(wp.vec3(*BOX_CENTER), wp.quat_identity()),
-            hx=BOX_HALF_EXTENTS[0],
-            hy=BOX_HALF_EXTENTS[1],
-            hz=BOX_HALF_EXTENTS[2],
+            xform=wp.transform(
+                wp.vec3(*self.box_center),
+                wp.quat_from_axis_angle(wp.vec3(0.0, 0.0, 1.0), self.box_yaw)),
+            hx=self.box_half_extents[0],
+            hy=self.box_half_extents[1],
+            hz=self.box_half_extents[2],
             cfg=newton.ModelBuilder.ShapeConfig(mu=0.8, **self.box_cfg_kwargs),
         )
 
