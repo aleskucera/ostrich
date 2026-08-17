@@ -120,14 +120,17 @@ def _add_wheel(
     kf: float = None,
     mu_rolling: float = 0.7,
     mu_long: float = None,
+    mu_stiction_scale: float = None,
+    v_stribeck: float = None,
 ) -> int:
     """Adds a wheel link, shapes, and returns the link index.
 
-    With ``mu_long`` set, the wheel gets anisotropic friction (same wiring as
-    examples/helhest/common.py): ``friction_axis_local`` is the body-local spin
-    axis (0,1,0), so ``mu`` becomes the LATERAL (skid) coefficient and
-    ``mu_long`` the longitudinal (rolling-direction) one. Requires an
-    OstrichModelBuilder (registers the mu_perp/friction_axis_local attributes)."""
+    Friction model: the wheel spins about body-local Y, so the friction frame
+    is anchored to that axis. `mu` is the lateral coefficient (resists skid
+    along the spin axis); `mu_long` is the longitudinal coefficient (rolling
+    direction, perpendicular to the spin axis in the contact plane). If
+    `mu_long` is None, friction is isotropic with coefficient `mu`.
+    """
     pos_world = wp.transform_point(parent_xform, pos_local)
     rot_world = parent_xform.q
 
@@ -166,12 +169,17 @@ def _add_wheel(
     if kf is not None:
         collision_cfg_kwargs["kf"] = kf
 
-    shape_custom_attrs = None
+    shape_custom_attrs = {}
     if mu_long is not None:
-        shape_custom_attrs = {
-            "friction_axis_local": wp.vec3(0.0, 1.0, 0.0),
-            "mu_perp": mu_long,
-        }
+        # Spin axis is body-local Y (matches the revolute joint axis below and the
+        # cylinder's WHEEL_ROT). mu (lateral) is applied along this projected axis;
+        # mu_long (longitudinal/rolling) is perpendicular to it in the tangent plane.
+        shape_custom_attrs["friction_axis_local"] = wp.vec3(0.0, 1.0, 0.0)
+        shape_custom_attrs["mu_perp"] = mu_long
+    if mu_stiction_scale is not None:
+        shape_custom_attrs["mu_stiction_scale"] = mu_stiction_scale
+    if v_stribeck is not None:
+        shape_custom_attrs["v_stribeck"] = v_stribeck
 
     builder.add_shape_cylinder(
         body=wheel_link,
@@ -179,7 +187,7 @@ def _add_wheel(
         radius=HelhestJuniorConfig.WHEEL_RADIUS,
         half_height=HelhestJuniorConfig.WHEEL_WIDTH / 2.0,
         cfg=newton.ModelBuilder.ShapeConfig(**collision_cfg_kwargs),
-        custom_attributes=shape_custom_attrs,
+        custom_attributes=shape_custom_attrs if shape_custom_attrs else None,
     )
     return wheel_link
 
@@ -193,12 +201,14 @@ def create_helhest_junior_model(
     k_d: float = 0.1,
     friction_left_right: float = 0.7,
     friction_rear: float = 0.4,
+    friction_long_left_right: float = None,
+    friction_long_rear: float = None,
     ke: float = None,
     kd: float = None,
     kf: float = None,
     mu_rolling: float = 0.7,
-    friction_long_left_right: float = None,
-    friction_long_rear: float = None,
+    mu_stiction_scale: float = None,
+    v_stribeck: float = None,
 ):
     """
     Creates a Helhest Junior robot model — a smaller variant of the Helhest
@@ -214,6 +224,16 @@ def create_helhest_junior_model(
         k_d: Derivative gain (target_kd).
         friction_left_right: Friction coefficient for front wheels.
         friction_rear: Friction coefficient for the rear wheel.
+        friction_long_left_right: Longitudinal (rolling-direction) friction
+            coefficient for the front wheels. None disables anisotropic
+            friction (isotropic at friction_left_right).
+        friction_long_rear: Longitudinal (rolling-direction) friction
+            coefficient for the rear wheel. None disables anisotropic
+            friction (isotropic at friction_rear).
+        mu_stiction_scale: Stribeck low-speed/high-speed mu ratio for the wheel
+            collision shapes. None disables the feature.
+        v_stribeck: Stribeck slip-speed scale (m/s) for the wheel collision
+            shapes. None disables the feature.
     """
 
     wheel_mesh_render = _load_wheel_mesh()
@@ -236,6 +256,8 @@ def create_helhest_junior_model(
         kf=kf,
         mu_rolling=mu_rolling,
         mu_long=friction_long_left_right,
+        mu_stiction_scale=mu_stiction_scale,
+        v_stribeck=v_stribeck,
     )
     right_wheel = _add_wheel(
         builder,
@@ -250,6 +272,8 @@ def create_helhest_junior_model(
         kf=kf,
         mu_rolling=mu_rolling,
         mu_long=friction_long_left_right,
+        mu_stiction_scale=mu_stiction_scale,
+        v_stribeck=v_stribeck,
     )
     rear_wheel = _add_wheel(
         builder,
@@ -264,6 +288,8 @@ def create_helhest_junior_model(
         kf=kf,
         mu_rolling=mu_rolling,
         mu_long=friction_long_rear,
+        mu_stiction_scale=mu_stiction_scale,
+        v_stribeck=v_stribeck,
     )
 
     # 3. Wheel Joints

@@ -157,9 +157,31 @@ def resolve_friction_frame(
 
 
 @wp.func
+def resolve_stribeck_params(
+    stiction_scale_0: wp.float32,
+    v_stribeck_0: wp.float32,
+    stiction_scale_1: wp.float32,
+    v_stribeck_1: wp.float32,
+):
+    """Resolves the per-contact Stribeck parameters from the two shapes.
+
+    Shape0 wins if both of its attributes are set (> 0); otherwise falls back
+    to shape1. If neither shape has both attributes set, returns the sentinel
+    (-1.0, -1.0), which `compute_friction_model` treats as "feature off".
+    """
+    if stiction_scale_0 > 0.0 and v_stribeck_0 > 0.0:
+        return stiction_scale_0, v_stribeck_0
+    if stiction_scale_1 > 0.0 and v_stribeck_1 > 0.0:
+        return stiction_scale_1, v_stribeck_1
+    return wp.float32(-1.0), wp.float32(-1.0)
+
+
+@wp.func
 def compute_friction_model(
     mu_x: wp.float32,
     mu_y: wp.float32,
+    mu_stiction_scale: wp.float32,
+    v_stribeck: wp.float32,
     J_t1_0: wp.spatial_vector,
     J_t2_0: wp.spatial_vector,
     J_t1_1: wp.spatial_vector,
@@ -197,10 +219,30 @@ def compute_friction_model(
     therefore deliberate: it guarantees the isotropic path exactly reproduces
     the original solver behavior rather than an FB-smoothing approximation of
     it.
+
+    Stribeck (velocity-dependent) friction, when enabled (``mu_stiction_scale``
+    and ``v_stribeck`` both > 0), uniformly rescales ``mu_x``/``mu_y`` by a
+    factor computed from the slip speed before either regime consumes them —
+    a uniform scale preserves the ``mu_x == mu_y`` equality, so branch
+    selection above is unaffected. When disabled (either sentinel <= 0) this
+    is a no-op and the arithmetic below is bit-identical to the pre-Stribeck
+    code.
     """
     v_t_0 = wp.dot(J_t1_0, vel0) + wp.dot(J_t1_1, vel1)
     v_t_1 = wp.dot(J_t2_0, vel0) + wp.dot(J_t2_1, vel1)
     v_t = wp.vec2(v_t_0, v_t_1)
+
+    # Stribeck friction: mu(v) is evaluated inline from the current-iterate
+    # v_t and treated as a constant by the residual/Jacobian below (Picard /
+    # frozen-mu) — no d(mu)/dv terms are added to the analytic Jacobian.
+    # Newton re-evaluates mu(v) each iteration since v_t changes with the
+    # iterate. The reverse-mode/tape-VJP adjoint differentiates this kernel
+    # directly and picks up d(mu)/dv through v_t automatically.
+    if mu_stiction_scale > 0.0 and v_stribeck > 0.0:
+        s = wp.length(v_t)
+        factor = 1.0 + (mu_stiction_scale - 1.0) * wp.exp(-s / v_stribeck)
+        mu_x = mu_x * factor
+        mu_y = mu_y * factor
 
     if friction_mode != FRICTION_CONE:
         # ---- Structural relaxation: rolling without slipping ----
@@ -210,7 +252,8 @@ def compute_friction_model(
         # bilateral equality v_t + alpha*lambda_f = 0 (alpha = compliance),
         # with an unbounded, sign-free multiplier. mu, mu_perp and
         # force_n_prev all drop out, so the row is linear in body velocity
-        # and carries no dependence on the normal block.
+        # and carries no dependence on the normal block. (mu_x/mu_y, and any
+        # Stribeck scaling applied to them above, are unused on this branch.)
         return v_t, 0.0, 0.0
 
     eps = 1e-8
@@ -306,6 +349,8 @@ def compute_friction_core(
     t2: wp.vec3,
     mu_x: float,
     mu_y: float,
+    mu_stiction_scale: float,
+    v_stribeck: float,
     p0_local: wp.vec3,
     p1_local: wp.vec3,
     thickness0: float,
@@ -372,7 +417,8 @@ def compute_friction_core(
     force_f_prev = wp.vec2(lambda_t1_prev, lambda_t2_prev)
 
     v_t, w_x, w_y = compute_friction_model(
-        mu_x, mu_y, J_t1_0, J_t2_0, J_t1_1, J_t2_1, vel0, vel1, force_f_prev, force_n_prev, dt, precond,
+        mu_x, mu_y, mu_stiction_scale, v_stribeck,
+        J_t1_0, J_t2_0, J_t1_1, J_t2_1, vel0, vel1, force_f_prev, force_n_prev, dt, precond,
         friction_mode,
     )
 
@@ -408,6 +454,8 @@ def friction_residual_kernel(
     shape_material_mu: wp.array(dtype=wp.float32, ndim=2),
     shape_friction_axis_local: wp.array(dtype=wp.vec3, ndim=2),
     shape_mu_perp: wp.array(dtype=wp.float32, ndim=2),
+    shape_mu_stiction_scale: wp.array(dtype=wp.float32, ndim=2),
+    shape_v_stribeck: wp.array(dtype=wp.float32, ndim=2),
     # Contact properties
     contact_count: wp.array(dtype=wp.int32, ndim=1),
     contact_shape0: wp.array(dtype=wp.int32, ndim=2),
@@ -511,6 +559,14 @@ def friction_residual_kernel(
         mu0, mu_perp_0, mu1, mu_perp_1,
     )
 
+    stiction_scale_0 = shape_mu_stiction_scale[world_idx, shape0]
+    v_stribeck_0 = shape_v_stribeck[world_idx, shape0]
+    stiction_scale_1 = shape_mu_stiction_scale[world_idx, shape1]
+    v_stribeck_1 = shape_v_stribeck[world_idx, shape1]
+    mu_stiction_scale, v_stribeck = resolve_stribeck_params(
+        stiction_scale_0, v_stribeck_0, stiction_scale_1, v_stribeck_1
+    )
+
     lam_t1 = constr_force[world_idx, constr_idx0]
     lam_t2 = constr_force[world_idx, constr_idx1]
     lam_t1_p = constr_force_prev[world_idx, constr_idx0]
@@ -529,6 +585,8 @@ def friction_residual_kernel(
         t2,
         mu_x,
         mu_y,
+        mu_stiction_scale,
+        v_stribeck,
         p0,
         p1,
         thickness0,
@@ -579,6 +637,8 @@ def friction_constraint_kernel(
     shape_material_mu: wp.array(dtype=wp.float32, ndim=2),
     shape_friction_axis_local: wp.array(dtype=wp.vec3, ndim=2),
     shape_mu_perp: wp.array(dtype=wp.float32, ndim=2),
+    shape_mu_stiction_scale: wp.array(dtype=wp.float32, ndim=2),
+    shape_v_stribeck: wp.array(dtype=wp.float32, ndim=2),
     # Contact properties
     contact_count: wp.array(dtype=wp.int32, ndim=1),
     contact_shape0: wp.array(dtype=wp.int32, ndim=2),
@@ -731,6 +791,14 @@ def friction_constraint_kernel(
         mu0, mu_perp_0, mu1, mu_perp_1,
     )
 
+    stiction_scale_0 = shape_mu_stiction_scale[world_idx, shape0]
+    v_stribeck_0 = shape_v_stribeck[world_idx, shape0]
+    stiction_scale_1 = shape_mu_stiction_scale[world_idx, shape1]
+    v_stribeck_1 = shape_v_stribeck[world_idx, shape1]
+    mu_stiction_scale, v_stribeck = resolve_stribeck_params(
+        stiction_scale_0, v_stribeck_0, stiction_scale_1, v_stribeck_1
+    )
+
     lam_t1 = constr_force[world_idx, constr_idx0]
     lam_t2 = constr_force[world_idx, constr_idx1]
     lam_t1_p = constr_force_prev[world_idx, constr_idx0]
@@ -749,6 +817,8 @@ def friction_constraint_kernel(
         t2,
         mu_x,
         mu_y,
+        mu_stiction_scale,
+        v_stribeck,
         p0,
         p1,
         thickness0,
@@ -812,6 +882,8 @@ def batch_friction_residual_kernel(
     shape_material_mu: wp.array(dtype=wp.float32, ndim=2),
     shape_friction_axis_local: wp.array(dtype=wp.vec3, ndim=2),
     shape_mu_perp: wp.array(dtype=wp.float32, ndim=2),
+    shape_mu_stiction_scale: wp.array(dtype=wp.float32, ndim=2),
+    shape_v_stribeck: wp.array(dtype=wp.float32, ndim=2),
     # Contact properties
     contact_count: wp.array(dtype=wp.int32, ndim=1),
     contact_shape0: wp.array(dtype=wp.int32, ndim=2),
@@ -915,6 +987,14 @@ def batch_friction_residual_kernel(
         mu0, mu_perp_0, mu1, mu_perp_1,
     )
 
+    stiction_scale_0 = shape_mu_stiction_scale[world_idx, shape0]
+    v_stribeck_0 = shape_v_stribeck[world_idx, shape0]
+    stiction_scale_1 = shape_mu_stiction_scale[world_idx, shape1]
+    v_stribeck_1 = shape_v_stribeck[world_idx, shape1]
+    mu_stiction_scale, v_stribeck = resolve_stribeck_params(
+        stiction_scale_0, v_stribeck_0, stiction_scale_1, v_stribeck_1
+    )
+
     lam_t1 = constr_force[batch_idx, world_idx, constr_idx0]
     lam_t2 = constr_force[batch_idx, world_idx, constr_idx1]
     lam_t1_p = constr_force_prev[world_idx, constr_idx0]
@@ -933,6 +1013,8 @@ def batch_friction_residual_kernel(
         t2,
         mu_x,
         mu_y,
+        mu_stiction_scale,
+        v_stribeck,
         p0,
         p1,
         thickness0,
@@ -983,6 +1065,8 @@ def fused_batch_friction_residual_kernel(
     shape_material_mu: wp.array(dtype=wp.float32, ndim=2),
     shape_friction_axis_local: wp.array(dtype=wp.vec3, ndim=2),
     shape_mu_perp: wp.array(dtype=wp.float32, ndim=2),
+    shape_mu_stiction_scale: wp.array(dtype=wp.float32, ndim=2),
+    shape_v_stribeck: wp.array(dtype=wp.float32, ndim=2),
     # Contact properties
     contact_count: wp.array(dtype=wp.int32, ndim=1),
     contact_shape0: wp.array(dtype=wp.int32, ndim=2),
@@ -1085,6 +1169,14 @@ def fused_batch_friction_residual_kernel(
         mu0, mu_perp_0, mu1, mu_perp_1,
     )
 
+    stiction_scale_0 = shape_mu_stiction_scale[world_idx, shape0]
+    v_stribeck_0 = shape_v_stribeck[world_idx, shape0]
+    stiction_scale_1 = shape_mu_stiction_scale[world_idx, shape1]
+    v_stribeck_1 = shape_v_stribeck[world_idx, shape1]
+    mu_stiction_scale, v_stribeck = resolve_stribeck_params(
+        stiction_scale_0, v_stribeck_0, stiction_scale_1, v_stribeck_1
+    )
+
     lam_t1_p = constr_force_prev[world_idx, constr_idx0]
     lam_t2_p = constr_force_prev[world_idx, constr_idx1]
 
@@ -1110,6 +1202,8 @@ def fused_batch_friction_residual_kernel(
                 t2,
                 mu_x,
                 mu_y,
+                mu_stiction_scale,
+                v_stribeck,
                 p0,
                 p1,
                 thickness0,

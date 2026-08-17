@@ -89,6 +89,29 @@ class OstrichModelBuilder(newton.ModelBuilder):
             )
         )
 
+        # Stribeck (velocity-dependent) friction: per-shape low-speed/high-speed
+        # mu ratio and slip-speed scale. Sentinel -1.0 on either one means the
+        # feature is off for that shape (see resolve_stribeck_params).
+        self.add_custom_attribute(
+            newton.ModelBuilder.CustomAttribute(
+                name="mu_stiction_scale",
+                frequency=Model.AttributeFrequency.SHAPE,
+                dtype=wp.float32,
+                default=-1.0,
+                assignment=Model.AttributeAssignment.MODEL,
+            )
+        )
+
+        self.add_custom_attribute(
+            newton.ModelBuilder.CustomAttribute(
+                name="v_stribeck",
+                frequency=Model.AttributeFrequency.SHAPE,
+                dtype=wp.float32,
+                default=-1.0,
+                assignment=Model.AttributeAssignment.MODEL,
+            )
+        )
+
     def add_track(
         self,
         parent_body: int,

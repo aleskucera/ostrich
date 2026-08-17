@@ -191,6 +191,7 @@ class HelhestJuniorReplaySimulator(InteractiveSimulator):
                  box_center=BOX_CENTER, box_half_extents=BOX_HALF_EXTENTS,
                  box_yaw=0.0,
                  mu_long_front=None, mu_long_rear=None,
+                 mu_stiction_scale=None, v_stribeck=None,
                  **kwargs):
         self.control_mode = control_mode
         # Box obstacle pose/size (campaign-2 GT carries a per-run fitted
@@ -226,6 +227,10 @@ class HelhestJuniorReplaySimulator(InteractiveSimulator):
         self.wheel_ke = wheel_ke
         self.wheel_kd = wheel_kd
         self.wheel_kf = wheel_kf
+        # Stribeck (velocity-dependent) friction on the wheel collision shapes.
+        # None (either one) disables the feature.
+        self.mu_stiction_scale = mu_stiction_scale
+        self.v_stribeck = v_stribeck
         super().__init__(*args, **kwargs)
         # [left, right, rear] velocity command consumed by control_policy.
         self.target_velocities = wp.zeros(3, dtype=wp.float32, device=self.model.device)
@@ -260,6 +265,8 @@ class HelhestJuniorReplaySimulator(InteractiveSimulator):
             ke=self.wheel_ke, kd=self.wheel_kd, kf=self.wheel_kf,
             friction_long_left_right=self.mu_long_front,
             friction_long_rear=self.mu_long_rear,
+            mu_stiction_scale=self.mu_stiction_scale,
+            v_stribeck=self.v_stribeck,
         )
 
         return self.builder.finalize_replicated(num_worlds=self.simulation_config.num_worlds)
