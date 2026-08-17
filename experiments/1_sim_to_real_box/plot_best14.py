@@ -46,7 +46,7 @@ def _run_mj_c3(gt):
     box = gt["box"]
     params = {**BASE_PARAMS, "dt": dt, "kv": p["kv"],
               "ground_friction": 0.3, "box_friction": 0.3,
-              "front_friction": 1.2, "rear_friction": 0.6,
+              "front_friction": 1.2, "rear_friction": 0.3,
               "ground_torsional": 0.05, "front_torsional": 0.05,
               "rear_torsional": 0.05,
               "solref0": p["solref0"], "condim": p["condim"],
