@@ -1,6 +1,13 @@
 import warp as wp
 from ostrich.mechanics import scaled_fisher_burmeister_diff
 
+# Contact FB scaling alpha. Default 1.0 preserves current behavior bit-exactly
+# (same arithmetic); the submitted-paper terrain experiment used 0.5 (softer
+# distance weighting on mesh contact), reproducible via
+# OSTRICH_CONTACT_FB_ALPHA=0.5. Baked at module import (warp constant).
+import os as _os
+CONTACT_FB_ALPHA = wp.constant(float(_os.environ.get("OSTRICH_CONTACT_FB_ALPHA", "1.0")))
+
 from .utils import compute_effective_mass
 
 # Values for the `contact_mode` kernel argument. Must match the index order of
@@ -117,7 +124,7 @@ def compute_contact_core(
         dphi_dc_n = 1.0
         dphi_dlambda_n = 0.0
     else:
-        phi_n, dphi_dc_n, dphi_dlambda_n = scaled_fisher_burmeister_diff(signed_dist, f_n, 1.0, precond, fb_eps_sq)
+        phi_n, dphi_dc_n, dphi_dlambda_n = scaled_fisher_burmeister_diff(signed_dist, f_n, CONTACT_FB_ALPHA, precond, fb_eps_sq)
 
     # --- 4. Final Solver Terms ---
     J_hat_0 = dphi_dc_n * J0
