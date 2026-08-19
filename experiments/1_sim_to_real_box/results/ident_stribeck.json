@@ -1,0 +1,260 @@
+{
+ "protocol": "train ['ostrich0', 'ostrich1', 'ostrich10', 'ostrich13'], test ['ostrich2', 'ostrich3', 'ostrich4', 'ostrich5', 'ostrich6', 'ostrich7', 'ostrich8', 'ostrich9', 'ostrich11', 'ostrich12']; contact params frozen at campaign-1; longitudinal mu pinned (0.8, 1.2); cmd_scale=0.937",
+ "reference": {
+  "label": "reference",
+  "k_p": 10000.0,
+  "mu_lat": 0.8,
+  "mu_stiction_scale": null,
+  "v_stribeck": null,
+  "train_combined": 0.2655499284900633,
+  "train_yaw_deg": 11.496525888290833
+ },
+ "grid": [
+  {
+   "k_p": 4000.0,
+   "mu_lat": 0.4,
+   "mu_stiction_scale": 1.5,
+   "v_stribeck": 0.1,
+   "train_combined": 0.20991073462108945,
+   "train_yaw_deg": 8.08514075107593
+  },
+  {
+   "k_p": 4000.0,
+   "mu_lat": 0.4,
+   "mu_stiction_scale": 1.5,
+   "v_stribeck": 0.3,
+   "train_combined": 0.20677947856371914,
+   "train_yaw_deg": 8.468542824976263
+  },
+  {
+   "k_p": 4000.0,
+   "mu_lat": 0.4,
+   "mu_stiction_scale": 2.5,
+   "v_stribeck": 0.1,
+   "train_combined": 0.23821665425869198,
+   "train_yaw_deg": 9.660403685456929
+  },
+  {
+   "k_p": 4000.0,
+   "mu_lat": 0.4,
+   "mu_stiction_scale": 2.5,
+   "v_stribeck": 0.3,
+   "train_combined": 0.24698082134864727,
+   "train_yaw_deg": 9.177540420610569
+  },
+  {
+   "k_p": 4000.0,
+   "mu_lat": 0.4,
+   "mu_stiction_scale": 4.0,
+   "v_stribeck": 0.1,
+   "train_combined": 0.2513827684841933,
+   "train_yaw_deg": 9.18319215289198
+  },
+  {
+   "k_p": 4000.0,
+   "mu_lat": 0.4,
+   "mu_stiction_scale": 4.0,
+   "v_stribeck": 0.3,
+   "train_combined": 0.17270300712035327,
+   "train_yaw_deg": 7.565198714746622
+  },
+  {
+   "k_p": 4000.0,
+   "mu_lat": 0.8,
+   "mu_stiction_scale": 1.5,
+   "v_stribeck": 0.1,
+   "train_combined": 0.3192412794011087,
+   "train_yaw_deg": 12.220619683642756
+  },
+  {
+   "k_p": 4000.0,
+   "mu_lat": 0.8,
+   "mu_stiction_scale": 1.5,
+   "v_stribeck": 0.3,
+   "train_combined": 0.3324328991975275,
+   "train_yaw_deg": 12.29002480251578
+  },
+  {
+   "k_p": 4000.0,
+   "mu_lat": 0.8,
+   "mu_stiction_scale": 2.5,
+   "v_stribeck": 0.1,
+   "train_combined": 0.2980446993815078,
+   "train_yaw_deg": 11.008320983774105
+  },
+  {
+   "k_p": 4000.0,
+   "mu_lat": 0.8,
+   "mu_stiction_scale": 2.5,
+   "v_stribeck": 0.3,
+   "train_combined": 0.3618664288208313,
+   "train_yaw_deg": 11.3861371859969
+  },
+  {
+   "k_p": 4000.0,
+   "mu_lat": 0.8,
+   "mu_stiction_scale": 4.0,
+   "v_stribeck": 0.1,
+   "train_combined": 0.3089027565578323,
+   "train_yaw_deg": 11.082642899115536
+  },
+  {
+   "k_p": 4000.0,
+   "mu_lat": 0.8,
+   "mu_stiction_scale": 4.0,
+   "v_stribeck": 0.3,
+   "train_combined": 0.35880263267933554,
+   "train_yaw_deg": 11.18393412958181
+  },
+  {
+   "k_p": 10000.0,
+   "mu_lat": 0.4,
+   "mu_stiction_scale": 1.5,
+   "v_stribeck": 0.1,
+   "train_combined": 0.32666559267472245,
+   "train_yaw_deg": 9.201754615176819
+  },
+  {
+   "k_p": 10000.0,
+   "mu_lat": 0.4,
+   "mu_stiction_scale": 1.5,
+   "v_stribeck": 0.3,
+   "train_combined": 0.35440015127630664,
+   "train_yaw_deg": 8.847750862418362
+  },
+  {
+   "k_p": 10000.0,
+   "mu_lat": 0.4,
+   "mu_stiction_scale": 2.5,
+   "v_stribeck": 0.1,
+   "train_combined": 0.39482337384996774,
+   "train_yaw_deg": 10.096378100052565
+  },
+  {
+   "k_p": 10000.0,
+   "mu_lat": 0.4,
+   "mu_stiction_scale": 2.5,
+   "v_stribeck": 0.3,
+   "train_combined": 0.32839190858231615,
+   "train_yaw_deg": 8.475227292271631
+  },
+  {
+   "k_p": 10000.0,
+   "mu_lat": 0.4,
+   "mu_stiction_scale": 4.0,
+   "v_stribeck": 0.1,
+   "train_combined": 0.33151275122843316,
+   "train_yaw_deg": 9.349939786135641
+  },
+  {
+   "k_p": 10000.0,
+   "mu_lat": 0.4,
+   "mu_stiction_scale": 4.0,
+   "v_stribeck": 0.3,
+   "train_combined": 0.37582746448530413,
+   "train_yaw_deg": 9.11805496341801
+  },
+  {
+   "k_p": 10000.0,
+   "mu_lat": 0.8,
+   "mu_stiction_scale": 1.5,
+   "v_stribeck": 0.1,
+   "train_combined": 0.2600136686698108,
+   "train_yaw_deg": 11.312034549467421
+  },
+  {
+   "k_p": 10000.0,
+   "mu_lat": 0.8,
+   "mu_stiction_scale": 1.5,
+   "v_stribeck": 0.3,
+   "train_combined": 0.273021569538751,
+   "train_yaw_deg": 11.58543627488282
+  },
+  {
+   "k_p": 10000.0,
+   "mu_lat": 0.8,
+   "mu_stiction_scale": 2.5,
+   "v_stribeck": 0.1,
+   "train_combined": 0.292285220520898,
+   "train_yaw_deg": 11.312869356458041
+  },
+  {
+   "k_p": 10000.0,
+   "mu_lat": 0.8,
+   "mu_stiction_scale": 2.5,
+   "v_stribeck": 0.3,
+   "train_combined": 0.29121617575181563,
+   "train_yaw_deg": 10.73090981727671
+  },
+  {
+   "k_p": 10000.0,
+   "mu_lat": 0.8,
+   "mu_stiction_scale": 4.0,
+   "v_stribeck": 0.1,
+   "train_combined": 0.34922836905016513,
+   "train_yaw_deg": 11.547959967154114
+  },
+  {
+   "k_p": 10000.0,
+   "mu_lat": 0.8,
+   "mu_stiction_scale": 4.0,
+   "v_stribeck": 0.3,
+   "train_combined": 0.26509654189769855,
+   "train_yaw_deg": 9.141863122784539
+  }
+ ],
+ "best": {
+  "k_p": 4000.0,
+  "mu_lat": 0.4,
+  "mu_stiction_scale": 4.0,
+  "v_stribeck": 0.3,
+  "train_combined": 0.17270300712035327,
+  "train_yaw_deg": 7.565198714746622
+ },
+ "test": {
+  "ostrich2": {
+   "combined_with_yaw": 0.23778037988512374,
+   "yaw_rmse_deg": 5.443543533070211
+  },
+  "ostrich3": {
+   "combined_with_yaw": 0.1268579702021892,
+   "yaw_rmse_deg": 5.60104217855691
+  },
+  "ostrich4": {
+   "combined_with_yaw": 0.19246048630370338,
+   "yaw_rmse_deg": 4.194759944792733
+  },
+  "ostrich5": {
+   "combined_with_yaw": 0.14563365961899877,
+   "yaw_rmse_deg": 5.77662697036018
+  },
+  "ostrich6": {
+   "combined_with_yaw": 0.08483955417462324,
+   "yaw_rmse_deg": 3.2067813103699696
+  },
+  "ostrich7": {
+   "combined_with_yaw": 0.2618203904053437,
+   "yaw_rmse_deg": 3.2795512677338863
+  },
+  "ostrich8": {
+   "combined_with_yaw": 0.4315384387561394,
+   "yaw_rmse_deg": 7.681546344320105
+  },
+  "ostrich9": {
+   "combined_with_yaw": 0.09555519518861016,
+   "yaw_rmse_deg": 2.2773527953870625
+  },
+  "ostrich11": {
+   "combined_with_yaw": 0.23388917186961186,
+   "yaw_rmse_deg": 9.913161995615466
+  },
+  "ostrich12": {
+   "combined_with_yaw": 0.1643027223351819,
+   "yaw_rmse_deg": 4.689232965333733
+  }
+ },
+ "test_mean": 0.19746779687395255,
+ "test_yaw_deg": 5.206359930554025,
+ "all14_mean": 0.18926626087113443,
+ "all14_yaw_deg": 5.650588480465967
+}

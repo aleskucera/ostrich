@@ -45,7 +45,12 @@ def load():
 
 def main():
     data = load()
-    fig, (ax_t, ax_m) = plt.subplots(1, 2, figsize=(11, 4.2))
+    plt.rcParams.update({
+        "text.usetex": True, "font.family": "serif", "font.size": 11,
+        "axes.labelsize": 12, "xtick.labelsize": 10, "ytick.labelsize": 10,
+        "legend.fontsize": 9, "axes.spines.top": False,
+        "axes.spines.right": False})
+    fig, (ax_t, ax_m) = plt.subplots(2, 1, figsize=(5.4, 6.4))
 
     for key, (label, color, ls, mk) in SERIES.items():
         if key not in data:
@@ -74,15 +79,14 @@ def main():
         ax.set_xlabel("parallel worlds")
         ax.grid(True, which="both", alpha=0.25, lw=0.5)
     ax_t.set_ylabel("throughput [world-iterations / s]")
-    ax_t.set_title("(a) optimization throughput (fwd+bwd), best memory config",
-                   fontsize=10)
+    ax_t.set_title("(a) optimization throughput (fwd+bwd)", fontsize=11)
     ax_m.set_ylabel("peak GPU memory [MB, NVML]")
-    ax_m.set_title("(b) memory: checkpointing removes the ceiling",
-                   fontsize=10)
+    ax_m.set_title("(b) peak GPU memory", fontsize=11)
     ax_t.legend(fontsize=8, loc="upper left")
 
     fig.tight_layout()
-    out = RES / "scalability_v2.png"
+    fig.tight_layout()
+    out = RES / "scalability_v2_paper.png"
     fig.savefig(out, dpi=150)
     print(f"saved {out}")
 

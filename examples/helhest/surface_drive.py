@@ -7,12 +7,12 @@ import newton
 import numpy as np
 import openmesh
 import warp as wp
+from omegaconf import DictConfig
 from ostrich import EngineConfig
 from ostrich import InteractiveSimulator
 from ostrich import LoggingConfig
 from ostrich import RenderingConfig
 from ostrich import SimulationConfig
-from omegaconf import DictConfig
 
 try:
     from examples.helhest.common import create_helhest_model

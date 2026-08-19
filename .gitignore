@@ -236,3 +236,4 @@ MUJOCO_LOG.TXT
 /implicit_gradient.pdf
 /draft_anchors.json
 /animated.blend1
+experiments/7_engine_comparison/engines/tmp/

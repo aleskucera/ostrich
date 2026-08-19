@@ -1,0 +1,68 @@
+{
+ "engine": "agx_soil",
+ "params": {
+  "terrain": "soil"
+ },
+ "dt": 0.01,
+ "bags": {
+  "fast_experiment0": {
+   "combined_mean": 6.199922470535104,
+   "combined_median": 6.284530040633413,
+   "yaw_rmse_deg_mean": 60.86301857789183,
+   "n_windows": 4,
+   "stable": false
+  },
+  "fast_experiment1": {
+   "combined_mean": 3.1723835779627536,
+   "combined_median": 2.5063545499817224,
+   "yaw_rmse_deg_mean": 42.873536611471515,
+   "n_windows": 5,
+   "stable": false
+  },
+  "calibrate": {
+   "combined_mean": 4.077608445507814,
+   "combined_median": 2.4882371038515663,
+   "yaw_rmse_deg_mean": 65.57118108573798,
+   "n_windows": 6,
+   "stable": false
+  },
+  "motors0": {
+   "combined_mean": 2.848698585578915,
+   "combined_median": 2.6934033061848366,
+   "yaw_rmse_deg_mean": 37.27284828314324,
+   "n_windows": 4,
+   "stable": false
+  }
+ },
+ "turn": [
+  {
+   "pair": [
+    1.0,
+    3.0
+   ],
+   "alpha": 13.130325869601606
+  },
+  {
+   "pair": [
+    1.5,
+    3.5
+   ],
+   "alpha": 12.200038270046674
+  },
+  {
+   "pair": [
+    2.0,
+    4.0
+   ],
+   "alpha": 11.932035714769466
+  },
+  {
+   "pair": [
+    0.5,
+    3.5
+   ],
+   "alpha": 16.639828176016906
+  }
+ ],
+ "error_gt_mean": 4.483304831335224
+}

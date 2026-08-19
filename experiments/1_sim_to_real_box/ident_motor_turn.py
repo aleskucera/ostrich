@@ -53,8 +53,8 @@ import eval_campaign2 as ec
 from common_box import DATA_DIR, RESULTS_DIR, load_gt
 import examples.helhest_junior.replay_real as rr
 
-TRAIN = ["ostrich0", "ostrich1"]
-TEST = ["ostrich2", "ostrich3"]
+TRAIN = ["ostrich0", "ostrich1", "ostrich10", "ostrich13"]
+TEST = [f"ostrich{i}" for i in range(14) if f"ostrich{i}" not in TRAIN]
 CMD_SCALE = 0.937          # cruise calibration (stable across k_p)
 MU_LONG = (0.8, 1.2)       # campaign-1 longitudinal (front, rear) — pinned
 GRID_KP = (4000.0, 10000.0)

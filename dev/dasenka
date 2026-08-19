@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Sync repo source to dasenka and (optionally) run a command there.
+#
+#   dev/dasenka                          # sync code -> dasenka only
+#   dev/dasenka python experiments/x.py  # sync, then run in .venv; output streams back
+#   dev/dasenka --pull outputs/          # pull a path back from dasenka -> local
+#
+# Source-only: .gitignore decides what is code (venvs, data, figures, *.usd are
+# excluded automatically). dasenka's .venv and data are never deleted.
+set -euo pipefail
+
+REMOTE=${REMOTE:-dasenka}
+REMOTE_DIR=${REMOTE_DIR:-/local/kuceral4/projects/ostrich}
+VENV=${VENV:-.venv}
+# dasenka's ssh host entry sets RemoteCommand + X11; both break ad-hoc ssh/rsync.
+SSH_OPTS="-o RemoteCommand=none -o RequestTTY=no -x"
+
+if [ "${1:-}" = "--pull" ]; then
+  shift
+  rsync -az -e "ssh $SSH_OPTS" "$REMOTE:$REMOTE_DIR/$1" "./$1"
+  exit 0
+fi
+
+rsync -az --delete -e "ssh $SSH_OPTS" \
+  --filter=':- .gitignore' \
+  --exclude='.git/' \
+  --exclude='third_party/' \
+  ./ "$REMOTE:$REMOTE_DIR/"
+
+if [ "$#" -gt 0 ]; then
+  ssh $SSH_OPTS "$REMOTE" "cd $REMOTE_DIR && source $VENV/bin/activate && $*"
+fi

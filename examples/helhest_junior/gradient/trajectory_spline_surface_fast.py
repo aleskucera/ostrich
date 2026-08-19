@@ -18,18 +18,18 @@ import newton
 import numpy as np
 import openmesh
 import warp as wp
-from ostrich import OstrichDifferentiableSimulator
-from ostrich import OstrichEngineConfig
+from newton import Model
 from ostrich import ComplianceConfig
 from ostrich import ContactsConfig
 from ostrich import LinearSolverConfig
 from ostrich import LinesearchConfig
 from ostrich import LoggingConfig
 from ostrich import NewtonRaphsonConfig
+from ostrich import OstrichDifferentiableSimulator
+from ostrich import OstrichEngineConfig
 from ostrich import RenderingConfig
 from ostrich import SimulationConfig
 from ostrich.collision import ContactReductionConfig
-from newton import Model
 
 from examples.helhest_junior.common import create_helhest_junior_model
 from examples.helhest_junior.common import HelhestJuniorConfig
@@ -43,7 +43,7 @@ NUM_WHEEL_DOFS = 3
 
 # Ground-truth controls used to generate the target trajectory (constant over time,
 # so the true spline has all K knots equal to this triple).
-TARGET_WHEEL_VEL = (5.2, 2.8, 4.0)
+TARGET_WHEEL_VEL = (5.0, 3.0, 4.0)
 
 
 def make_interp_matrix(T: int, K: int) -> tuple[np.ndarray, np.ndarray]:
@@ -399,7 +399,10 @@ class HelhestJuniorTrajectorySplineSurfaceOptimizer(OstrichDifferentiableSimulat
                     geo_is_solid=g["geo_is_solid"],
                     geo_src=g["geo_src"],
                 )
-                viewer.set_opacity(name, GHOST_OPACITY)
+                # set_opacity was removed from newer newton ViewerGL builds;
+                # the ghost still renders, just fully opaque, without it.
+                if hasattr(viewer, "set_opacity"):
+                    viewer.set_opacity(name, GHOST_OPACITY)
 
         print(f"Rendering iteration {train_iter} (Loss: {loss_val:.4f})...")
 

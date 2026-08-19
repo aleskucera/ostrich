@@ -576,7 +576,15 @@ class HelhestBalanceBundledOptimizer(OstrichDifferentiableSimulator):
 
         T = self.clock.total_sim_steps
         self.W, self.W_col_sums = make_interp_matrix(T, self.K)
-        self.spline_params = np.zeros((self.K, NUM_WHEEL_DOFS), dtype=np.float64)
+        # Honor a curriculum warm start; train() used to unconditionally zero
+        # the spline, silently discarding --init-spline.
+        warm = getattr(self, "warm_start_spline", None)
+        if warm is not None:
+            self.spline_params = warm.astype(np.float64).copy()
+        else:
+            self.spline_params = np.zeros((self.K, NUM_WHEEL_DOFS), dtype=np.float64)
+        self.best_spline = self.spline_params.copy()
+        self.best_loss = float("inf")
         self.spline_adam = SplineAdam(
             K=self.K, num_dofs=NUM_WHEEL_DOFS,
             lr=self.lr, lr_min_ratio=0.2, total_steps=self.total_adam_steps,
@@ -592,6 +600,9 @@ class HelhestBalanceBundledOptimizer(OstrichDifferentiableSimulator):
             self.iter_walls.append(time.perf_counter() - t0)
             curr_loss = float(self.loss.numpy()[0]) / self.N
             self.iter_losses.append(curr_loss)
+            if curr_loss < self.best_loss:
+                self.best_loss = curr_loss
+                self.best_spline = self.spline_params.copy()
             sigma_now = self._current_sigma()
 
             diag = self._compute_diagnostics()
@@ -667,12 +678,26 @@ def main():
                              "translate freely while still penalizing far-drift.")
     parser.add_argument("--weight-rot", type=float, default=200.0,
                         help="Orientation loss weight (multiplies the chosen rot-loss formulation).")
+    parser.add_argument("--duration", type=float, default=4.0,
+                        help="Episode length in seconds. Short horizons keep rollouts on the "
+                             "living side of the fall cliff (informative gradients); grow via "
+                             "curriculum with --init-spline warm starts.")
+    parser.add_argument("--init-spline", type=str, default=None, metavar="NPY",
+                        help="Warm-start spline knots from a [K,3] .npy (curriculum stage input).")
+    parser.add_argument("--init-duration", type=float, default=None,
+                        help="Episode duration the --init-spline was trained for. When shorter "
+                             "than --duration, the warm start is resampled in ABSOLUTE time: the "
+                             "learned control plays back at its original rate and the final knot "
+                             "value is held for the remainder. Without this, reusing a shorter "
+                             "run's knots time-stretches the control and breaks the curriculum.")
+    parser.add_argument("--save-spline", type=str, default=None, metavar="NPY",
+                        help="Save the final spline knots to a [K,3] .npy (curriculum stage output).")
     args = parser.parse_args()
 
     np.random.seed(args.seed)
 
     sim_config = SimulationConfig(
-        duration_seconds=4.0,
+        duration_seconds=args.duration,
         target_timestep_seconds=5e-2,
         num_worlds=args.num_worlds,
     )
@@ -695,7 +720,28 @@ def main():
     sim.render_every = args.render_every
     sim.render_loops = args.render_loops
     sim.render_speed = args.render_speed
+    if args.init_spline:
+        warm = np.load(args.init_spline).astype(np.float64)
+        K_new = sim.spline_params.shape[0]
+        if args.init_duration is not None and args.init_duration != args.duration:
+            # Time-preserving resample: knot j of the new spline sits at absolute
+            # time t_j; sample the old spline at t_j (its knots span
+            # [0, init_duration]) and hold the last value beyond it.
+            K_old = warm.shape[0]
+            t_new = np.linspace(0.0, args.duration, K_new)
+            t_old = np.linspace(0.0, args.init_duration, K_old)
+            res = np.empty((K_new, warm.shape[1]))
+            for d in range(warm.shape[1]):
+                res[:, d] = np.interp(t_new, t_old, warm[:, d])
+            warm = res
+        assert warm.shape == sim.spline_params.shape, (
+            f"init spline shape {warm.shape} != {sim.spline_params.shape}")
+        sim.warm_start_spline = warm
     sim.train(iterations=args.iterations)
+    if args.save_spline:
+        best = getattr(sim, "best_spline", sim.spline_params)
+        np.save(args.save_spline, best)
+        print(f"saved spline (best-loss iterate) -> {args.save_spline}")
 
 
 if __name__ == "__main__":

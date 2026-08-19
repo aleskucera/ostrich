@@ -1,0 +1,904 @@
+{
+ "rows": [
+  {
+   "scenario": "step16",
+   "cleared": true,
+   "time_to_clear_s": 5.065,
+   "max_pitch_deg": 12.880797084459719,
+   "climbed_top": true,
+   "x_final": 9.688283351584188,
+   "wall_clock_s": 0.1707957170001464,
+   "engine": "chrono",
+   "config": "defaults",
+   "job": "step16_r0"
+  },
+  {
+   "scenario": "turn_radius",
+   "pair": [
+    1.0,
+    3.0
+   ],
+   "alpha": 1.0456152335970184,
+   "radius_m": 0.7549507057689816,
+   "wz_deg_s": 52.54433626430564,
+   "engine": "chrono",
+   "config": "defaults",
+   "job": "turn0_r0"
+  },
+  {
+   "scenario": "turn_radius",
+   "pair": [
+    1.5,
+    3.5
+   ],
+   "alpha": 1.0653551540815274,
+   "radius_m": 0.9589560608100595,
+   "wz_deg_s": 51.57074448526843,
+   "engine": "chrono",
+   "config": "defaults",
+   "job": "turn1_r0"
+  },
+  {
+   "scenario": "turn_radius",
+   "pair": [
+    2.0,
+    4.0
+   ],
+   "alpha": 1.0709586170484384,
+   "radius_m": 1.1586835894045637,
+   "wz_deg_s": 51.30091635904666,
+   "engine": "chrono",
+   "config": "defaults",
+   "job": "turn2_r0"
+  },
+  {
+   "scenario": "turn_radius",
+   "pair": [
+    0.5,
+    3.5
+   ],
+   "alpha": 1.046939497802826,
+   "radius_m": 0.4963148579310023,
+   "wz_deg_s": 78.7168101201243,
+   "engine": "chrono",
+   "config": "defaults",
+   "job": "turn3_r0"
+  },
+  {
+   "scenario": "rock_field",
+   "success": true,
+   "x_final": 9.681542341887122,
+   "lateral_rms": 0.02099199071968618,
+   "wall_clock_s": 0.37185469901305623,
+   "stable": true,
+   "engine": "chrono",
+   "config": "defaults",
+   "job": "rocks_r0"
+  },
+  {
+   "scenario": "step16",
+   "cleared": true,
+   "time_to_clear_s": 5.065,
+   "max_pitch_deg": 12.880797084459719,
+   "climbed_top": true,
+   "x_final": 9.688283351584188,
+   "wall_clock_s": 0.21563424299529288,
+   "engine": "chrono",
+   "config": "defaults",
+   "job": "step16_r1"
+  },
+  {
+   "scenario": "turn_radius",
+   "pair": [
+    1.0,
+    3.0
+   ],
+   "alpha": 1.0456152335970184,
+   "radius_m": 0.7549507057689816,
+   "wz_deg_s": 52.54433626430564,
+   "engine": "chrono",
+   "config": "defaults",
+   "job": "turn0_r1"
+  },
+  {
+   "scenario": "turn_radius",
+   "pair": [
+    1.5,
+    3.5
+   ],
+   "alpha": 1.0653551540815274,
+   "radius_m": 0.9589560608100595,
+   "wz_deg_s": 51.57074448526843,
+   "engine": "chrono",
+   "config": "defaults",
+   "job": "turn1_r1"
+  },
+  {
+   "scenario": "turn_radius",
+   "pair": [
+    2.0,
+    4.0
+   ],
+   "alpha": 1.0709586170484384,
+   "radius_m": 1.1586835894045637,
+   "wz_deg_s": 51.30091635904666,
+   "engine": "chrono",
+   "config": "defaults",
+   "job": "turn2_r1"
+  },
+  {
+   "scenario": "turn_radius",
+   "pair": [
+    0.5,
+    3.5
+   ],
+   "alpha": 1.046939497802826,
+   "radius_m": 0.4963148579310023,
+   "wz_deg_s": 78.7168101201243,
+   "engine": "chrono",
+   "config": "defaults",
+   "job": "turn3_r1"
+  },
+  {
+   "scenario": "rock_field",
+   "success": true,
+   "x_final": 9.681542341887122,
+   "lateral_rms": 0.02099199071968618,
+   "wall_clock_s": 0.3905654440022772,
+   "stable": true,
+   "engine": "chrono",
+   "config": "defaults",
+   "job": "rocks_r1"
+  },
+  {
+   "scenario": "step16",
+   "cleared": true,
+   "time_to_clear_s": 4.985,
+   "max_pitch_deg": 13.174701519845712,
+   "climbed_top": true,
+   "x_final": 9.776080623515107,
+   "wall_clock_s": 0.8153631570021389,
+   "engine": "chrono",
+   "config": "best",
+   "job": "step16_r0"
+  },
+  {
+   "scenario": "turn_radius",
+   "pair": [
+    1.0,
+    3.0
+   ],
+   "alpha": 1.0894085795443675,
+   "radius_m": 0.7861409373741113,
+   "wz_deg_s": 50.43209633999828,
+   "engine": "chrono",
+   "config": "best",
+   "job": "turn0_r0"
+  },
+  {
+   "scenario": "turn_radius",
+   "pair": [
+    1.5,
+    3.5
+   ],
+   "alpha": 1.135691973658114,
+   "radius_m": 1.0285394540406219,
+   "wz_deg_s": 48.37681317781469,
+   "engine": "chrono",
+   "config": "best",
+   "job": "turn1_r0"
+  },
+  {
+   "scenario": "turn_radius",
+   "pair": [
+    2.0,
+    4.0
+   ],
+   "alpha": 1.1888112594851747,
+   "radius_m": 1.2994894439274092,
+   "wz_deg_s": 46.21520699677338,
+   "engine": "chrono",
+   "config": "best",
+   "job": "turn2_r0"
+  },
+  {
+   "scenario": "turn_radius",
+   "pair": [
+    0.5,
+    3.5
+   ],
+   "alpha": 1.0844341122290908,
+   "radius_m": 0.515413129457572,
+   "wz_deg_s": 75.99515427120161,
+   "engine": "chrono",
+   "config": "best",
+   "job": "turn3_r0"
+  },
+  {
+   "scenario": "rock_field",
+   "success": true,
+   "x_final": 9.645235349233223,
+   "lateral_rms": 0.0032962889920285965,
+   "wall_clock_s": 2.4624457099998835,
+   "stable": true,
+   "engine": "chrono",
+   "config": "best",
+   "job": "rocks_r0"
+  },
+  {
+   "scenario": "step16",
+   "cleared": true,
+   "time_to_clear_s": 4.985,
+   "max_pitch_deg": 13.174701519845712,
+   "climbed_top": true,
+   "x_final": 9.776080623515107,
+   "wall_clock_s": 0.8366742560028797,
+   "engine": "chrono",
+   "config": "best",
+   "job": "step16_r1"
+  },
+  {
+   "scenario": "turn_radius",
+   "pair": [
+    1.0,
+    3.0
+   ],
+   "alpha": 1.0894085795443675,
+   "radius_m": 0.7861409373741113,
+   "wz_deg_s": 50.43209633999828,
+   "engine": "chrono",
+   "config": "best",
+   "job": "turn0_r1"
+  },
+  {
+   "scenario": "turn_radius",
+   "pair": [
+    1.5,
+    3.5
+   ],
+   "alpha": 1.135691973658114,
+   "radius_m": 1.0285394540406219,
+   "wz_deg_s": 48.37681317781469,
+   "engine": "chrono",
+   "config": "best",
+   "job": "turn1_r1"
+  },
+  {
+   "scenario": "turn_radius",
+   "pair": [
+    2.0,
+    4.0
+   ],
+   "alpha": 1.1888112594851747,
+   "radius_m": 1.2994894439274092,
+   "wz_deg_s": 46.21520699677338,
+   "engine": "chrono",
+   "config": "best",
+   "job": "turn2_r1"
+  },
+  {
+   "scenario": "turn_radius",
+   "pair": [
+    0.5,
+    3.5
+   ],
+   "alpha": 1.0844341122290908,
+   "radius_m": 0.515413129457572,
+   "wz_deg_s": 75.99515427120161,
+   "engine": "chrono",
+   "config": "best",
+   "job": "turn3_r1"
+  },
+  {
+   "scenario": "rock_field",
+   "success": true,
+   "x_final": 9.645235349233223,
+   "lateral_rms": 0.0032962889920285965,
+   "wall_clock_s": 2.687023639999097,
+   "stable": true,
+   "engine": "chrono",
+   "config": "best",
+   "job": "rocks_r1"
+  },
+  {
+   "scenario": "step16",
+   "cleared": true,
+   "time_to_clear_s": 5.75,
+   "max_pitch_deg": 13.57634313775626,
+   "climbed_top": true,
+   "x_final": 8.9540485527098,
+   "wall_clock_s": 0.1551953849993879,
+   "engine": "agx",
+   "config": "defaults",
+   "job": "step16_r0"
+  },
+  {
+   "scenario": "turn_radius",
+   "pair": [
+    1.0,
+    3.0
+   ],
+   "alpha": 4.450378687888225,
+   "radius_m": 3.228643824656818,
+   "wz_deg_s": 12.345277175339133,
+   "engine": "agx",
+   "config": "defaults",
+   "job": "turn0_r0"
+  },
+  {
+   "scenario": "turn_radius",
+   "pair": [
+    1.5,
+    3.5
+   ],
+   "alpha": 4.481669463179371,
+   "radius_m": 4.066809931936979,
+   "wz_deg_s": 12.259083113689972,
+   "engine": "agx",
+   "config": "defaults",
+   "job": "turn1_r0"
+  },
+  {
+   "scenario": "turn_radius",
+   "pair": [
+    2.0,
+    4.0
+   ],
+   "alpha": 4.511746209117379,
+   "radius_m": 4.915810838194089,
+   "wz_deg_s": 12.17736013745113,
+   "engine": "agx",
+   "config": "defaults",
+   "job": "turn2_r0"
+  },
+  {
+   "scenario": "turn_radius",
+   "pair": [
+    0.5,
+    3.5
+   ],
+   "alpha": 3.9407264938849242,
+   "radius_m": 1.9168019869571755,
+   "wz_deg_s": 20.912828582162923,
+   "engine": "agx",
+   "config": "defaults",
+   "job": "turn3_r0"
+  },
+  {
+   "scenario": "rock_field",
+   "success": true,
+   "x_final": 6.994392178313101,
+   "lateral_rms": 0.017929509918506923,
+   "wall_clock_s": 0.287152844000957,
+   "stable": true,
+   "engine": "agx",
+   "config": "defaults",
+   "job": "rocks_r0"
+  },
+  {
+   "scenario": "step16",
+   "cleared": true,
+   "time_to_clear_s": 5.75,
+   "max_pitch_deg": 13.57634313775626,
+   "climbed_top": true,
+   "x_final": 8.9540485527098,
+   "wall_clock_s": 0.1533088440046413,
+   "engine": "agx",
+   "config": "defaults",
+   "job": "step16_r1"
+  },
+  {
+   "scenario": "turn_radius",
+   "pair": [
+    1.0,
+    3.0
+   ],
+   "alpha": 4.450378687888225,
+   "radius_m": 3.228643824656818,
+   "wz_deg_s": 12.345277175339133,
+   "engine": "agx",
+   "config": "defaults",
+   "job": "turn0_r1"
+  },
+  {
+   "scenario": "turn_radius",
+   "pair": [
+    1.5,
+    3.5
+   ],
+   "alpha": 4.481669463179371,
+   "radius_m": 4.066809931936979,
+   "wz_deg_s": 12.259083113689972,
+   "engine": "agx",
+   "config": "defaults",
+   "job": "turn1_r1"
+  },
+  {
+   "scenario": "turn_radius",
+   "pair": [
+    2.0,
+    4.0
+   ],
+   "alpha": 4.511746209117379,
+   "radius_m": 4.915810838194089,
+   "wz_deg_s": 12.17736013745113,
+   "engine": "agx",
+   "config": "defaults",
+   "job": "turn2_r1"
+  },
+  {
+   "scenario": "turn_radius",
+   "pair": [
+    0.5,
+    3.5
+   ],
+   "alpha": 3.9407264938849242,
+   "radius_m": 1.9168019869571755,
+   "wz_deg_s": 20.912828582162923,
+   "engine": "agx",
+   "config": "defaults",
+   "job": "turn3_r1"
+  },
+  {
+   "scenario": "rock_field",
+   "success": true,
+   "x_final": 6.994392178313101,
+   "lateral_rms": 0.017929509918506923,
+   "wall_clock_s": 0.2679344690113794,
+   "stable": true,
+   "engine": "agx",
+   "config": "defaults",
+   "job": "rocks_r1"
+  },
+  {
+   "scenario": "step16",
+   "cleared": true,
+   "time_to_clear_s": 6.09,
+   "max_pitch_deg": 13.508203235035872,
+   "climbed_top": true,
+   "x_final": 8.589884305134216,
+   "wall_clock_s": 0.15773771399108227,
+   "engine": "agx",
+   "config": "best",
+   "job": "step16_r0"
+  },
+  {
+   "scenario": "turn_radius",
+   "pair": [
+    1.0,
+    3.0
+   ],
+   "alpha": 4.360092145170736,
+   "radius_m": 3.1704780059037754,
+   "wz_deg_s": 12.600916817332722,
+   "engine": "agx",
+   "config": "best",
+   "job": "turn0_r0"
+  },
+  {
+   "scenario": "turn_radius",
+   "pair": [
+    1.5,
+    3.5
+   ],
+   "alpha": 4.376171528322191,
+   "radius_m": 3.9781439805344907,
+   "wz_deg_s": 12.55461722229761,
+   "engine": "agx",
+   "config": "best",
+   "job": "turn1_r0"
+  },
+  {
+   "scenario": "turn_radius",
+   "pair": [
+    2.0,
+    4.0
+   ],
+   "alpha": 4.381358786938921,
+   "radius_m": 4.780824286669044,
+   "wz_deg_s": 12.539753329717012,
+   "engine": "agx",
+   "config": "best",
+   "job": "turn2_r0"
+  },
+  {
+   "scenario": "turn_radius",
+   "pair": [
+    0.5,
+    3.5
+   ],
+   "alpha": 2.9094057827688964,
+   "radius_m": 1.4002918553281811,
+   "wz_deg_s": 28.325968877868817,
+   "engine": "agx",
+   "config": "best",
+   "job": "turn3_r0"
+  },
+  {
+   "scenario": "rock_field",
+   "success": true,
+   "x_final": 6.749403782601586,
+   "lateral_rms": 0.010647826624558638,
+   "wall_clock_s": 0.2677475580130704,
+   "stable": true,
+   "engine": "agx",
+   "config": "best",
+   "job": "rocks_r0"
+  },
+  {
+   "scenario": "step16",
+   "cleared": true,
+   "time_to_clear_s": 6.09,
+   "max_pitch_deg": 13.508203235035872,
+   "climbed_top": true,
+   "x_final": 8.589884305134216,
+   "wall_clock_s": 0.1574838779924903,
+   "engine": "agx",
+   "config": "best",
+   "job": "step16_r1"
+  },
+  {
+   "scenario": "turn_radius",
+   "pair": [
+    1.0,
+    3.0
+   ],
+   "alpha": 4.360092145170736,
+   "radius_m": 3.1704780059037754,
+   "wz_deg_s": 12.600916817332722,
+   "engine": "agx",
+   "config": "best",
+   "job": "turn0_r1"
+  },
+  {
+   "scenario": "turn_radius",
+   "pair": [
+    1.5,
+    3.5
+   ],
+   "alpha": 4.376171528322191,
+   "radius_m": 3.9781439805344907,
+   "wz_deg_s": 12.55461722229761,
+   "engine": "agx",
+   "config": "best",
+   "job": "turn1_r1"
+  },
+  {
+   "scenario": "turn_radius",
+   "pair": [
+    2.0,
+    4.0
+   ],
+   "alpha": 4.381358786938921,
+   "radius_m": 4.780824286669044,
+   "wz_deg_s": 12.539753329717012,
+   "engine": "agx",
+   "config": "best",
+   "job": "turn2_r1"
+  },
+  {
+   "scenario": "turn_radius",
+   "pair": [
+    0.5,
+    3.5
+   ],
+   "alpha": 2.9094057827688964,
+   "radius_m": 1.4002918553281811,
+   "wz_deg_s": 28.325968877868817,
+   "engine": "agx",
+   "config": "best",
+   "job": "turn3_r1"
+  },
+  {
+   "scenario": "rock_field",
+   "success": true,
+   "x_final": 6.749403782601586,
+   "lateral_rms": 0.010647826624558638,
+   "wall_clock_s": 0.2680417649971787,
+   "stable": true,
+   "engine": "agx",
+   "config": "best",
+   "job": "rocks_r1"
+  },
+  {
+   "scenario": "step16",
+   "cleared": true,
+   "time_to_clear_s": 4.9,
+   "max_pitch_deg": 12.604694918244087,
+   "climbed_top": true,
+   "x_final": 9.816206932067871,
+   "wall_clock_s": 2.999450925999554,
+   "engine": "ostrich",
+   "config": "defaults",
+   "job": "step16_r0"
+  },
+  {
+   "scenario": "turn_radius",
+   "pair": [
+    1.0,
+    3.0
+   ],
+   "alpha": 14.235156610501042,
+   "radius_m": 10.361596804148144,
+   "wz_deg_s": 3.859540147009906,
+   "engine": "ostrich",
+   "config": "defaults",
+   "job": "turn0_r0"
+  },
+  {
+   "scenario": "turn_radius",
+   "pair": [
+    1.5,
+    3.5
+   ],
+   "alpha": 13.079363490103686,
+   "radius_m": 11.88576997532399,
+   "wz_deg_s": 4.2005987889833225,
+   "engine": "ostrich",
+   "config": "defaults",
+   "job": "turn1_r0"
+  },
+  {
+   "scenario": "turn_radius",
+   "pair": [
+    2.0,
+    4.0
+   ],
+   "alpha": 7.7131062976271805,
+   "radius_m": 8.377522524086384,
+   "wz_deg_s": 7.123091050113498,
+   "engine": "ostrich",
+   "config": "defaults",
+   "job": "turn2_r0"
+  },
+  {
+   "scenario": "turn_radius",
+   "pair": [
+    0.5,
+    3.5
+   ],
+   "alpha": 6.510461219656497,
+   "radius_m": 3.110178518537478,
+   "wz_deg_s": 12.658356278505183,
+   "engine": "ostrich",
+   "config": "defaults",
+   "job": "turn3_r0"
+  },
+  {
+   "scenario": "rock_field",
+   "success": false,
+   "x_final": 1.6872855424880981,
+   "lateral_rms": 0.7319109982935179,
+   "wall_clock_s": 3.59009415001492,
+   "stable": true,
+   "engine": "ostrich",
+   "config": "defaults",
+   "job": "rocks_r0"
+  },
+  {
+   "scenario": "step16",
+   "cleared": true,
+   "time_to_clear_s": 4.9,
+   "max_pitch_deg": 12.519752922863844,
+   "climbed_top": true,
+   "x_final": 9.814946174621582,
+   "wall_clock_s": 2.9708952679939102,
+   "engine": "ostrich",
+   "config": "defaults",
+   "job": "step16_r1"
+  },
+  {
+   "scenario": "turn_radius",
+   "pair": [
+    1.0,
+    3.0
+   ],
+   "alpha": 14.243911494232648,
+   "radius_m": 10.3687487183694,
+   "wz_deg_s": 3.857167917636098,
+   "engine": "ostrich",
+   "config": "defaults",
+   "job": "turn0_r1"
+  },
+  {
+   "scenario": "turn_radius",
+   "pair": [
+    1.5,
+    3.5
+   ],
+   "alpha": 13.742948221737521,
+   "radius_m": 12.49490708501662,
+   "wz_deg_s": 3.9977708968080514,
+   "engine": "ostrich",
+   "config": "defaults",
+   "job": "turn1_r1"
+  },
+  {
+   "scenario": "turn_radius",
+   "pair": [
+    2.0,
+    4.0
+   ],
+   "alpha": 7.935042590760104,
+   "radius_m": 8.612842284580548,
+   "wz_deg_s": 6.923864340838953,
+   "engine": "ostrich",
+   "config": "defaults",
+   "job": "turn2_r1"
+  },
+  {
+   "scenario": "turn_radius",
+   "pair": [
+    0.5,
+    3.5
+   ],
+   "alpha": 6.829967591670722,
+   "radius_m": 3.2756590876355176,
+   "wz_deg_s": 12.066197467218737,
+   "engine": "ostrich",
+   "config": "defaults",
+   "job": "turn3_r1"
+  },
+  {
+   "scenario": "rock_field",
+   "success": false,
+   "x_final": 2.2744081020355225,
+   "lateral_rms": 0.004270061032652727,
+   "wall_clock_s": 3.535173027019482,
+   "stable": true,
+   "engine": "ostrich",
+   "config": "defaults",
+   "job": "rocks_r1"
+  },
+  {
+   "scenario": "step16",
+   "cleared": true,
+   "time_to_clear_s": 4.96,
+   "max_pitch_deg": 12.358666890529175,
+   "climbed_top": true,
+   "x_final": 9.790369033813477,
+   "wall_clock_s": 5.468392132985173,
+   "engine": "ostrich",
+   "config": "best",
+   "job": "step16_r0"
+  },
+  {
+   "scenario": "turn_radius",
+   "pair": [
+    1.0,
+    3.0
+   ],
+   "alpha": 4.807089982001947,
+   "radius_m": 3.517290053192736,
+   "wz_deg_s": 11.429192847004206,
+   "engine": "ostrich",
+   "config": "best",
+   "job": "turn0_r0"
+  },
+  {
+   "scenario": "turn_radius",
+   "pair": [
+    1.5,
+    3.5
+   ],
+   "alpha": 4.639657229356226,
+   "radius_m": 4.240875258959133,
+   "wz_deg_s": 11.841641681970883,
+   "engine": "ostrich",
+   "config": "best",
+   "job": "turn1_r0"
+  },
+  {
+   "scenario": "turn_radius",
+   "pair": [
+    2.0,
+    4.0
+   ],
+   "alpha": 4.17556483899251,
+   "radius_m": 4.579037256675971,
+   "wz_deg_s": 13.157778781004048,
+   "engine": "ostrich",
+   "config": "best",
+   "job": "turn2_r0"
+  },
+  {
+   "scenario": "turn_radius",
+   "pair": [
+    0.5,
+    3.5
+   ],
+   "alpha": 3.6720525601875167,
+   "radius_m": 1.7922654342459867,
+   "wz_deg_s": 22.44296243177818,
+   "engine": "ostrich",
+   "config": "best",
+   "job": "turn3_r0"
+  },
+  {
+   "scenario": "rock_field",
+   "success": false,
+   "x_final": 1.8413680791854858,
+   "lateral_rms": 8.390432331953311e-05,
+   "wall_clock_s": 7.834484785998939,
+   "stable": true,
+   "engine": "ostrich",
+   "config": "best",
+   "job": "rocks_r0"
+  },
+  {
+   "scenario": "step16",
+   "cleared": true,
+   "time_to_clear_s": 4.96,
+   "max_pitch_deg": 12.35899678943221,
+   "climbed_top": true,
+   "x_final": 9.789495468139648,
+   "wall_clock_s": 5.63638006200199,
+   "engine": "ostrich",
+   "config": "best",
+   "job": "step16_r1"
+  },
+  {
+   "scenario": "turn_radius",
+   "pair": [
+    1.0,
+    3.0
+   ],
+   "alpha": 4.798554551874516,
+   "radius_m": 3.5112350928906757,
+   "wz_deg_s": 11.449522526682522,
+   "engine": "ostrich",
+   "config": "best",
+   "job": "turn0_r1"
+  },
+  {
+   "scenario": "turn_radius",
+   "pair": [
+    1.5,
+    3.5
+   ],
+   "alpha": 4.592654097459946,
+   "radius_m": 4.19738942304398,
+   "wz_deg_s": 11.962833967310637,
+   "engine": "ostrich",
+   "config": "best",
+   "job": "turn1_r1"
+  },
+  {
+   "scenario": "turn_radius",
+   "pair": [
+    2.0,
+    4.0
+   ],
+   "alpha": 4.30966745520555,
+   "radius_m": 4.7260265648192465,
+   "wz_deg_s": 12.748352165975135,
+   "engine": "ostrich",
+   "config": "best",
+   "job": "turn2_r1"
+  },
+  {
+   "scenario": "turn_radius",
+   "pair": [
+    0.5,
+    3.5
+   ],
+   "alpha": 3.6718295887089005,
+   "radius_m": 1.792651305955197,
+   "wz_deg_s": 22.444325278391034,
+   "engine": "ostrich",
+   "config": "best",
+   "job": "turn3_r1"
+  },
+  {
+   "scenario": "rock_field",
+   "success": false,
+   "x_final": 1.8723382949829102,
+   "lateral_rms": 0.0002771744919548311,
+   "wall_clock_s": 6.925187448010547,
+   "stable": true,
+   "engine": "ostrich",
+   "config": "best",
+   "job": "rocks_r1"
+  }
+ ]
+}

@@ -1,0 +1,307 @@
+{
+ "window_s": 3.0,
+ "rows": [
+  {
+   "label": "ostrich defaults",
+   "kind": "ostrich",
+   "params": {
+    "dt": 0.05
+   },
+   "gt_mean": 0.4848821836158632,
+   "holdout": 0.4258818217115173,
+   "per_bag": {
+    "fast_experiment0": {
+     "combined_mean": 0.3874194064942889,
+     "yaw_rmse_deg_mean": 15.195727837675792,
+     "stable": true
+    },
+    "fast_experiment1": {
+     "combined_mean": 0.3804035484867784,
+     "yaw_rmse_deg_mean": 16.037630634162223,
+     "stable": true
+    },
+    "calibrate": {
+     "combined_mean": 0.6868235958665223,
+     "yaw_rmse_deg_mean": 28.20940544965844,
+     "stable": true
+    },
+    "motors0": {
+     "combined_mean": 0.4258818217115173,
+     "yaw_rmse_deg_mean": 16.876361557309572,
+     "stable": true
+    }
+   }
+  },
+  {
+   "label": "ostrich tuned",
+   "kind": "ostrich",
+   "params": {
+    "mu_front": 1.0,
+    "mu_rear": 0.3,
+    "compliance_contact": 1e-05,
+    "mu_rolling": 0.3,
+    "dt": 0.02
+   },
+   "gt_mean": 0.4323585567453754,
+   "holdout": 0.3492532563215129,
+   "per_bag": {
+    "fast_experiment0": {
+     "combined_mean": 0.31635053060000057,
+     "yaw_rmse_deg_mean": 11.725384988728218,
+     "stable": true
+    },
+    "fast_experiment1": {
+     "combined_mean": 0.3407465035694711,
+     "yaw_rmse_deg_mean": 13.186003015736954,
+     "stable": true
+    },
+    "calibrate": {
+     "combined_mean": 0.6399786360666545,
+     "yaw_rmse_deg_mean": 24.73688416000542,
+     "stable": true
+    },
+    "motors0": {
+     "combined_mean": 0.3492532563215129,
+     "yaw_rmse_deg_mean": 12.768006855361666,
+     "stable": true
+    }
+   }
+  },
+  {
+   "label": "ostrich anisotropic",
+   "kind": "ostrich",
+   "params": {
+    "mu_front": 0.1,
+    "mu_rear": 0.05,
+    "mu_long_front": 1.6,
+    "mu_long_rear": 0.6,
+    "mu_rolling": 0.3,
+    "dt": 0.05
+   },
+   "gt_mean": 0.26064228334368594,
+   "holdout": 0.27194629665399866,
+   "per_bag": {
+    "fast_experiment0": {
+     "combined_mean": 0.25915102874158574,
+     "yaw_rmse_deg_mean": 7.595864006225135,
+     "stable": true
+    },
+    "fast_experiment1": {
+     "combined_mean": 0.23118689240491472,
+     "yaw_rmse_deg_mean": 9.53111852701741,
+     "stable": true
+    },
+    "calibrate": {
+     "combined_mean": 0.2915889288845574,
+     "yaw_rmse_deg_mean": 9.401818906555434,
+     "stable": true
+    },
+    "motors0": {
+     "combined_mean": 0.27194629665399866,
+     "yaw_rmse_deg_mean": 8.36622909507302,
+     "stable": true
+    }
+   }
+  },
+  {
+   "label": "agx defaults",
+   "kind": "agx",
+   "params": {
+    "dt": 0.01
+   },
+   "gt_mean": 0.3861357212378988,
+   "holdout": 0.33408425484380516,
+   "per_bag": {
+    "fast_experiment0": {
+     "combined_mean": 0.3188911231094049,
+     "yaw_rmse_deg_mean": 10.621762532084452,
+     "stable": true
+    },
+    "fast_experiment1": {
+     "combined_mean": 0.29061526182166597,
+     "yaw_rmse_deg_mean": 10.836565945606585,
+     "stable": true
+    },
+    "calibrate": {
+     "combined_mean": 0.5489007787826253,
+     "yaw_rmse_deg_mean": 20.280131753067028,
+     "stable": true
+    },
+    "motors0": {
+     "combined_mean": 0.33408425484380516,
+     "yaw_rmse_deg_mean": 11.376844320689102,
+     "stable": true
+    }
+   }
+  },
+  {
+   "label": "agx tuned",
+   "kind": "agx",
+   "params": {
+    "mu_front": 0.7,
+    "mu_rear": 0.2,
+    "dt": 0.01
+   },
+   "gt_mean": 0.33278190316686396,
+   "holdout": 0.2630557779692561,
+   "per_bag": {
+    "fast_experiment0": {
+     "combined_mean": 0.2566861923317406,
+     "yaw_rmse_deg_mean": 8.182519579263964,
+     "stable": true
+    },
+    "fast_experiment1": {
+     "combined_mean": 0.2843521664271678,
+     "yaw_rmse_deg_mean": 10.345477755983866,
+     "stable": true
+    },
+    "calibrate": {
+     "combined_mean": 0.4573073507416834,
+     "yaw_rmse_deg_mean": 16.194371483066476,
+     "stable": true
+    },
+    "motors0": {
+     "combined_mean": 0.2630557779692561,
+     "yaw_rmse_deg_mean": 8.236071760987826,
+     "stable": true
+    }
+   }
+  },
+  {
+   "label": "agx anisotropic",
+   "kind": "agx",
+   "params": {
+    "mu_front": 0.7,
+    "mu_rear": 0.4,
+    "mu_lat_front": 0.3,
+    "mu_lat_rear": 0.1,
+    "oriented_friction": true,
+    "dt": 0.01
+   },
+   "gt_mean": 0.37564866961958693,
+   "holdout": 0.24755775883152192,
+   "per_bag": {
+    "fast_experiment0": {
+     "combined_mean": 0.29770480805110144,
+     "yaw_rmse_deg_mean": 11.989476853955694,
+     "stable": true
+    },
+    "fast_experiment1": {
+     "combined_mean": 0.22050331341901466,
+     "yaw_rmse_deg_mean": 8.276379519005445,
+     "stable": true
+    },
+    "calibrate": {
+     "combined_mean": 0.6087378873886448,
+     "yaw_rmse_deg_mean": 25.949441804410725,
+     "stable": true
+    },
+    "motors0": {
+     "combined_mean": 0.24755775883152192,
+     "yaw_rmse_deg_mean": 10.164070002911808,
+     "stable": true
+    }
+   }
+  },
+  {
+   "label": "chrono defaults",
+   "kind": "chrono",
+   "params": {
+    "dt": 0.005
+   },
+   "gt_mean": 0.4581897444185568,
+   "holdout": 0.5404242071464259,
+   "per_bag": {
+    "fast_experiment0": {
+     "combined_mean": 0.466072313633126,
+     "yaw_rmse_deg_mean": 22.896724999875346,
+     "stable": true
+    },
+    "fast_experiment1": {
+     "combined_mean": 0.3344075911437818,
+     "yaw_rmse_deg_mean": 22.59058937920357,
+     "stable": true
+    },
+    "calibrate": {
+     "combined_mean": 0.5740893284787627,
+     "yaw_rmse_deg_mean": 24.633736350937966,
+     "stable": false
+    },
+    "motors0": {
+     "combined_mean": 0.5404242071464259,
+     "yaw_rmse_deg_mean": 28.28612926190274,
+     "stable": true
+    }
+   }
+  },
+  {
+   "label": "chrono tuned",
+   "kind": "chrono",
+   "params": {
+    "mu_front": 1.0,
+    "mu_rear": 0.7,
+    "solver": "psor",
+    "iterations": 500,
+    "rolling_resistance": 0.09,
+    "dt": 0.005
+   },
+   "gt_mean": 0.4055919511738779,
+   "holdout": 0.4931340323359256,
+   "per_bag": {
+    "fast_experiment0": {
+     "combined_mean": 0.4203539147305693,
+     "yaw_rmse_deg_mean": 20.804316654254055,
+     "stable": true
+    },
+    "fast_experiment1": {
+     "combined_mean": 0.3127804231310731,
+     "yaw_rmse_deg_mean": 21.270655214362982,
+     "stable": true
+    },
+    "calibrate": {
+     "combined_mean": 0.4836415156599913,
+     "yaw_rmse_deg_mean": 20.592246674593518,
+     "stable": true
+    },
+    "motors0": {
+     "combined_mean": 0.4931340323359256,
+     "yaw_rmse_deg_mean": 26.101362635812865,
+     "stable": true
+    }
+   }
+  },
+  {
+   "label": "chrono SCM (phi=20)",
+   "kind": "chrono_scm",
+   "params": {
+    "terrain": "scm",
+    "scm_phi": 20.0,
+    "dt": 0.002
+   },
+   "gt_mean": 0.30155674828840245,
+   "holdout": 0.27242648996261026,
+   "per_bag": {
+    "fast_experiment0": {
+     "combined_mean": 0.25346491780553904,
+     "yaw_rmse_deg_mean": 9.845702293321564,
+     "stable": true
+    },
+    "fast_experiment1": {
+     "combined_mean": 0.2434297791436084,
+     "yaw_rmse_deg_mean": 10.433876687391352,
+     "stable": true
+    },
+    "calibrate": {
+     "combined_mean": 0.4077755479160598,
+     "yaw_rmse_deg_mean": 15.95613777505855,
+     "stable": true
+    },
+    "motors0": {
+     "combined_mean": 0.27242648996261026,
+     "yaw_rmse_deg_mean": 10.731077261309094,
+     "stable": true
+    }
+   }
+  }
+ ]
+}

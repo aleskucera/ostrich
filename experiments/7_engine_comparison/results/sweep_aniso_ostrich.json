@@ -1,0 +1,231 @@
+{
+ "engine": "ostrich",
+ "grid": [
+  {
+   "params": {
+    "mu_front": 0.1,
+    "mu_rear": 0.05,
+    "mu_long_front": 1.6,
+    "mu_long_rear": 0.6,
+    "mu_rolling": 0.3,
+    "ground_mu": 0.2
+   },
+   "error": 3.225007453740505,
+   "stable": true,
+   "alphas": [
+    2.8432044976314086,
+    2.8382266276816863,
+    2.8191462576397766,
+    2.5091854771152704
+   ],
+   "per_bag": {
+    "fast_experiment0": {
+     "combined_mean": 1.7613274164063333,
+     "yaw_rmse_deg_mean": 23.453668968945195
+    },
+    "fast_experiment1": {
+     "combined_mean": 1.914931164805602,
+     "yaw_rmse_deg_mean": 24.109923284485337
+    },
+    "calibrate": {
+     "combined_mean": 5.998763780009579,
+     "yaw_rmse_deg_mean": 58.59546317453182
+    }
+   }
+  },
+  {
+   "params": {
+    "mu_front": 0.1,
+    "mu_rear": 0.2,
+    "mu_long_front": 1.6,
+    "mu_long_rear": 0.6,
+    "mu_rolling": 0.3,
+    "ground_mu": 0.2
+   },
+   "error": 3.4390163630681143,
+   "stable": true,
+   "alphas": [
+    2.876855515371652,
+    2.8654226060930204,
+    2.884154947037997,
+    2.508949023674276
+   ],
+   "per_bag": {
+    "fast_experiment0": {
+     "combined_mean": 1.9407251918701534,
+     "yaw_rmse_deg_mean": 25.778454769816417
+    },
+    "fast_experiment1": {
+     "combined_mean": 2.1584773145890024,
+     "yaw_rmse_deg_mean": 26.681748233065242
+    },
+    "calibrate": {
+     "combined_mean": 6.217846582745188,
+     "yaw_rmse_deg_mean": 61.287467112160904
+    }
+   }
+  },
+  {
+   "params": {
+    "mu_front": 0.2,
+    "mu_rear": 0.05,
+    "mu_long_front": 1.6,
+    "mu_long_rear": 0.6,
+    "mu_rolling": 0.3,
+    "ground_mu": 0.2
+   },
+   "error": 3.76104656571446,
+   "stable": true,
+   "alphas": [
+    3.400609758412868,
+    3.447341724054089,
+    3.2383873726370953,
+    2.898091102475146
+   ],
+   "per_bag": {
+    "fast_experiment0": {
+     "combined_mean": 2.0451414486568935,
+     "yaw_rmse_deg_mean": 26.80125315895804
+    },
+    "fast_experiment1": {
+     "combined_mean": 2.383597442856155,
+     "yaw_rmse_deg_mean": 28.36386781286177
+    },
+    "calibrate": {
+     "combined_mean": 6.854400805630331,
+     "yaw_rmse_deg_mean": 69.28090844651923
+    }
+   }
+  },
+  {
+   "params": {
+    "mu_front": 0.2,
+    "mu_rear": 0.2,
+    "mu_long_front": 1.6,
+    "mu_long_rear": 0.6,
+    "mu_rolling": 0.3,
+    "ground_mu": 0.2
+   },
+   "error": 3.9804248739155725,
+   "stable": true,
+   "alphas": [
+    3.6984353211505523,
+    3.5585128270458792,
+    3.5242669639196187,
+    2.924462774169171
+   ],
+   "per_bag": {
+    "fast_experiment0": {
+     "combined_mean": 2.1961249782820076,
+     "yaw_rmse_deg_mean": 28.600226495983907
+    },
+    "fast_experiment1": {
+     "combined_mean": 2.6537915209800307,
+     "yaw_rmse_deg_mean": 31.739412156190795
+    },
+    "calibrate": {
+     "combined_mean": 7.09135812248468,
+     "yaw_rmse_deg_mean": 74.15721562382194
+    }
+   }
+  },
+  {
+   "params": {
+    "mu_front": 0.4,
+    "mu_rear": 0.05,
+    "mu_long_front": 1.6,
+    "mu_long_rear": 0.6,
+    "mu_rolling": 0.3,
+    "ground_mu": 0.2
+   },
+   "error": 4.141149727801027,
+   "stable": true,
+   "alphas": [
+    3.896047204271247,
+    3.725984817396254,
+    3.6968958472270455,
+    3.48501542483963
+   ],
+   "per_bag": {
+    "fast_experiment0": {
+     "combined_mean": 2.308959587789426,
+     "yaw_rmse_deg_mean": 29.275058875375553
+    },
+    "fast_experiment1": {
+     "combined_mean": 2.9113075492113154,
+     "yaw_rmse_deg_mean": 34.0554643038758
+    },
+    "calibrate": {
+     "combined_mean": 7.20318204640234,
+     "yaw_rmse_deg_mean": 79.53952533070839
+    }
+   }
+  },
+  {
+   "params": {
+    "mu_front": 0.4,
+    "mu_rear": 0.2,
+    "mu_long_front": 1.6,
+    "mu_long_rear": 0.6,
+    "mu_rolling": 0.3,
+    "ground_mu": 0.2
+   },
+   "error": 4.323505160268295,
+   "stable": true,
+   "alphas": [
+    4.2834082328613015,
+    4.111404144518728,
+    3.9237990360027872,
+    3.56024574168613
+   ],
+   "per_bag": {
+    "fast_experiment0": {
+     "combined_mean": 2.5462214648772896,
+     "yaw_rmse_deg_mean": 31.57247265717915
+    },
+    "fast_experiment1": {
+     "combined_mean": 3.1525689400260513,
+     "yaw_rmse_deg_mean": 37.32968519816168
+    },
+    "calibrate": {
+     "combined_mean": 7.271725075901543,
+     "yaw_rmse_deg_mean": 78.999658699915
+    }
+   }
+  }
+ ],
+ "best": {
+  "params": {
+   "mu_front": 0.1,
+   "mu_rear": 0.05,
+   "mu_long_front": 1.6,
+   "mu_long_rear": 0.6,
+   "mu_rolling": 0.3,
+   "ground_mu": 0.2
+  },
+  "error": 3.225007453740505,
+  "stable": true,
+  "alphas": [
+   2.8432044976314086,
+   2.8382266276816863,
+   2.8191462576397766,
+   2.5091854771152704
+  ],
+  "per_bag": {
+   "fast_experiment0": {
+    "combined_mean": 1.7613274164063333,
+    "yaw_rmse_deg_mean": 23.453668968945195
+   },
+   "fast_experiment1": {
+    "combined_mean": 1.914931164805602,
+    "yaw_rmse_deg_mean": 24.109923284485337
+   },
+   "calibrate": {
+    "combined_mean": 5.998763780009579,
+    "yaw_rmse_deg_mean": 58.59546317453182
+   }
+  },
+  "holdout": 1.7199974428227993
+ },
+ "note": "alphas ordered as pairs [(1.0, 3.0), (1.5, 3.5), (2.0, 4.0), (0.5, 3.5)]"
+}
