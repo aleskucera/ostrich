@@ -380,7 +380,6 @@ class HelhestJuniorTrajectorySplineSurfaceOptimizer(OstrichDifferentiableSimulat
 
         ghost_shapes = self._collect_ghost_shapes()
         ghost_color = wp.array([wp.vec3(1.0, 0.2, 0.0)], dtype=wp.vec3)
-        GHOST_OPACITY = 0.3
 
         def draw_extras(viewer, step_idx, state):
             viewer.log_scalar("/loss", loss_val)
@@ -399,10 +398,6 @@ class HelhestJuniorTrajectorySplineSurfaceOptimizer(OstrichDifferentiableSimulat
                     geo_is_solid=g["geo_is_solid"],
                     geo_src=g["geo_src"],
                 )
-                # set_opacity was removed from newer newton ViewerGL builds;
-                # the ghost still renders, just fully opaque, without it.
-                if hasattr(viewer, "set_opacity"):
-                    viewer.set_opacity(name, GHOST_OPACITY)
 
         print(f"Rendering iteration {train_iter} (Loss: {loss_val:.4f})...")
 
