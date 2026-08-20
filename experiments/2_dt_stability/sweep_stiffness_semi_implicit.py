@@ -22,7 +22,6 @@ from typing import override
 import newton
 import numpy as np
 import warp as wp
-from ostrich import ExecutionConfig
 from ostrich import InteractiveSimulator
 from ostrich import LoggingConfig
 from ostrich import RenderingConfig
@@ -30,6 +29,7 @@ from ostrich import SemiImplicitEngineConfig
 from ostrich import SimulationConfig
 
 from examples.helhest.common import create_helhest_model
+from ostrich.core.logging_config import HDF5LoggingConfig
 
 os.environ["PYOPENGL_PLATFORM"] = "glx"
 
@@ -84,7 +84,6 @@ class HelhestObstacleSim(InteractiveSimulator):
         self,
         sim_config: SimulationConfig,
         render_config: RenderingConfig,
-        exec_config: ExecutionConfig,
         engine_config: SemiImplicitEngineConfig,
         logging_config: LoggingConfig,
         ke: float,
@@ -92,7 +91,7 @@ class HelhestObstacleSim(InteractiveSimulator):
     ):
         self._ke = ke
         self._kd_contact = kd_contact
-        super().__init__(sim_config, render_config, exec_config, engine_config, logging_config)
+        super().__init__(sim_config, render_config, engine_config, logging_config)
 
         num_dofs = 9
         total_steps = self.clock.total_sim_steps
@@ -193,16 +192,18 @@ class HelhestObstacleSim(InteractiveSimulator):
 def run_one(dt: float, ke: float, kd_contact: float) -> dict:
     sim_config = SimulationConfig(
         duration_seconds=DURATION, target_timestep_seconds=dt, num_worlds=1,
+        use_cuda_graph=False,
     )
     render_config = RenderingConfig(
         vis_type="null", target_fps=30, usd_file=None, start_paused=False,
     )
-    exec_config = ExecutionConfig(use_cuda_graph=False, headless_steps_per_segment=1)
     engine_config = SemiImplicitEngineConfig(angular_damping=0.05, friction_smoothing=0.1)
-    logging_config = LoggingConfig(enable_timing=False, enable_hdf5_logging=False)
+    logging_config = LoggingConfig(
+        hdf5=HDF5LoggingConfig(enabled=False),
+    )
     try:
         sim = HelhestObstacleSim(
-            sim_config, render_config, exec_config, engine_config, logging_config,
+            sim_config, render_config, engine_config, logging_config,
             ke=ke, kd_contact=kd_contact,
         )
         return sim.simulate_and_check()

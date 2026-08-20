@@ -29,13 +29,18 @@ import newton
 import numpy as np
 import warp as wp
 from ostrich import OstrichEngineConfig
-from ostrich import ExecutionConfig
 from ostrich import InteractiveSimulator
 from ostrich import LoggingConfig
 from ostrich import RenderingConfig
 from ostrich import SimulationConfig
 
 from examples.helhest.common import create_helhest_model
+from ostrich.core.engine_config import ComplianceConfig
+from ostrich.core.engine_config import ContactsConfig
+from ostrich.core.engine_config import LinearSolverConfig
+from ostrich.core.engine_config import LinesearchConfig
+from ostrich.core.engine_config import NewtonRaphsonConfig
+from ostrich.core.logging_config import HDF5LoggingConfig
 
 os.environ["PYOPENGL_PLATFORM"] = "glx"
 
@@ -75,7 +80,6 @@ class HelhestSim(InteractiveSimulator):
         self,
         sim_config: SimulationConfig,
         render_config: RenderingConfig,
-        exec_config: ExecutionConfig,
         engine_config: OstrichEngineConfig,
         logging_config: LoggingConfig,
         target_ctrl: list[float],
@@ -89,7 +93,7 @@ class HelhestSim(InteractiveSimulator):
         self._k_d = k_d
         self._gt_trajectory = gt_trajectory
         self._gt_lines_initialized = False
-        super().__init__(sim_config, render_config, exec_config, engine_config, logging_config)
+        super().__init__(sim_config, render_config, engine_config, logging_config)
 
         self.set_friction_coefficient(mu)
 
@@ -289,6 +293,7 @@ def main():
         duration_seconds=duration,
         target_timestep_seconds=args.dt,
         num_worlds=1,
+        use_cuda_graph=True,
     )
     if args.headless:
         vis_type = "null"
@@ -302,37 +307,37 @@ def main():
         usd_file=args.usd,
         start_paused=False,
     )
-    exec_config = ExecutionConfig(
-        use_cuda_graph=True,
-        headless_steps_per_segment=1,
-    )
+    # NOTE: this config previously set contact_fb_alpha=0.5 (plus contact/friction
+    # fb_beta). Those knobs no longer exist: friction's were removed outright and
+    # contact alpha is now a module-import warp constant defaulting to 1.0. To
+    # reproduce the original solve, run with OSTRICH_CONTACT_FB_ALPHA=0.5.
     engine_config = OstrichEngineConfig(
-        max_newton_iters=16,
-        max_linear_iters=16,
-        backtrack_min_iter=12,
-        newton_atol=1e-5,
-        linear_atol=1e-5,
-        linear_tol=1e-5,
-        enable_linesearch=False,
-        joint_compliance=6e-8,
-        contact_compliance=1e-3,
-        friction_compliance=2e-2,
-        regularization=1e-6,
-        contact_fb_alpha=0.5,
-        contact_fb_beta=1.0,
-        friction_fb_alpha=1.0,
-        friction_fb_beta=1.0,
-        max_contacts_per_world=8,
+        nr=NewtonRaphsonConfig(
+            max_iters=16,
+            backtrack_min_iter=12,
+            atol=1e-5,
+        ),
+        linear=LinearSolverConfig(
+            max_iters=16,
+            atol=1e-5,
+            tol=1e-5,
+            regularization=1e-6,
+        ),
+        compliance=ComplianceConfig(
+            joint=6e-8,
+            contact=1e-3,
+            friction=2e-2,
+        ),
+        linesearch=LinesearchConfig(enabled=False),
+        contacts=ContactsConfig(max_per_world=8),
     )
     logging_config = LoggingConfig(
-        enable_timing=False,
-        enable_hdf5_logging=False,
+        hdf5=HDF5LoggingConfig(enabled=False),
     )
 
     sim = HelhestSim(
         sim_config,
         render_config,
-        exec_config,
         engine_config,
         logging_config,
         target_ctrl=target_ctrl,

@@ -16,7 +16,6 @@ from typing import override
 import newton
 import numpy as np
 import warp as wp
-from ostrich import ExecutionConfig
 from ostrich import InteractiveSimulator
 from ostrich import LoggingConfig
 from ostrich import RenderingConfig
@@ -24,6 +23,7 @@ from ostrich import SemiImplicitEngineConfig
 from ostrich import SimulationConfig
 
 from examples.helhest.common import create_helhest_model
+from ostrich.core.logging_config import HDF5LoggingConfig
 
 os.environ["PYOPENGL_PLATFORM"] = "glx"
 
@@ -69,7 +69,6 @@ class HelhestSemiImplicitObstacleSim(InteractiveSimulator):
         self,
         sim_config: SimulationConfig,
         render_config: RenderingConfig,
-        exec_config: ExecutionConfig,
         engine_config: SemiImplicitEngineConfig,
         logging_config: LoggingConfig,
         k_p: float = K_P,
@@ -91,7 +90,7 @@ class HelhestSemiImplicitObstacleSim(InteractiveSimulator):
         self._kf = kf
         self._obstacle_x = obstacle_x
         self._obstacle_height = obstacle_height
-        super().__init__(sim_config, render_config, exec_config, engine_config, logging_config)
+        super().__init__(sim_config, render_config, engine_config, logging_config)
 
         num_dofs = 9
         total_steps = self.clock.total_sim_steps
@@ -252,16 +251,13 @@ def main():
         duration_seconds=args.duration,
         target_timestep_seconds=args.dt,
         num_worlds=1,
+        use_cuda_graph=True,
     )
     render_config = RenderingConfig(
         vis_type="null" if args.headless else "gl",
         target_fps=30,
         usd_file=None,
         start_paused=False,
-    )
-    exec_config = ExecutionConfig(
-        use_cuda_graph=True,
-        headless_steps_per_segment=1,
     )
     engine_config = SemiImplicitEngineConfig(
         angular_damping=args.angular_damping,
@@ -270,14 +266,12 @@ def main():
         joint_attach_kd=args.joint_attach_kd,
     )
     logging_config = LoggingConfig(
-        enable_timing=False,
-        enable_hdf5_logging=False,
+        hdf5=HDF5LoggingConfig(enabled=False),
     )
 
     sim = HelhestSemiImplicitObstacleSim(
         sim_config,
         render_config,
-        exec_config,
         engine_config,
         logging_config,
         k_p=args.k_p,

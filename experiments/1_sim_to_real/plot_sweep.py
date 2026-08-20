@@ -16,6 +16,12 @@ import sys
 import matplotlib.pyplot as plt
 import numpy as np
 import mujoco
+from ostrich.core.engine_config import ComplianceConfig
+from ostrich.core.engine_config import ContactsConfig
+from ostrich.core.engine_config import LinearSolverConfig
+from ostrich.core.engine_config import LinesearchConfig
+from ostrich.core.engine_config import NewtonRaphsonConfig
+from ostrich.core.logging_config import HDF5LoggingConfig
 
 os.environ["PYOPENGL_PLATFORM"] = "glx"
 
@@ -113,7 +119,7 @@ def simulate_ostrich(sweep_data, target_ctrl, duration):
     """Re-simulate Ostrich best config to get full trajectory."""
     import warp as wp
     from sweep_ostrich_fast import HelhestSweepSim
-    from ostrich import OstrichEngineConfig, ExecutionConfig, LoggingConfig, RenderingConfig, SimulationConfig
+    from ostrich import OstrichEngineConfig, LoggingConfig, RenderingConfig, SimulationConfig
 
     fixed = sweep_data["fixed_params"]
     best = sweep_data["best_params"]
@@ -124,24 +130,39 @@ def simulate_ostrich(sweep_data, target_ctrl, duration):
         duration_seconds=duration,
         target_timestep_seconds=dt,
         num_worlds=1,
+        use_cuda_graph=False,
     )
     render_config = RenderingConfig(vis_type="null", target_fps=30, usd_file=None, start_paused=False)
-    exec_config = ExecutionConfig(use_cuda_graph=False, headless_steps_per_segment=1)
+    # NOTE: this config previously set contact_fb_alpha=0.5 (plus contact/friction
+    # fb_beta). Those knobs no longer exist: friction's were removed outright and
+    # contact alpha is now a module-import warp constant defaulting to 1.0. To
+    # reproduce the original solve, run with OSTRICH_CONTACT_FB_ALPHA=0.5.
     engine_config = OstrichEngineConfig(
-        max_newton_iters=16, max_linear_iters=16, backtrack_min_iter=12,
-        newton_atol=1e-5, linear_atol=1e-5, linear_tol=1e-5,
-        enable_linesearch=False,
-        joint_compliance=6e-8, contact_compliance=1e-4,
-        friction_compliance=best["friction_compliance"],
-        regularization=1e-6,
-        contact_fb_alpha=0.5, contact_fb_beta=1.0,
-        friction_fb_alpha=1.0, friction_fb_beta=1.0,
-        max_contacts_per_world=8,
+        nr=NewtonRaphsonConfig(
+            max_iters=16,
+            backtrack_min_iter=12,
+            atol=1e-5,
+        ),
+        linear=LinearSolverConfig(
+            max_iters=16,
+            atol=1e-5,
+            tol=1e-5,
+            regularization=1e-6,
+        ),
+        compliance=ComplianceConfig(
+            joint=6e-8,
+            contact=1e-4,
+            friction=best["friction_compliance"],
+        ),
+        linesearch=LinesearchConfig(enabled=False),
+        contacts=ContactsConfig(max_per_world=8),
     )
-    logging_config = LoggingConfig(enable_timing=False, enable_hdf5_logging=False)
+    logging_config = LoggingConfig(
+        hdf5=HDF5LoggingConfig(enabled=False),
+    )
 
     sim = HelhestSweepSim(
-        sim_config, render_config, exec_config, engine_config, logging_config,
+        sim_config, render_config, engine_config, logging_config,
         target_ctrl=target_ctrl, k_p=k_p, mu=best["mu"],
     )
     traj = sim.simulate_trajectory()

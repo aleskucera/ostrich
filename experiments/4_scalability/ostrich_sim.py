@@ -14,7 +14,6 @@ import numpy as np
 import warp as wp
 from ostrich import OstrichDifferentiableSimulator
 from ostrich import OstrichEngineConfig
-from ostrich import ExecutionConfig
 from ostrich import LoggingConfig
 from ostrich import RenderingConfig
 from ostrich import SimulationConfig
@@ -23,6 +22,12 @@ from newton import Model
 
 from examples.helhest.common import create_helhest_model
 from examples.helhest.common import HelhestConfig
+from ostrich.core.engine_config import ComplianceConfig
+from ostrich.core.engine_config import ContactsConfig
+from ostrich.core.engine_config import LinearSolverConfig
+from ostrich.core.engine_config import LinesearchConfig
+from ostrich.core.engine_config import NewtonRaphsonConfig
+from ostrich.core.logging_config import HDF5LoggingConfig
 
 os.environ["PYOPENGL_PLATFORM"] = "glx"
 
@@ -98,12 +103,12 @@ def regularization_kernel(
 
 class HelhestScalabilityOptimizer(OstrichDifferentiableSimulator):
     def __init__(
-        self, sim_config, render_config, exec_config, engine_config, logging_config, save_path=None
+        self, sim_config, render_config, engine_config, logging_config, save_path=None
     ):
         self.save_path = save_path
         self.K = K
         self.num_worlds = sim_config.num_worlds
-        super().__init__(sim_config, render_config, exec_config, engine_config, logging_config)
+        super().__init__(sim_config, render_config, engine_config, logging_config)
         self.loss = wp.zeros(1, dtype=float, requires_grad=True)
         self.trajectory_weight = 10.0
         self.regularization_weight = 1e-7
@@ -257,6 +262,7 @@ def main():
         target_timestep_seconds=DT,
         num_worlds=args.num_worlds,
         sync_mode=SyncMode.ALIGN_FPS_TO_DT,
+        use_cuda_graph=True,
     )
     render_config = RenderingConfig(
         vis_type="null",
@@ -266,31 +272,37 @@ def main():
         world_offset_y=5.0,
         start_paused=False,
     )
-    exec_config = ExecutionConfig(use_cuda_graph=True, headless_steps_per_segment=1)
+    # NOTE: this config previously set contact_fb_alpha=0.5 (plus contact/friction
+    # fb_beta). Those knobs no longer exist: friction's were removed outright and
+    # contact alpha is now a module-import warp constant defaulting to 1.0. To
+    # reproduce the original solve, run with OSTRICH_CONTACT_FB_ALPHA=0.5.
     engine_config = OstrichEngineConfig(
-        max_newton_iters=12,
-        max_linear_iters=12,
-        backtrack_min_iter=8,
-        newton_atol=1e-3,
-        linear_atol=1e-3,
-        linear_tol=1e-3,
-        enable_linesearch=False,
-        joint_compliance=6e-8,
-        contact_compliance=1e-6,
-        friction_compliance=1e-6,
-        regularization=1e-6,
-        contact_fb_alpha=0.5,
-        contact_fb_beta=1.0,
-        friction_fb_alpha=1.0,
-        friction_fb_beta=1.0,
-        max_contacts_per_world=8,
+        nr=NewtonRaphsonConfig(
+            max_iters=12,
+            backtrack_min_iter=8,
+            atol=1e-3,
+        ),
+        linear=LinearSolverConfig(
+            max_iters=12,
+            atol=1e-3,
+            tol=1e-3,
+            regularization=1e-6,
+        ),
+        compliance=ComplianceConfig(
+            joint=6e-8,
+            contact=1e-6,
+            friction=1e-6,
+        ),
+        linesearch=LinesearchConfig(enabled=False),
+        contacts=ContactsConfig(max_per_world=8),
     )
-    logging_config = LoggingConfig(enable_timing=False, enable_hdf5_logging=False)
+    logging_config = LoggingConfig(
+        hdf5=HDF5LoggingConfig(enabled=False),
+    )
 
     sim = HelhestScalabilityOptimizer(
         sim_config,
         render_config,
-        exec_config,
         engine_config,
         logging_config,
         save_path=args.save,

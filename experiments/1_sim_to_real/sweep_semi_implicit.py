@@ -22,7 +22,6 @@ from typing import override
 import newton
 import numpy as np
 import warp as wp
-from ostrich import ExecutionConfig
 from ostrich import InteractiveSimulator
 from ostrich import LoggingConfig
 from ostrich import RenderingConfig
@@ -30,6 +29,7 @@ from ostrich import SemiImplicitEngineConfig
 from ostrich import SimulationConfig
 
 from examples.helhest.common import create_helhest_model
+from ostrich.core.logging_config import HDF5LoggingConfig
 
 os.environ["PYOPENGL_PLATFORM"] = "glx"
 
@@ -62,7 +62,6 @@ class HelhestSemiImplicitSim(InteractiveSimulator):
         self,
         sim_config: SimulationConfig,
         render_config: RenderingConfig,
-        exec_config: ExecutionConfig,
         engine_config: SemiImplicitEngineConfig,
         logging_config: LoggingConfig,
         target_ctrl: list[float],
@@ -80,7 +79,7 @@ class HelhestSemiImplicitSim(InteractiveSimulator):
         self._ke = ke
         self._kd = kd
         self._kf = kf
-        super().__init__(sim_config, render_config, exec_config, engine_config, logging_config)
+        super().__init__(sim_config, render_config, engine_config, logging_config)
 
         num_dofs = 9
         total_steps = self.clock.total_sim_steps
@@ -269,7 +268,9 @@ def main():
     render_config = RenderingConfig(
         vis_type="null", target_fps=30, usd_file=None, start_paused=False,
     )
-    logging_config = LoggingConfig(enable_timing=False, enable_hdf5_logging=False)
+    logging_config = LoggingConfig(
+        hdf5=HDF5LoggingConfig(enabled=False),
+    )
 
     results = []
 
@@ -285,12 +286,12 @@ def main():
                     duration_seconds=gt_entry["duration"],
                     target_timestep_seconds=cfg["dt"],
                     num_worlds=1,
+                    use_cuda_graph=False,
                 )
-                exec_config = ExecutionConfig(use_cuda_graph=False, headless_steps_per_segment=1)
                 engine_config = SemiImplicitEngineConfig(angular_damping=0.05, friction_smoothing=0.1)
 
                 sim = HelhestSemiImplicitSim(
-                    sim_config, render_config, exec_config, engine_config, logging_config,
+                    sim_config, render_config, engine_config, logging_config,
                     target_ctrl=gt_entry["target_ctrl"],
                     k_p=cfg["k_p"], k_d=cfg["k_d"],
                     mu=cfg["mu"], ke=cfg["ke"], kd=cfg["kd"], kf=cfg["kf"],

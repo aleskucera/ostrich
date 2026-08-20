@@ -33,6 +33,11 @@ from newton import Model
 
 from examples.helhest.common import create_helhest_model
 from examples.helhest.common import HelhestConfig
+from ostrich.core.engine_config import ComplianceConfig
+from ostrich.core.engine_config import ContactsConfig
+from ostrich.core.engine_config import LinearSolverConfig
+from ostrich.core.engine_config import LinesearchConfig
+from ostrich.core.engine_config import NewtonRaphsonConfig
 
 os.environ["PYOPENGL_PLATFORM"] = "glx"
 
@@ -253,11 +258,11 @@ class HelhestBatchOptimizer(OstrichDifferentiableSimulator):
             results["loss"].append(float(curr_loss))
             results["time_ms"].append(t_iter * 1000)
 
-        results["peak_gpu_mb"] = peak_mem_mb
-
             self.update()
             self.tape.zero()
             self.loss.zero_()
+
+        results["peak_gpu_mb"] = peak_mem_mb
 
         if self.save_path:
             pathlib.Path(self.save_path).parent.mkdir(parents=True, exist_ok=True)
@@ -285,18 +290,24 @@ def main():
         start_paused=False,
     )
     engine_config = OstrichEngineConfig(
-        max_newton_iters=12,
-        max_linear_iters=12,
-        backtrack_min_iter=8,
-        newton_atol=1e-3,
-        linear_atol=1e-3,
-        linear_tol=1e-3,
-        enable_linesearch=False,
-        joint_compliance=6e-8,
-        contact_compliance=1e-6,
-        friction_compliance=1e-6,
-        regularization=1e-6,
-        max_contacts_per_world=8,
+        nr=NewtonRaphsonConfig(
+            max_iters=12,
+            backtrack_min_iter=8,
+            atol=1e-3,
+        ),
+        linear=LinearSolverConfig(
+            max_iters=12,
+            atol=1e-3,
+            tol=1e-3,
+            regularization=1e-6,
+        ),
+        compliance=ComplianceConfig(
+            joint=6e-8,
+            contact=1e-6,
+            friction=1e-6,
+        ),
+        linesearch=LinesearchConfig(enabled=False),
+        contacts=ContactsConfig(max_per_world=8),
     )
     logging_config = LoggingConfig()
 

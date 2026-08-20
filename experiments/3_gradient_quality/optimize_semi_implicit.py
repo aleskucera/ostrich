@@ -19,7 +19,6 @@ import time
 import newton
 import numpy as np
 import warp as wp
-from ostrich import ExecutionConfig
 from ostrich import LoggingConfig
 from ostrich import RenderingConfig
 from ostrich import SemiImplicitEngineConfig
@@ -29,6 +28,7 @@ from ostrich.simulation.sim_config import SyncMode
 from newton import Model
 
 from examples.helhest.common import create_helhest_model
+from ostrich.core.logging_config import HDF5LoggingConfig
 
 os.environ["PYOPENGL_PLATFORM"] = "glx"
 
@@ -128,13 +128,13 @@ def yaw_loss_kernel(
 
 
 class HelhestSemiImplicitOptimizer(NewtonDifferentiableSimulator):
-    def __init__(self, sim_config, render_config, exec_config, engine_config,
+    def __init__(self, sim_config, render_config, engine_config,
                  logging_config, num_control_points=10,
                  target_trajectory_xy=None, lr=0.01, iterations=200):
         self.K = num_control_points
         self._lr = lr
         self._iterations = iterations
-        super().__init__(sim_config, render_config, exec_config, engine_config, logging_config)
+        super().__init__(sim_config, render_config, engine_config, logging_config)
         self.loss = wp.zeros(1, dtype=float, requires_grad=True)
         self.trajectory_weight = 10.0
         self.yaw_weight = 5.0
@@ -332,18 +332,20 @@ def main():
         target_timestep_seconds=DT,
         num_worlds=1,
         sync_mode=SyncMode.ALIGN_FPS_TO_DT,
+        use_cuda_graph=False,
     )
     render_config = RenderingConfig(
         vis_type="null", target_fps=30, usd_file=None, start_paused=False,
     )
-    exec_config = ExecutionConfig(use_cuda_graph=False, headless_steps_per_segment=1)
     engine_config = SemiImplicitEngineConfig(
         angular_damping=0.05, friction_smoothing=0.1,
     )
-    logging_config = LoggingConfig(enable_timing=False, enable_hdf5_logging=False)
+    logging_config = LoggingConfig(
+        hdf5=HDF5LoggingConfig(enabled=False),
+    )
 
     sim = HelhestSemiImplicitOptimizer(
-        sim_config, render_config, exec_config, engine_config, logging_config,
+        sim_config, render_config, engine_config, logging_config,
         num_control_points=args.K,
         target_trajectory_xy=traj_xy, lr=args.lr, iterations=args.iterations,
     )

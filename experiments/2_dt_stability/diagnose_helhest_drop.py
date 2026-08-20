@@ -31,6 +31,11 @@ from ostrich.core.engine_config import OstrichEngineConfig
 from ostrich.core.logging_config import LoggingConfig
 from ostrich.core.model_builder import OstrichModelBuilder
 from ostrich.logging.hdf5_reader import HDF5Reader
+from ostrich.core.engine_config import ComplianceConfig
+from ostrich.core.engine_config import ContactsConfig
+from ostrich.core.engine_config import LinearSolverConfig
+from ostrich.core.engine_config import NewtonRaphsonConfig
+from ostrich.core.logging_config import HDF5LoggingConfig
 
 os.environ.setdefault("PYOPENGL_PLATFORM", "glx")
 
@@ -77,18 +82,23 @@ def run(dt: float, out_path: pathlib.Path) -> None:
     num_steps = int(round(SIM_DURATION / dt))
 
     config = OstrichEngineConfig(
-        max_newton_iters=MAX_NEWTON_ITERS,
-        newton_atol=NEWTON_ATOL,
-        contact_compliance=CONTACT_COMPLIANCE,
-        friction_compliance=FRICTION_COMPLIANCE,
-        joint_compliance=JOINT_COMPLIANCE,
-        regularization=REGULARIZATION,
-        max_contacts_per_world=16,
+        nr=NewtonRaphsonConfig(
+            max_iters=MAX_NEWTON_ITERS,
+            atol=NEWTON_ATOL,
+        ),
+        linear=LinearSolverConfig(regularization=REGULARIZATION),
+        compliance=ComplianceConfig(
+            contact=CONTACT_COMPLIANCE,
+            friction=FRICTION_COMPLIANCE,
+            joint=JOINT_COMPLIANCE,
+        ),
+        contacts=ContactsConfig(max_per_world=16),
     )
     logging_config = LoggingConfig(
-        enable_hdf5_logging=True,
-        hdf5_log_file=str(out_path),
-        max_simulation_steps=num_steps,
+        hdf5=HDF5LoggingConfig(
+            enabled=True,
+            file=str(out_path),
+        ),
     )
 
     engine = OstrichEngine(model=model, sim_steps=num_steps, config=config, logging_config=logging_config)

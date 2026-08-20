@@ -222,11 +222,11 @@ def main():
         results["loss"].append(float(loss))
         results["time_ms"].append(t_iter * 1000)
 
-    results["peak_gpu_mb"] = peak_mem_mb
-
         if float(loss) < 1e-4:
             print("Converged!")
             break
+
+    results["peak_gpu_mb"] = peak_mem_mb
 
     if args.save:
         pathlib.Path(args.save).parent.mkdir(parents=True, exist_ok=True)

@@ -37,6 +37,10 @@ from ostrich.core.engine_config import OstrichEngineConfig
 from ostrich.core.logging_config import LoggingConfig
 from ostrich.core.model_builder import OstrichModelBuilder
 from ostrich.logging.hdf5_reader import HDF5Reader
+from ostrich.core.engine_config import ComplianceConfig
+from ostrich.core.engine_config import ContactsConfig
+from ostrich.core.engine_config import NewtonRaphsonConfig
+from ostrich.core.logging_config import HDF5LoggingConfig
 
 RESULTS_DIR = pathlib.Path(__file__).parent / "results"
 
@@ -104,16 +108,21 @@ def run(
     num_steps = int(round(SIM_DURATION / dt))
 
     config = OstrichEngineConfig(
-        max_newton_iters=MAX_NEWTON_ITERS,
-        newton_atol=NEWTON_ATOL,
-        contact_compliance=contact_compliance,
-        friction_compliance=friction_compliance,
-        max_contacts_per_world=8,
+        nr=NewtonRaphsonConfig(
+            max_iters=MAX_NEWTON_ITERS,
+            atol=NEWTON_ATOL,
+        ),
+        compliance=ComplianceConfig(
+            contact=contact_compliance,
+            friction=friction_compliance,
+        ),
+        contacts=ContactsConfig(max_per_world=8),
     )
     logging_config = LoggingConfig(
-        enable_hdf5_logging=True,
-        hdf5_log_file=str(out_path),
-        max_simulation_steps=num_steps,
+        hdf5=HDF5LoggingConfig(
+            enabled=True,
+            file=str(out_path),
+        ),
     )
 
     engine = OstrichEngine(

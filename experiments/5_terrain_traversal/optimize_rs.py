@@ -35,6 +35,11 @@ from examples.terrain_traversal.optimize import (
     NUM_WHEEL_DOFS,
     DT,
 )
+from ostrich.core.engine_config import ComplianceConfig
+from ostrich.core.engine_config import ContactsConfig
+from ostrich.core.engine_config import LinearSolverConfig
+from ostrich.core.engine_config import LinesearchConfig
+from ostrich.core.engine_config import NewtonRaphsonConfig
 
 os.environ["PYOPENGL_PLATFORM"] = "glx"
 
@@ -234,14 +239,29 @@ def train_rs(
 
     # --- First: run target trajectory with 1 world to get target poses ---
     model_target = build_model(1, terrain_seed, roughness, terrain_freq)
+    # NOTE: this config previously set contact_fb_alpha=0.5 (plus contact/friction
+    # fb_beta). Those knobs no longer exist: friction's were removed outright and
+    # contact alpha is now a module-import warp constant defaulting to 1.0. To
+    # reproduce the original solve, run with OSTRICH_CONTACT_FB_ALPHA=0.5.
     engine_config = OstrichEngineConfig(
-        max_newton_iters=14, max_linear_iters=16, backtrack_min_iter=10,
-        newton_atol=1e-3, linear_atol=1e-3, linear_tol=1e-3,
-        enable_linesearch=False, joint_compliance=6e-8,
-        contact_compliance=0.1, friction_compliance=1e-6,
-        regularization=1e-6, contact_fb_alpha=0.5, contact_fb_beta=1.0,
-        friction_fb_alpha=1.0, friction_fb_beta=1.0,
-        max_contacts_per_world=256,
+        nr=NewtonRaphsonConfig(
+            max_iters=14,
+            backtrack_min_iter=10,
+            atol=1e-3,
+        ),
+        linear=LinearSolverConfig(
+            max_iters=16,
+            atol=1e-3,
+            tol=1e-3,
+            regularization=1e-6,
+        ),
+        compliance=ComplianceConfig(
+            joint=6e-8,
+            contact=0.1,
+            friction=1e-6,
+        ),
+        linesearch=LinesearchConfig(enabled=False),
+        contacts=ContactsConfig(max_per_world=256),
     )
     engine_target = OstrichEngine(
         model=model_target, sim_steps=T, config=engine_config,
