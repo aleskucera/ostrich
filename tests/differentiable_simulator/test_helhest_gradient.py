@@ -94,7 +94,13 @@ def compute_wheel_vel_gradient(model, engine, target_vel, w, dt=0.01):
     grad_analytical = engine.data.joint_target_vel.grad.numpy().flatten().copy()
 
     # FD for wheel DOFs only (skip free joint DOFs 0-5)
-    eps = 1e-4
+    # Central-difference step. 1e-4 sits in the roundoff-dominated regime for
+    # this solve (forward tol 1e-8, so FD noise ~ tol/eps) and made the FD
+    # reference, not the adjoint, the inaccurate side: it reported 23% error on
+    # the rear wheel while the analytic gradient was unchanged. Measured across
+    # 1e-6..1e-2, agreement is monotonically better with larger eps -- 0.8/0.4/3.2%
+    # at 1e-3, 0.1/0.05/0.45% at 1e-2. 1e-3 keeps truncation error negligible.
+    eps = 1e-3
     grad_fd = np.zeros(dims.joint_dof_count, dtype=np.float32)
     for dof in range(WHEEL_DOF_OFFSET, WHEEL_DOF_OFFSET + NUM_WHEEL_DOFS):
         tv_p = target_vel.copy()
@@ -181,7 +187,13 @@ def test_differential_turn():
 
 
 def test_multi_step():
-    """Multi-step trajectory (5 steps) — gradient through multiple contacts."""
+    """Multi-step trajectory (5 steps) — gradient through multiple contacts.
+
+    KNOWN FAILING. The analytic parameter gradient comes back ~0 where finite
+    differences give O(1), while the single-step cases above are accurate on
+    the same model. Not an FD step-size artifact and not the zero_gradients()
+    placement -- both were ruled out. See docs/adjoint_multistep_issue.md.
+    """
     print("\n=== Helhest: Multi-step trajectory (5 steps) ===")
 
     model = build_helhest()
@@ -237,7 +249,13 @@ def test_multi_step():
     grad_a = engine.data.joint_target_vel.grad.numpy().flatten().copy()
 
     # FD
-    eps = 1e-4
+    # Central-difference step. 1e-4 sits in the roundoff-dominated regime for
+    # this solve (forward tol 1e-8, so FD noise ~ tol/eps) and made the FD
+    # reference, not the adjoint, the inaccurate side: it reported 23% error on
+    # the rear wheel while the analytic gradient was unchanged. Measured across
+    # 1e-6..1e-2, agreement is monotonically better with larger eps -- 0.8/0.4/3.2%
+    # at 1e-3, 0.1/0.05/0.45% at 1e-2. 1e-3 keeps truncation error negligible.
+    eps = 1e-3
     grad_fd = np.zeros(dims.joint_dof_count, dtype=np.float32)
     for dof in range(WHEEL_DOF_OFFSET, WHEEL_DOF_OFFSET + NUM_WHEEL_DOFS):
         for sign, tv_arr in [(1, None), (-1, None)]:

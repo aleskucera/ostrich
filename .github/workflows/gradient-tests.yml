@@ -38,6 +38,20 @@ jobs:
       # `uv run` puts the synced venv on PATH, so the bare `python` inside
       # run_all.sh resolves to it. Without this the suite silently ran against
       # the system interpreter and every test failed on `import numpy`.
+      # Warp JIT-compiles its kernels on first use, and every test here is a
+      # separate process building a different model. Measured locally: the same
+      # test takes 27s on a cold cache and 3.6s on a warm one, and a cold cache
+      # was 625s of this job's 761s. Warp's cache is content-addressed by module
+      # hash, so a stale entry is simply unused rather than wrong -- which makes
+      # the loose restore-key safe.
+      - name: Cache warp kernels
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/warp
+          key: warp-${{ runner.os }}-${{ hashFiles('src/ostrich/**/*.py', 'uv.lock') }}
+          restore-keys: |
+            warp-${{ runner.os }}-
+
       # Unit tests: joint/control constraints, relaxation modes, anisotropic
       # and Stribeck friction, plus the static API-drift check. Fast (~30 s)
       # and previously run by nothing at all.

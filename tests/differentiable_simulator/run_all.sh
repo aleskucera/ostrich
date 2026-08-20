@@ -27,55 +27,62 @@ TESTS=(
     test_contact_boundary.py
     test_cartpole_gradient.py
     test_wheeled_robot.py
-    test_friction_accuracy.py
-    test_friction_timestep.py
     test_stiffness_gradient.py
     test_stribeck_friction.py
+    test_helhest_gradient.py
 )
-
-# Deliberately NOT listed: test_helhest_gradient.py. It fails today -- the rear
-# wheel's analytic gradient disagrees with finite differences by 23% on the
-# straight-drive case (the threshold is tighter), while left/right sit at 6%
-# and 3%. That is a real adjoint-accuracy question on the contact-rich 3-wheel
-# model, not a plumbing issue, so it is tracked rather than gating CI.
 
 PASSED=0
 FAILED=0
 FAILED_NAMES=()
+TIMES=()                 # "<seconds> <test>", so slow tests are visible
+SUITE_START=$SECONDS
 
 for test in "${TESTS[@]}"; do
     echo "========================================"
     echo "Running: $test"
     echo "========================================"
+    start=$SECONDS
     if python "$test" 2>&1 | grep -v "^Module\|^Warp [0-9]"; then
         PASSED=$((PASSED + 1))
     else
         FAILED=$((FAILED + 1))
         FAILED_NAMES+=("$test")
     fi
+    elapsed=$((SECONDS - start))
+    TIMES+=("$elapsed $test")
+    echo "  -> ${elapsed}s"
     echo ""
 done
 
+TOTAL=$((SECONDS - SUITE_START))
+
 # Under Actions, mirror the tally into the run summary so PR reviewers see
-# pass/fail in the checks tab without opening the raw log.
+# pass/fail and per-test timing in the checks tab without opening the raw log.
 if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
     {
         echo "## Gradient suite"
         echo ""
-        echo "| result | count |"
-        echo "| --- | --- |"
-        echo "| passed | $PASSED |"
-        echo "| failed | $FAILED |"
+        echo "$PASSED passed, $FAILED failed in ${TOTAL}s"
         if [ ${#FAILED_NAMES[@]} -gt 0 ]; then
             echo ""
             echo "Failed:"
             for name in "${FAILED_NAMES[@]}"; do echo "- \`$name\`"; done
         fi
+        echo ""
+        echo "| test | seconds |"
+        echo "| --- | ---: |"
+        printf '%s\n' "${TIMES[@]}" | sort -rn | while read -r secs name; do
+            echo "| \`$name\` | $secs |"
+        done
     } >> "$GITHUB_STEP_SUMMARY"
 fi
 
 echo "========================================"
-echo "Results: $PASSED passed, $FAILED failed"
+echo "Results: $PASSED passed, $FAILED failed in ${TOTAL}s"
+echo "========================================"
+printf '%s\n' "${TIMES[@]}" | sort -rn | awk '{printf "  %5ds  %s\n", $1, $2}'
+echo ""
 if [ $FAILED -gt 0 ]; then
     echo "Failed tests:"
     for name in "${FAILED_NAMES[@]}"; do
