@@ -39,24 +39,21 @@ def _python_files():
 FILES = list(_python_files())
 FILE_IDS = [str(p.relative_to(ROOT)) for p in FILES]
 
-# The two diagnostics below import ostrich.logging.hdf5_reader.HDF5Reader,
-# which commit 09664f9 deleted as a "dead wrapper module" while these two
-# consumers were still using it (get_dataset / get_attribute / list_attributes).
-# Restoring them needs a replacement reader, not a mechanical port, so they are
-# listed rather than fixed.
+# Escape hatch for files that are knowingly stale: list them here and they are
+# expected to fail, so the check still guards everything else. Empty today --
+# the last two entries used HDF5Reader, which 09664f9 had deleted as a "dead
+# wrapper" while they were still calling it, and the reader has since been
+# restored.
 #
-# The xfail is strict and narrowed to AssertionError: fixing one of these makes
-# the suite fail until it is removed from the list, and a file that fails to
-# parse at all still errors instead of hiding in here (which is how committed
-# IndentationErrors in helhest_batch/ went unnoticed).
-STALE_IMPORTS = frozenset({
-    "experiments/2_dt_stability/diagnose.py",
-    "experiments/2_dt_stability/diagnose_helhest_drop.py",
-})
+# The xfail is strict, so fixing a listed file fails the suite until it is
+# removed and the list cannot quietly rot; and narrowed to AssertionError, so a
+# file that will not parse still errors instead of hiding here (which is how
+# committed IndentationErrors in helhest_batch/ went unnoticed).
+STALE_IMPORTS = frozenset()
 
 STALE_KWARGS = frozenset()
 
-STALE_REASON = "uses HDF5Reader, deleted in 09664f9 with no replacement"
+STALE_REASON = "known stale; see the list above"
 
 
 def _params(stale: frozenset):

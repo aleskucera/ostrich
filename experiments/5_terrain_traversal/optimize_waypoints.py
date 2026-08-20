@@ -23,6 +23,12 @@ Usage:
 import argparse
 import json
 import os
+# This experiment was tuned with contact FB alpha = 0.5. It is baked into a
+# warp constant when ostrich.constraints is first imported, so it has to be
+# set before any ostrich import below -- not at the config site. setdefault,
+# so an explicit value from the environment still wins.
+os.environ.setdefault("OSTRICH_CONTACT_FB_ALPHA", "0.5")
+
 import pathlib
 import time
 
@@ -654,10 +660,6 @@ class WaypointOptimizer(OstrichDifferentiableSimulator):
 # ---------------------------------------------------------------------------
 
 def run_single(args, seed):
-    # NOTE: this config previously set contact_fb_alpha=0.5 (plus contact/friction
-    # fb_beta). Those knobs no longer exist: friction's were removed outright and
-    # contact alpha is now a module-import warp constant defaulting to 1.0. To
-    # reproduce the original solve, run with OSTRICH_CONTACT_FB_ALPHA=0.5.
     engine_config = OstrichEngineConfig(
         nr=NewtonRaphsonConfig(
             max_iters=14,

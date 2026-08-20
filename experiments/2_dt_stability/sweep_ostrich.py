@@ -13,6 +13,12 @@ import dataclasses
 import json
 import math
 import os
+# This experiment was tuned with contact FB alpha = 0.5. It is baked into a
+# warp constant when ostrich.constraints is first imported, so it has to be
+# set before any ostrich import below -- not at the config site. setdefault,
+# so an explicit value from the environment still wins.
+os.environ.setdefault("OSTRICH_CONTACT_FB_ALPHA", "0.5")
+
 import pathlib
 import time
 from typing import override
@@ -343,11 +349,9 @@ def main():
         usd_file=None,
         start_paused=False,
     )
-    # The old flat OstrichEngineConfig also carried contact_fb_alpha=0.5 and
-    # contact/friction fb_beta. Those knobs no longer exist on the config:
-    # friction's are gone entirely and contact's alpha is a module-import
-    # constant, so reproducing the original 0.5 needs OSTRICH_CONTACT_FB_ALPHA=0.5
-    # in the environment (it defaults to 1.0).
+    # contact/friction fb_beta and friction fb_alpha are gone from the config
+    # entirely; contact alpha is set at the top of this file, since it is baked
+    # in at import time rather than read from here.
     engine_config = OstrichEngineConfig(
         nr=NewtonRaphsonConfig(
             max_iters=16,
