@@ -1,5 +1,6 @@
 #!/bin/bash
 # Run all differentiable simulator gradient tests.
+# In CI this is invoked via `uv run` so bare `python` resolves to the venv.
 # Each test runs in a separate Python process to avoid CUDA state contamination
 # between models with different topologies.
 
