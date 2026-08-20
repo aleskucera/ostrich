@@ -57,6 +57,13 @@ docs = [
   "mkdocstrings-python==1.18.2",
 ]
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# tests/differentiable_simulator holds standalone scripts, deliberately run one
+# process per test by run_all.sh to keep CUDA state from leaking between models
+# with different topologies. pytest must not collect them as well.
+norecursedirs = ["differentiable_simulator"]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

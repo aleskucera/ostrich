@@ -38,6 +38,14 @@ jobs:
       # `uv run` puts the synced venv on PATH, so the bare `python` inside
       # run_all.sh resolves to it. Without this the suite silently ran against
       # the system interpreter and every test failed on `import numpy`.
+      # Unit tests: joint/control constraints, relaxation modes, anisotropic
+      # and Stribeck friction, plus the static API-drift check. Fast (~30 s)
+      # and previously run by nothing at all.
+      - name: Run unit tests
+        env:
+          CUDA_VISIBLE_DEVICES: ""
+        run: uv run pytest -q
+
       # Hosted runners have no GPU, but pin it anyway: these tests compare
       # analytic gradients against finite differences, which is only reliably
       # deterministic on CPU. The old WARP_DEVICE=cpu was read by nothing;
