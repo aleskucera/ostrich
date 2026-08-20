@@ -1,18 +1,23 @@
 name: gradient-tests
-# Gradient-correctness suite on deterministic CPU. Added 2026-08-14 after
-# run_all.sh's missing pipefail let assertion failures masquerade as passes.
-# NOTE: not yet verified on a hosted runner (heavy deps: warp, newton
-# submodule, openmesh). If the install step fights the runner, fix or gate it
-# rather than deleting the job — this suite is the guardrail for the adjoint.
+# Gradient-correctness suite on deterministic CPU -- the guardrail for the
+# adjoint. Added 2026-08-14; first ran on a hosted runner 2026-08-20, which
+# turned up three faults fixed here: `uv sync` without an extra installed the
+# bare package only (all real deps live in the `sim` extra), the suite ran
+# under the system python instead of the synced venv, and WARP_DEVICE is not
+# read by anything so it never pinned the device.
 on:
   push:
     branches: [main, master]
   pull_request:
 
+concurrency:
+  group: gradient-tests-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   gradient-tests:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with:
@@ -20,11 +25,25 @@ jobs:
 
       - name: Install uv
         uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
 
+      # `sim` carries the actual dependencies; the bare project has none.
+      # It deliberately excludes torch (only ostrich.learning needs it), which
+      # keeps this env at ~2.4 GB instead of ~8.9 GB of CUDA wheels.
       - name: Sync environment
-        run: uv sync --frozen
+        run: uv sync --frozen --extra sim
 
+      # `uv run` puts the synced venv on PATH, so the bare `python` inside
+      # run_all.sh resolves to it. Without this the suite silently ran against
+      # the system interpreter and every test failed on `import numpy`.
+      # Hosted runners have no GPU, but pin it anyway: these tests compare
+      # analytic gradients against finite differences, which is only reliably
+      # deterministic on CPU. The old WARP_DEVICE=cpu was read by nothing;
+      # emptying CUDA_VISIBLE_DEVICES actually hides the device from warp,
+      # so this still holds if the job ever moves to a GPU runner.
       - name: Run gradient test suite (CPU)
         env:
-          WARP_DEVICE: cpu
-        run: bash tests/differentiable_simulator/run_all.sh
+          CUDA_VISIBLE_DEVICES: ""
+        run: uv run bash tests/differentiable_simulator/run_all.sh
