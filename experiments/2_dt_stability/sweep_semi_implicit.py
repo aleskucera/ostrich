@@ -16,7 +16,6 @@ from typing import override
 import newton
 import numpy as np
 import warp as wp
-from ostrich import ExecutionConfig
 from ostrich import InteractiveSimulator
 from ostrich import LoggingConfig
 from ostrich import RenderingConfig
@@ -79,7 +78,6 @@ class HelhestObstacleSim(InteractiveSimulator):
         self,
         sim_config: SimulationConfig,
         render_config: RenderingConfig,
-        exec_config: ExecutionConfig,
         engine_config: SemiImplicitEngineConfig,
         logging_config: LoggingConfig,
         k_p: float = K_P,
@@ -102,7 +100,7 @@ class HelhestObstacleSim(InteractiveSimulator):
         self._obstacle_x = obstacle_x
         self._obstacle_height = obstacle_height
         self._initial_yaw = initial_yaw
-        super().__init__(sim_config, render_config, exec_config, engine_config, logging_config)
+        super().__init__(sim_config, render_config, engine_config, logging_config)
 
         # Build ramped control sequence
         num_dofs = 9
@@ -303,7 +301,7 @@ def main():
     render_config = RenderingConfig(
         vis_type="null", target_fps=30, usd_file=None, start_paused=False,
     )
-    logging_config = LoggingConfig(enable_timing=False, enable_hdf5_logging=False)
+    logging_config = LoggingConfig()
 
     def make_run_one(trial_params: dict):
         def run_one(dt):
@@ -311,12 +309,12 @@ def main():
                 duration_seconds=DURATION,
                 target_timestep_seconds=dt,
                 num_worlds=1,
+                use_cuda_graph=False,
             )
-            exec_config = ExecutionConfig(use_cuda_graph=False, headless_steps_per_segment=1)
             engine_config = SemiImplicitEngineConfig(angular_damping=0.05, friction_smoothing=0.1)
             try:
                 sim = HelhestObstacleSim(
-                    sim_config, render_config, exec_config, engine_config, logging_config,
+                    sim_config, render_config, engine_config, logging_config,
                     k_p=K_P, k_d=K_D, mu=MU, ke=KE, kd_contact=KD_CONTACT, kf=KF,
                     wheel_vel=trial_params["wheel_vel"],
                     obstacle_x=trial_params["obstacle_x"],

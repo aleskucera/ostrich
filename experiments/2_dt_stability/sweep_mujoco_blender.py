@@ -18,6 +18,7 @@ import sys
 import mujoco
 import numpy as np
 import openmesh
+from ostrich import FrameRecorder
 
 # Wheel mesh shared with the heightmap experiments — keeps the visualization
 # consistent across simulators.
@@ -218,37 +219,10 @@ def _snapshot_poses(data, body_ids: list[int]) -> np.ndarray:
     return out
 
 
-def _resample_poses(raw_poses: np.ndarray, raw_times: np.ndarray, target_times: np.ndarray) -> np.ndarray:
-    """Resample [N_raw, B, 7] body poses onto target_times. Linear xyz, nlerp quat."""
-    target_T = len(target_times)
-    num_bodies = raw_poses.shape[1]
-    out = np.zeros((target_T, num_bodies, 7), dtype=np.float32)
-    for b in range(num_bodies):
-        for d in range(3):
-            out[:, b, d] = np.interp(target_times, raw_times, raw_poses[:, b, d])
-        for k, t_target in enumerate(target_times):
-            idx = int(np.searchsorted(raw_times, t_target, side="right")) - 1
-            idx = max(0, min(idx, len(raw_times) - 1))
-            if idx + 1 >= len(raw_times):
-                out[k, b, 3:7] = raw_poses[idx, b, 3:7]
-                continue
-            t0 = float(raw_times[idx])
-            t1 = float(raw_times[idx + 1])
-            alpha = 0.0 if t1 == t0 else (float(t_target) - t0) / (t1 - t0)
-            q0 = raw_poses[idx, b, 3:7].astype(np.float32)
-            q1 = raw_poses[idx + 1, b, 3:7].astype(np.float32)
-            if float(np.dot(q0, q1)) < 0.0:
-                q1 = -q1
-            qm = (1.0 - alpha) * q0 + alpha * q1
-            n = float(np.linalg.norm(qm))
-            out[k, b, 3:7] = qm / max(n, 1e-9)
-    return out
+def simulate_dt(dt: float, recorder: FrameRecorder) -> tuple[np.ndarray, bool]:
+    """Run mujoco at given dt, capturing poses onto the recorder's fps grid.
 
-
-def simulate_dt(dt: float, target_times: np.ndarray) -> tuple[np.ndarray, bool]:
-    """Run mujoco at given dt, capture per-step poses, resample to target_times.
-
-    Returns (resampled_poses [target_T, B, 7], is_stable). "Stable" matches the
+    Returns (poses [T, B, 7], is_stable). "Stable" matches the
     sweep_mujoco predicate: no NaN, chassis z stays in [0.05, 2.0], and the
     robot actually drives past the obstacle (chassis x_final > obstacle_x + 1).
     """
@@ -278,12 +252,13 @@ def simulate_dt(dt: float, target_times: np.ndarray) -> tuple[np.ndarray, bool]:
         mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, name) for name in RENDER_BODIES
     ]
     T = int(DURATION / dt)
-    raw_poses: list[np.ndarray] = [_snapshot_poses(data, body_ids)]
-    raw_times: list[float] = [0.0]
+    snap = _snapshot_poses(data, body_ids)
+    recorder.start(snap)
+    x_final = float(snap[0, 0])
 
     has_nan = False
-    z_min = float(raw_poses[0][0, 2])
-    z_max = float(raw_poses[0][0, 2])
+    z_min = float(snap[0, 2])
+    z_max = float(snap[0, 2])
     for step in range(T):
         t = (step + 1) * dt
         ramp = min(t / RAMP_TIME, 1.0)
@@ -297,22 +272,18 @@ def simulate_dt(dt: float, target_times: np.ndarray) -> tuple[np.ndarray, bool]:
         if not np.all(np.isfinite(snap)) or np.any(np.abs(snap[:, :3]) > 50.0):
             has_nan = True
             break
-        raw_poses.append(snap)
-        raw_times.append(t)
+        recorder.record(snap, t)
+        x_final = float(snap[0, 0])
         z_min = min(z_min, float(snap[0, 2]))
         z_max = max(z_max, float(snap[0, 2]))
 
-    raw_poses_arr = np.stack(raw_poses, axis=0).astype(np.float32)
-    raw_times_arr = np.asarray(raw_times, dtype=np.float32)
-    x_final = float(raw_poses_arr[-1, 0, 0])
     is_stable = (
         not has_nan
         and z_min > 0.05
         and z_max < 2.0
         and x_final > OBSTACLE_X + 1.0
     )
-    resampled = _resample_poses(raw_poses_arr, raw_times_arr, target_times)
-    return resampled, is_stable
+    return recorder.finish(), is_stable
 
 
 def main():
@@ -322,9 +293,6 @@ def main():
         "--fps", type=float, default=DEFAULT_FPS, help=f"Target fps (default {DEFAULT_FPS})"
     )
     args = parser.parse_args()
-
-    target_T = int(round(DURATION * args.fps))
-    target_times = np.linspace(0.0, DURATION, target_T, dtype=np.float32)
 
     # Build shapes once (XML is identical apart from dt)
     setup_xml = HELHEST_OBSTACLE_XML.format(
@@ -347,7 +315,7 @@ def main():
     iter_stable: list[bool] = []
     for dt in DT_LIST:
         print(f"  simulating dt={dt}s ({int(DURATION/dt)} steps)...", end=" ", flush=True)
-        poses, stable = simulate_dt(dt, target_times)
+        poses, stable = simulate_dt(dt, FrameRecorder(args.fps, DURATION, len(RENDER_BODIES)))
         pose_iters.append(poses)
         iter_stable.append(stable)
         suffix = "" if stable else "  (unstable)"

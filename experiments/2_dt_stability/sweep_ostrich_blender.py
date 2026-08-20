@@ -24,11 +24,16 @@ warp.config.quiet = True
 import newton  # noqa: E402
 import numpy as np  # noqa: E402
 import warp as wp  # noqa: E402
-from ostrich import OstrichEngineConfig  # noqa: E402
-from ostrich import ExecutionConfig  # noqa: E402
+from ostrich import OstrichEngineConfig
+from ostrich.core.engine_config import ComplianceConfig
+from ostrich.core.engine_config import ContactsConfig
+from ostrich.core.engine_config import LinearSolverConfig
+from ostrich.core.engine_config import LinesearchConfig
+from ostrich.core.engine_config import NewtonRaphsonConfig  # noqa: E402
 from ostrich import LoggingConfig  # noqa: E402
 from ostrich import RenderingConfig  # noqa: E402
 from ostrich import SimulationConfig  # noqa: E402
+from ostrich import FrameRecorder  # noqa: E402
 
 os.environ["PYOPENGL_PLATFORM"] = "glx"
 
@@ -66,17 +71,19 @@ DEFAULT_FPS = 30
 class HelhestObstacleBlenderSim(HelhestObstacleSim):
     """HelhestObstacleSim that records every body's pose at every sim step."""
 
-    def simulate_and_capture(self) -> tuple[np.ndarray, np.ndarray, bool, str]:
-        """Run all sim steps, capture full body_q each step.
+    def simulate_and_capture(self, recorder: FrameRecorder) -> tuple[np.ndarray, bool, str]:
+        """Run all sim steps, capturing body_q onto the recorder's fps grid.
 
-        Returns (raw_poses [T+1, num_bodies, 7], raw_times [T+1], is_stable, note).
+        Returns (poses [T, num_bodies, 7], is_stable, note). The recorder
+        interpolates as it goes, so the poses come out on the render grid
+        with no resampling pass afterwards.
         Stability matches sweep_ostrich's simulate_and_check predicate.
         """
         body_q = self.current_state.body_q.numpy()
         if body_q.ndim == 3:
             body_q = body_q[0]
-        raw_poses: list[np.ndarray] = [body_q.astype(np.float32).copy()]
-        raw_times: list[float] = [0.0]
+        recorder.start(body_q)
+        x_final = float(body_q[0, 0])
 
         z_min = float(body_q[0, 2])
         z_max = z_min
@@ -101,16 +108,14 @@ class HelhestObstacleBlenderSim(HelhestObstacleSim):
             ):
                 has_nan = True
                 break
-            raw_poses.append(body_q.astype(np.float32).copy())
-            raw_times.append((step + 1) * dt)
+            recorder.record(body_q, (step + 1) * dt)
+            x_final = float(body_q[0, 0])
             z = float(body_q[0, 2])
             z_min = min(z_min, z)
             z_max = max(z_max, z)
 
-        raw_poses_arr = np.stack(raw_poses, axis=0).astype(np.float32)
-        raw_times_arr = np.asarray(raw_times, dtype=np.float32)
+        poses = recorder.finish()
 
-        x_final = float(raw_poses_arr[-1, 0, 0])
         is_stable = (
             not has_nan and z_min > 0.05 and z_max < 2.0 and x_final > self._obstacle_x + 1.0
         )
@@ -122,7 +127,7 @@ class HelhestObstacleBlenderSim(HelhestObstacleSim):
             note = f"stalled at x={x_final:.2f}"
         else:
             note = "stable"
-        return raw_poses_arr, raw_times_arr, is_stable, note
+        return poses, is_stable, note
 
 
 # ---------------------------------------------------------------------------
@@ -135,6 +140,7 @@ def _build_configs(dt: float):
         duration_seconds=DURATION,
         target_timestep_seconds=dt,
         num_worlds=1,
+        use_cuda_graph=True,
     )
     render_config = RenderingConfig(
         vis_type="null",
@@ -142,33 +148,33 @@ def _build_configs(dt: float):
         usd_file=None,
         start_paused=False,
     )
-    exec_config = ExecutionConfig(
-        use_cuda_graph=True,
-        headless_steps_per_segment=1,
-    )
+    # The old flat OstrichEngineConfig also carried contact_fb_alpha=0.5 and
+    # contact/friction fb_beta. Those knobs no longer exist on the config:
+    # friction's are gone entirely and contact's alpha is a module-import
+    # constant, so reproducing the original 0.5 needs OSTRICH_CONTACT_FB_ALPHA=0.5
+    # in the environment (it defaults to 1.0).
     engine_config = OstrichEngineConfig(
-        max_newton_iters=24,
-        max_linear_iters=16,
-        backtrack_min_iter=18,
-        newton_atol=1e-8,
-        linear_atol=1e-5,
-        linear_tol=1e-5,
-        enable_linesearch=False,
-        joint_compliance=6e-10,
-        contact_compliance=CONTACT_COMPLIANCE,
-        friction_compliance=FRICTION_COMPLIANCE,
-        regularization=1e-6,
-        contact_fb_alpha=0.5,
-        contact_fb_beta=1.0,
-        friction_fb_alpha=1.0,
-        friction_fb_beta=1.0,
-        max_contacts_per_world=16,
+        nr=NewtonRaphsonConfig(
+            max_iters=24,
+            backtrack_min_iter=18,
+            atol=1e-8,
+        ),
+        linear=LinearSolverConfig(
+            max_iters=16,
+            tol=1e-5,
+            atol=1e-5,
+            regularization=1e-6,
+        ),
+        compliance=ComplianceConfig(
+            joint=6e-10,
+            contact=CONTACT_COMPLIANCE,
+            friction=FRICTION_COMPLIANCE,
+        ),
+        linesearch=LinesearchConfig(enabled=False),
+        contacts=ContactsConfig(max_per_world=16),
     )
-    logging_config = LoggingConfig(
-        enable_timing=False,
-        enable_hdf5_logging=False,
-    )
-    return sim_config, render_config, exec_config, engine_config, logging_config
+    logging_config = LoggingConfig()
+    return sim_config, render_config, engine_config, logging_config
 
 
 # ---------------------------------------------------------------------------
@@ -211,40 +217,6 @@ def extract_shapes(model) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
-# Resampling onto a common fps grid
-# ---------------------------------------------------------------------------
-
-
-def _resample_poses(
-    raw_poses: np.ndarray, raw_times: np.ndarray, target_times: np.ndarray
-) -> np.ndarray:
-    """Resample [N_raw, B, 7] body poses onto target_times. Linear xyz, nlerp quat."""
-    target_T = len(target_times)
-    num_bodies = raw_poses.shape[1]
-    out = np.zeros((target_T, num_bodies, 7), dtype=np.float32)
-    for b in range(num_bodies):
-        for d in range(3):
-            out[:, b, d] = np.interp(target_times, raw_times, raw_poses[:, b, d])
-        for k, t_target in enumerate(target_times):
-            idx = int(np.searchsorted(raw_times, t_target, side="right")) - 1
-            idx = max(0, min(idx, len(raw_times) - 1))
-            if idx + 1 >= len(raw_times):
-                out[k, b, 3:7] = raw_poses[idx, b, 3:7]
-                continue
-            t0 = float(raw_times[idx])
-            t1 = float(raw_times[idx + 1])
-            alpha = 0.0 if t1 == t0 else (float(t_target) - t0) / (t1 - t0)
-            q0 = raw_poses[idx, b, 3:7].astype(np.float32)
-            q1 = raw_poses[idx + 1, b, 3:7].astype(np.float32)
-            if float(np.dot(q0, q1)) < 0.0:
-                q1 = -q1
-            qm = (1.0 - alpha) * q0 + alpha * q1
-            n = float(np.linalg.norm(qm))
-            out[k, b, 3:7] = qm / max(n, 1e-9)
-    return out
-
-
-# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -257,9 +229,6 @@ def main():
     )
     args = parser.parse_args()
 
-    target_T = int(round(DURATION * args.fps))
-    target_times = np.linspace(0.0, DURATION, target_T, dtype=np.float32)
-
     pose_iters: list[np.ndarray] = []
     iter_labels: list[str] = []
     iter_stable: list[bool] = []
@@ -269,11 +238,10 @@ def main():
 
     for dt in DT_LIST:
         print(f"  simulating dt={dt}s ({int(DURATION/dt)} steps)...", end=" ", flush=True)
-        sim_config, render_config, exec_config, engine_config, logging_config = _build_configs(dt)
+        sim_config, render_config, engine_config, logging_config = _build_configs(dt)
         sim = HelhestObstacleBlenderSim(
             sim_config,
             render_config,
-            exec_config,
             engine_config,
             logging_config,
             wheel_vel=WHEEL_VEL,
@@ -286,11 +254,11 @@ def main():
             print(f"\nExtracted {len(shapes)} shape descriptors.")
             print(f"  simulating dt={dt}s ({int(DURATION/dt)} steps)...", end=" ", flush=True)
 
-        # Trim per-body capture to the helhest robot bodies (chassis + 3 wheels).
-        raw_poses, raw_times, stable, note = sim.simulate_and_capture()
-        raw_poses = raw_poses[:, :num_render_bodies]
-        resampled = _resample_poses(raw_poses, raw_times, target_times)
-        pose_iters.append(resampled)
+        # Capture straight onto the render grid, trimmed to the helhest
+        # robot bodies (chassis + 3 wheels).
+        recorder = FrameRecorder(args.fps, DURATION, num_render_bodies)
+        poses, stable, note = sim.simulate_and_capture(recorder)
+        pose_iters.append(poses)
         iter_stable.append(stable)
         suffix = "" if stable else f"  ({note})"
         iter_labels.append(f"dt = {dt*1000:.1f} ms{suffix}")

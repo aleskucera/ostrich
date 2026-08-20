@@ -38,9 +38,9 @@ from sweep_mujoco import (  # noqa: E402
 )
 from sweep_mujoco_blender import (  # noqa: E402
     RENDER_BODIES,
-    _resample_poses,
     extract_shapes,
 )
+from ostrich import FrameRecorder  # noqa: E402
 
 DURATION = 4.0
 DT_LIST = [5e-4, 1e-3, 2e-2, 1.3e-1]
@@ -77,8 +77,8 @@ def _write_xml_tmpfile(xml: str) -> str:
     return path
 
 
-def simulate_dt(dt: float, target_times: np.ndarray) -> tuple[np.ndarray, bool, str]:
-    """Run Genesis at given dt, capture per-step poses, resample to target_times.
+def simulate_dt(dt: float, recorder: FrameRecorder) -> tuple[np.ndarray, bool, str]:
+    """Run Genesis at given dt, capturing poses onto the recorder's fps grid.
 
     Returns (resampled_poses [target_T, B, 7], is_stable, note). Stability matches
     the predicate used by the other sweeps (no NaN, chassis z in (0.05, 2.0),
@@ -124,12 +124,13 @@ def simulate_dt(dt: float, target_times: np.ndarray) -> tuple[np.ndarray, bool, 
         out[:, 6] = quat_wxyz[:, 0]
         return out
 
-    raw_poses: list[np.ndarray] = [_snapshot()]
-    raw_times: list[float] = [0.0]
+    snap = _snapshot()
+    recorder.start(snap)
+    x_final = float(snap[0, 0])
 
     has_nan = False
-    z_min = float(raw_poses[0][0, 2])
-    z_max = float(raw_poses[0][0, 2])
+    z_min = float(snap[0, 2])
+    z_max = float(snap[0, 2])
     total_steps = int(round(DURATION / dt))
     for step in range(total_steps):
         t = (step + 1) * dt
@@ -144,14 +145,11 @@ def simulate_dt(dt: float, target_times: np.ndarray) -> tuple[np.ndarray, bool, 
         if not np.all(np.isfinite(snap)) or np.any(np.abs(snap[:, :3]) > 50.0):
             has_nan = True
             break
-        raw_poses.append(snap)
-        raw_times.append(t)
+        recorder.record(snap, t)
+        x_final = float(snap[0, 0])
         z_min = min(z_min, float(snap[0, 2]))
         z_max = max(z_max, float(snap[0, 2]))
 
-    raw_poses_arr = np.stack(raw_poses, axis=0).astype(np.float32)
-    raw_times_arr = np.asarray(raw_times, dtype=np.float32)
-    x_final = float(raw_poses_arr[-1, 0, 0])
     is_stable = (
         not has_nan and z_min > 0.05 and z_max < 2.0 and x_final > OBSTACLE_X + 1.0
     )
@@ -164,13 +162,13 @@ def simulate_dt(dt: float, target_times: np.ndarray) -> tuple[np.ndarray, bool, 
     else:
         note = "stable"
 
-    resampled = _resample_poses(raw_poses_arr, raw_times_arr, target_times)
+    poses = recorder.finish()
     scene.destroy()
     try:
         os.unlink(xml_path)
     except OSError:
         pass
-    return resampled, is_stable, note
+    return poses, is_stable, note
 
 
 def main():
@@ -180,9 +178,6 @@ def main():
         "--fps", type=float, default=DEFAULT_FPS, help=f"Target fps (default {DEFAULT_FPS})"
     )
     args = parser.parse_args()
-
-    target_T = int(round(DURATION * args.fps))
-    target_times = np.linspace(0.0, DURATION, target_T, dtype=np.float32)
 
     # Reuse the MuJoCo-side shape extractor (Genesis loads the same MJCF, so
     # the visualization geometry is identical to the MuJoCo sweep).
@@ -196,7 +191,7 @@ def main():
     iter_stable: list[bool] = []
     for dt in DT_LIST:
         print(f"  simulating dt={dt}s ({int(DURATION/dt)} steps)...", end=" ", flush=True)
-        poses, stable, note = simulate_dt(dt, target_times)
+        poses, stable, note = simulate_dt(dt, FrameRecorder(args.fps, DURATION, len(RENDER_BODIES)))
         pose_iters.append(poses)
         iter_stable.append(stable)
         suffix = "" if stable else f"  ({note})"

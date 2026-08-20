@@ -24,7 +24,11 @@ import newton
 import numpy as np
 import warp as wp
 from ostrich import OstrichEngineConfig
-from ostrich import ExecutionConfig
+from ostrich.core.engine_config import ComplianceConfig
+from ostrich.core.engine_config import ContactsConfig
+from ostrich.core.engine_config import LinearSolverConfig
+from ostrich.core.engine_config import LinesearchConfig
+from ostrich.core.engine_config import NewtonRaphsonConfig
 from ostrich import InteractiveSimulator
 from ostrich import LoggingConfig
 from ostrich import RenderingConfig
@@ -105,7 +109,6 @@ class HelhestObstacleSim(InteractiveSimulator):
         self,
         sim_config: SimulationConfig,
         render_config: RenderingConfig,
-        exec_config: ExecutionConfig,
         engine_config: OstrichEngineConfig,
         logging_config: LoggingConfig,
         k_p: float = K_P,
@@ -122,7 +125,7 @@ class HelhestObstacleSim(InteractiveSimulator):
         self._obstacle_x = obstacle_x
         self._obstacle_height = obstacle_height
         self._initial_yaw = initial_yaw
-        super().__init__(sim_config, render_config, exec_config, engine_config, logging_config)
+        super().__init__(sim_config, render_config, engine_config, logging_config)
 
         self.set_friction_coefficient(mu, obstacle_mu)
 
@@ -340,26 +343,32 @@ def main():
         usd_file=None,
         start_paused=False,
     )
-    exec_config = ExecutionConfig(use_cuda_graph=False, headless_steps_per_segment=1)
+    # The old flat OstrichEngineConfig also carried contact_fb_alpha=0.5 and
+    # contact/friction fb_beta. Those knobs no longer exist on the config:
+    # friction's are gone entirely and contact's alpha is a module-import
+    # constant, so reproducing the original 0.5 needs OSTRICH_CONTACT_FB_ALPHA=0.5
+    # in the environment (it defaults to 1.0).
     engine_config = OstrichEngineConfig(
-        max_newton_iters=16,
-        max_linear_iters=16,
-        backtrack_min_iter=12,
-        newton_atol=1e-5,
-        linear_atol=1e-5,
-        linear_tol=1e-5,
-        enable_linesearch=False,
-        joint_compliance=6e-8,
-        contact_compliance=CONTACT_COMPLIANCE,
-        friction_compliance=FRICTION_COMPLIANCE,
-        regularization=1e-6,
-        contact_fb_alpha=0.5,
-        contact_fb_beta=1.0,
-        friction_fb_alpha=1.0,
-        friction_fb_beta=1.0,
-        max_contacts_per_world=16,
+        nr=NewtonRaphsonConfig(
+            max_iters=16,
+            backtrack_min_iter=12,
+            atol=1e-5,
+        ),
+        linear=LinearSolverConfig(
+            max_iters=16,
+            tol=1e-5,
+            atol=1e-5,
+            regularization=1e-6,
+        ),
+        compliance=ComplianceConfig(
+            joint=6e-8,
+            contact=CONTACT_COMPLIANCE,
+            friction=FRICTION_COMPLIANCE,
+        ),
+        linesearch=LinesearchConfig(enabled=False),
+        contacts=ContactsConfig(max_per_world=16),
     )
-    logging_config = LoggingConfig(enable_timing=False, enable_hdf5_logging=False)
+    logging_config = LoggingConfig()
 
     def make_run_one(trial_params: dict):
         def run_one(dt):
@@ -367,11 +376,11 @@ def main():
                 duration_seconds=DURATION,
                 target_timestep_seconds=dt,
                 num_worlds=1,
+                use_cuda_graph=False,
             )
             sim = HelhestObstacleSim(
                 sim_config,
                 render_config,
-                exec_config,
                 engine_config,
                 logging_config,
                 k_p=K_P,
