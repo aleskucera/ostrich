@@ -189,10 +189,10 @@ def test_differential_turn():
 def test_multi_step():
     """Multi-step trajectory (5 steps) — gradient through multiple contacts.
 
-    KNOWN FAILING. The analytic parameter gradient comes back ~0 where finite
-    differences give O(1), while the single-step cases above are accurate on
-    the same model. Not an FD step-size artifact and not the zero_gradients()
-    placement -- both were ruled out. See docs/adjoint_multistep_issue.md.
+    Note the control here is a *single* object reused for all 5 steps, so
+    d(loss)/d(joint_target_vel) is the sum of every step's contribution. That
+    differs from OstrichDifferentiableSimulator, which drives each step with its
+    own controls[i] and therefore keeps a separate gradient per step.
     """
     print("\n=== Helhest: Multi-step trajectory (5 steps) ===")
 
@@ -238,15 +238,21 @@ def test_multi_step():
     )
 
     # Backward
+    # step_backward leaves this step's d(loss)/d(joint_target_vel) in
+    # data.joint_target_vel.grad, overwriting whatever was there. Because one
+    # control drives every step, the total derivative is their sum -- reading
+    # the array after the loop instead yields step 0 alone, which is ~1e-4
+    # against a true value of ~1.2 and reads as a dead gradient.
+    grad_a = None
     for step in range(4, -1, -1):
         buffer.load_step(step, engine.data, engine.ostrich_contacts)
         engine.data.zero_gradients()
         engine.step_backward()
+        step_grad = engine.data.joint_target_vel.grad.numpy().flatten().copy()
+        grad_a = step_grad if grad_a is None else grad_a + step_grad
         if step > 0:
             # Propagate pose and vel gradients to previous step
             buffer.save_gradients(step, engine.data)
-
-    grad_a = engine.data.joint_target_vel.grad.numpy().flatten().copy()
 
     # FD
     # Central-difference step. 1e-4 sits in the roundoff-dominated regime for
