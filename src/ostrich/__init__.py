@@ -23,6 +23,7 @@ from .profiling import EngineProfiler
 from .simulation import OstrichDifferentiableSimulator
 from .simulation import DatasetSimulator
 from .simulation import DifferentiableSimulator
+from .simulation import FrameRecorder
 from .simulation import InteractiveSimulator
 from .simulation import NewtonDifferentiableSimulator
 from .simulation import RenderingConfig
@@ -46,6 +47,7 @@ __all__ = [
     "MuJoCoEngineConfig",
     "SemiImplicitEngineConfig",
     "XPBDEngineConfig",
+    "FrameRecorder",
     "InteractiveSimulator",
     "OstrichDifferentiableSimulator",
     "DifferentiableSimulator",

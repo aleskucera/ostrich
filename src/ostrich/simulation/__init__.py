@@ -2,6 +2,7 @@ from .base_simulator import BaseSimulator
 from .dataset_simulator import DatasetSimulator
 from .differentiable_simulator import OstrichDifferentiableSimulator
 from .differentiable_simulator import DifferentiableSimulator
+from .frame_recorder import FrameRecorder
 from .differentiable_simulator import NewtonDifferentiableSimulator
 from .interactive_simulator import InteractiveSimulator
 from .sim_config import RenderingConfig
