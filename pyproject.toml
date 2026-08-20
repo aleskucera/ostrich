@@ -12,7 +12,7 @@ sim = [
   "h5py==3.14.0",
   "hydra-core==1.3.2",
   "matplotlib==3.10.3",
-  "newton[examples,importers,torch-cu12]",
+  "newton[examples,importers]",
   "nvtx==0.2.12",
   "openmesh==1.2.1",
   "pandas==2.3.1",
@@ -20,12 +20,19 @@ sim = [
   "pytest==8.4.0",
   "scipy==1.16.1",
   "taichi==1.7.3",
-  "torch>=2.9.1",
   "tqdm==4.67.1",
   "trimesh==4.6.12",
   "usd-core==25.5.1",
   "mujoco-warp>=3.8.0.1",
   "warp-lang>=1.13.0",
+]
+# torch is only needed by ostrich.learning (NN warm-start / unrolled Newton)
+# and the train_warm_start* examples -- the engine itself does not import it.
+# Kept out of `sim` so CPU-only environments (CI) skip ~6 GB of CUDA wheels.
+learning = [
+  "ostrich[sim]",
+  "newton[torch-cu12]",
+  "torch>=2.9.1",
 ]
 brax = [
   "brax",
@@ -40,6 +47,7 @@ nimble = [
 dev = [
   "ostrich[sim]",
   "ostrich[docs]",
+  "ostrich[learning]",
 ]
 docs = [
   "mkdocs-gen-files==0.5.0",

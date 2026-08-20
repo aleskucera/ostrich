@@ -1,5 +1,3 @@
-import torch
-import torch.nn as nn
 import warp as wp
 from ostrich.constraints import contact_residual_kernel
 from ostrich.constraints import control_residual_kernel
