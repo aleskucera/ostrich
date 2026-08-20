@@ -78,9 +78,30 @@ def _ostrich_imports(tree: ast.AST):
                     yield node.module, alias.name, alias.asname, node.lineno
 
 
+def _import(module: str):
+    """Import an ostrich module, distinguishing "gone" from "needs a missing dep".
+
+    ostrich.learning imports torch, which the CI environment deliberately does
+    not install. Without this split the check would report those names as
+    deleted whenever torch is absent -- true of CI, false everywhere else.
+    Raises _MissingDep so the caller can skip rather than fail.
+    """
+    try:
+        return importlib.import_module(module)
+    except ImportError as exc:
+        root = (exc.name or "").split(".")[0]
+        if root and root != "ostrich":
+            raise _MissingDep(exc.name) from exc
+        raise
+
+
+class _MissingDep(Exception):
+    """An optional third-party dependency is absent, so this import is uncheckable."""
+
+
 def _resolves(module: str, name: str) -> bool:
     try:
-        mod = importlib.import_module(module)
+        mod = _import(module)
     except ImportError:
         return False
     if hasattr(mod, name):
@@ -88,7 +109,7 @@ def _resolves(module: str, name: str) -> bool:
     # `from ostrich.core import engine_config` imports a submodule, which is
     # not an attribute of the parent until it has been imported.
     try:
-        importlib.import_module(f"{module}.{name}")
+        _import(f"{module}.{name}")
     except ImportError:
         return False
     return True
@@ -97,18 +118,21 @@ def _resolves(module: str, name: str) -> bool:
 @pytest.mark.parametrize("path", _params(STALE_IMPORTS))
 def test_ostrich_imports_resolve(path: pathlib.Path):
     tree = ast.parse(path.read_text(), filename=str(path))
-    missing = [
-        f"line {lineno}: from {module} import {name}"
-        for module, name, _asname, lineno in _ostrich_imports(tree)
-        if not _resolves(module, name)
-    ]
+    missing = []
+    for module, name, _asname, lineno in _ostrich_imports(tree):
+        try:
+            ok = _resolves(module, name)
+        except _MissingDep:
+            continue  # uncheckable here; checked wherever that dep is installed
+        if not ok:
+            missing.append(f"line {lineno}: from {module} import {name}")
     assert not missing, "imports no longer in the ostrich API:\n  " + "\n  ".join(missing)
 
 
 def _dataclass_fields(module: str, name: str) -> set[str] | None:
     """Field names of an ostrich dataclass, or None if it is not one."""
     try:
-        obj = getattr(importlib.import_module(module), name, None)
+        obj = getattr(_import(module), name, None)
     except ImportError:
         return None
     if obj is None or not dataclasses.is_dataclass(obj):
@@ -123,7 +147,10 @@ def test_ostrich_config_kwargs_exist(path: pathlib.Path):
     # Local name -> ostrich dataclass fields, for names this file imported.
     fields_by_local_name = {}
     for module, name, asname, _lineno in _ostrich_imports(tree):
-        fields = _dataclass_fields(module, name)
+        try:
+            fields = _dataclass_fields(module, name)
+        except _MissingDep:
+            continue
         if fields is not None:
             fields_by_local_name[asname or name] = (name, fields)
 
