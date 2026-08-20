@@ -32,13 +32,20 @@ class SimulationConfig:
 
 @dataclass
 class RenderingConfig:
-    """Parameters for rendering the simulation to a USD file."""
+    """Parameters for rendering the simulation to a USD file.
+
+    ``real_time`` only affects the ``gl`` viewer: it paces the interactive
+    loop so one rendered frame takes as long in wall-clock as it covers in
+    sim time. Off, the loop runs as fast as the solver does, which for a
+    faster-than-real-time solver means the window plays back sped up.
+    """
 
     vis_type: Literal["gl", "usd", "null", None] = "gl"
     target_fps: int | None = 30
     usd_file: str | None = "sim.usd"
     usd_scaling: float | None = 100.0
     start_paused: bool = True
+    real_time: bool = True
     world_offset_x: float = 20.0
     world_offset_y: float = 20.0
 

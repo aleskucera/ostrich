@@ -31,7 +31,6 @@ Headless self-test (no window; drives a script and prints per-scan hit stats):
 """
 
 import pathlib
-import time
 from typing import override
 
 import hydra
@@ -186,12 +185,8 @@ class HelhestLidarTeleop(HelhestControlSimulator):
         assert self.simulation_config.num_worlds == 1, "single-world demo"
         self._chassis = 0  # first body added by create_helhest_model
         self._sensor = SENSORS[sensor]
-        # REAL-TIME pacing: the stock run loop renders as fast as the display allows and each
-        # frame advances steps_per_segment*dt of sim time, so on a >33 Hz monitor the sim runs
-        # faster than reality (4.3x at 144 Hz). Sleep the remainder of each frame's sim-time
-        # budget; if a frame overruns, resync instead of accumulating debt.
-        self._realtime = realtime
-        self._frame_due: float | None = None
+        # Real-time pacing now lives in InteractiveSimulator._pace_real_time
+        self.rendering_config.real_time = realtime
         dev = self.model.device
         dirs = _odin_directions() if sensor == "odin" else _dome_directions()
         self._n_rays = len(dirs)
@@ -262,14 +257,6 @@ class HelhestLidarTeleop(HelhestControlSimulator):
 
     @override
     def _render(self, segment_num: int):
-        if self._realtime:
-            budget = self.steps_per_segment * self.clock.dt  # sim seconds per rendered frame
-            now = time.perf_counter()
-            if self._frame_due is None or now > self._frame_due + budget:
-                self._frame_due = now  # first frame, or overrun -> resync, no debt
-            else:
-                time.sleep(max(0.0, self._frame_due - now))
-            self._frame_due += budget
         sim_time = segment_num * self.steps_per_segment * self.clock.dt
         self._scan()
         self.viewer.begin_frame(sim_time)

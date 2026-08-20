@@ -2,6 +2,7 @@
 _target_: ostrich.RenderingConfig
 vis_type: "gl"
 target_fps: 30
+real_time: true
 usd_file: null
 world_offset_x: 5.0
 world_offset_y: 5.0

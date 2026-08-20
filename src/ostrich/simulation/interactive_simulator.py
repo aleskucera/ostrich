@@ -14,6 +14,28 @@ from .base_simulator import RenderingConfig
 from .base_simulator import SimulationConfig
 
 
+@wp.kernel
+def _blend_body_q_kernel(
+    prev: wp.array(dtype=wp.transform),
+    curr: wp.array(dtype=wp.transform),
+    alpha: float,
+    out: wp.array(dtype=wp.transform),
+):
+    i = wp.tid()
+    out[i] = wp.transform(
+        wp.lerp(
+            wp.transform_get_translation(prev[i]),
+            wp.transform_get_translation(curr[i]),
+            alpha,
+        ),
+        wp.quat_slerp(
+            wp.transform_get_rotation(prev[i]),
+            wp.transform_get_rotation(curr[i]),
+            alpha,
+        ),
+    )
+
+
 class InteractiveSimulator(BaseSimulator, ABC):
     """
     Simulator designed for real-time visualization and interactive sessions.
@@ -45,6 +67,20 @@ class InteractiveSimulator(BaseSimulator, ABC):
         # CUDA Graph Storage
         self.cuda_graph: Optional[wp.Graph] = None
 
+        # Wall-clock deadline for the next rendered frame (real-time pacing)
+        self._frame_due: Optional[float] = None
+
+        # Pose interpolation: with dt above the frame duration one physics
+        # step is too coarse to render directly, so each step is drawn as
+        # several frames blended between its start and end pose.
+        self._display_frames = self.clock.display_frames
+        if self._display_frames > 1 and self.current_state.body_q is not None:
+            self._body_q_true = self.current_state.body_q
+            self._body_q_prev = wp.clone(self._body_q_true)
+            self._body_q_blend = wp.clone(self._body_q_true)
+        else:
+            self._display_frames = 1
+
     def run(self):
         """Main entry point to start the simulation."""
         pbar = tqdm(
@@ -58,14 +94,22 @@ class InteractiveSimulator(BaseSimulator, ABC):
         try:
             segment_num = 0
             while self.viewer.is_running():
-                if not self.viewer.is_paused():
-                    self._run_simulation_segment(segment_num)
-                    segment_num += 1
-                    pbar.update(1)
-                self._render(segment_num)
+                if self.viewer.is_paused():
+                    # Nothing moved, so there is no span to interpolate
+                    # across; redraw the current pose once.
+                    self._render_frame(segment_num)
+                    continue
 
-                if self.rendering_config.vis_type == "gl":
-                    wp.synchronize()
+                if self._display_frames > 1:
+                    self.current_state.body_q = self._body_q_true
+                    wp.copy(self._body_q_prev, self._body_q_true)
+                self._run_simulation_segment(segment_num)
+                segment_num += 1
+                pbar.update(1)
+
+                for i in range(self._display_frames):
+                    self._blend_pose((i + 1) / self._display_frames)
+                    self._render_frame(segment_num)
         finally:
             pbar.close()
 
@@ -105,6 +149,56 @@ class InteractiveSimulator(BaseSimulator, ABC):
             self.viewer.log_state(self.current_state)
             self.viewer.log_contacts(self.contacts, self.current_state)
             self.viewer.end_frame()
+
+    def _render_frame(self, segment_num: int):
+        """Draws one display frame and holds it for its wall-clock share."""
+        self._render(segment_num)
+        if self.rendering_config.vis_type == "gl":
+            wp.synchronize()
+            self._pace_real_time()
+
+    def _blend_pose(self, alpha: float):
+        """Points ``current_state.body_q`` at the blended pose for this frame.
+
+        ``alpha`` runs 0 (segment start pose) to 1 (the pose physics
+        actually produced), so the last frame of every segment shows the
+        true state and the buffer never feeds back into the solver.
+        """
+        if self._display_frames == 1:
+            return
+        if alpha >= 1.0:
+            self.current_state.body_q = self._body_q_true
+            return
+
+        wp.launch(
+            _blend_body_q_kernel,
+            dim=len(self._body_q_prev),
+            inputs=[self._body_q_prev, self._body_q_true, alpha],
+            outputs=[self._body_q_blend],
+            device=self.model.device,
+        )
+        self.current_state.body_q = self._body_q_blend
+
+    def _pace_real_time(self):
+        """Sleeps out whatever is left of the frame's sim-time budget.
+
+        The loop otherwise runs as fast as the solver does, so a solver
+        that beats real time plays the window back sped up. Called after
+        ``wp.synchronize()`` so the GPU work is already accounted for.
+        An overrun (solver slower than real time) resyncs instead of
+        accumulating debt the loop would then try to sprint off.
+        """
+        if not self.rendering_config.real_time:
+            return
+
+        # sim seconds covered by one display frame
+        budget = self.steps_per_segment * self.clock.dt / self._display_frames
+        now = time.perf_counter()
+        if self._frame_due is None or now > self._frame_due + budget:
+            self._frame_due = now
+        else:
+            time.sleep(max(0.0, self._frame_due - now))
+        self._frame_due += budget
 
     def _render(self, segment_num: int):
         sim_time = segment_num * self.steps_per_segment * self.clock.dt

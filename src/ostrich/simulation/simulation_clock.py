@@ -29,6 +29,7 @@ class SimulationClock:
         # --- Calculated Parameters ---
         self.dt: float = 0.0
         self.steps_per_segment: int = 0
+        self.display_frames: int = 1
         self.num_segments: int = 0
         self.total_sim_steps: int = 0
         self.sim_duration: float = 0.0
@@ -81,6 +82,22 @@ class SimulationClock:
                 if abs(new_fps - target_fps) > 0.1:
                     print(f"INFO: Rendering FPS adjusted from {target_fps} to {new_fps:.2f}")
                 self.render_config.target_fps = new_fps
+
+            # One physics step is the coarsest thing that can be rendered
+            # directly, so a dt above the frame duration caps the frame rate
+            # at 1/dt (50ms -> 20 fps). The GL viewer closes that gap by
+            # drawing several interpolated frames per segment instead.
+            if self.render_config.vis_type == "gl":
+                segment_duration = self.steps_per_segment * self.dt
+                self.display_frames = max(1, round(segment_duration * target_fps))
+                if self.display_frames > 1:
+                    self.render_config.target_fps = self.display_frames / segment_duration
+                    print(
+                        f"INFO: dt={self.dt * 1e3:.1f}ms caps direct rendering at "
+                        f"{1.0 / segment_duration:.2f} fps; interpolating "
+                        f"{self.display_frames} frames per step -> "
+                        f"{self.render_config.target_fps:.2f} fps"
+                    )
         else:
             self.dt = target_dt
             # Headless: one physics step per segment. There used to be an
