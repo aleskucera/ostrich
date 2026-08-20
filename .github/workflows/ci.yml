@@ -4,18 +4,22 @@ on:
     branches:
       - master
       - main
+  # Build (but do not deploy) on PRs, so docs breakage is caught before it
+  # reaches the public site instead of on the way out to gh-pages.
+  pull_request:
 
 permissions:
   contents: write
 
 jobs:
-  deploy:
+  docs:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Configure Git Credentials
+        if: github.event_name == 'push'
         run: |
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
@@ -39,5 +43,8 @@ jobs:
       - name: Build documentation
         run: mkdocs build
 
+      # Push-only: gh-deploy needs contents:write, which a fork PR's token
+      # does not have, and a PR must not publish to gh-pages regardless.
       - name: Deploy documentation
+        if: github.event_name == 'push'
         run: mkdocs gh-deploy --force

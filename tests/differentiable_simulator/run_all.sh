@@ -46,6 +46,24 @@ for test in "${TESTS[@]}"; do
     echo ""
 done
 
+# Under Actions, mirror the tally into the run summary so PR reviewers see
+# pass/fail in the checks tab without opening the raw log.
+if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+    {
+        echo "## Gradient suite"
+        echo ""
+        echo "| result | count |"
+        echo "| --- | --- |"
+        echo "| passed | $PASSED |"
+        echo "| failed | $FAILED |"
+        if [ ${#FAILED_NAMES[@]} -gt 0 ]; then
+            echo ""
+            echo "Failed:"
+            for name in "${FAILED_NAMES[@]}"; do echo "- \`$name\`"; done
+        fi
+    } >> "$GITHUB_STEP_SUMMARY"
+fi
+
 echo "========================================"
 echo "Results: $PASSED passed, $FAILED failed"
 if [ $FAILED -gt 0 ]; then
