@@ -106,10 +106,24 @@ class NewtonRaphsonConfig:
     max_iters: int = 16
     backtrack_min_iter: int = 2
     atol: float = 1e-3
+    # Under-relaxation theta of the friction weight w across NR iterations:
+    #   w_used = (1 - theta) * w_prev + theta * w_raw
+    # with w_prev a persistent per-contact buffer zeroed at each step start
+    # (EngineData.friction_w). Damps the w oscillation of sliding contacts
+    # near the cone boundary at truncated NR iteration counts. 1.0 (default)
+    # is bit-exact with the unrelaxed solver. Threaded to the kernels as a
+    # plain float argument (CUDA-graph-safe, per-engine-instance). The
+    # batched linesearch-candidate kernels ignore it (known gap; they always
+    # run unrelaxed).
+    w_relaxation: float = 1.0
 
     def __post_init__(self):
         if self.max_iters < 1:
             raise ValueError(f"nr.max_iters must be >= 1, got {self.max_iters}")
+        if not (0.0 < self.w_relaxation <= 1.0):
+            raise ValueError(
+                f"nr.w_relaxation must be in (0, 1], got {self.w_relaxation}"
+            )
         if self.backtrack_min_iter < 0:
             raise ValueError(
                 f"nr.backtrack_min_iter must be >= 0, got {self.backtrack_min_iter}"

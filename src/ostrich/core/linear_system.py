@@ -308,6 +308,7 @@ def compute_linear_system(
             config.compliance.friction,
             config.relaxation.friction_mode,
             config.relaxation.friction_load_gate,
+            config.nr.w_relaxation,
         ],
         outputs=[
             data.constr_active_mask.f,
@@ -316,6 +317,7 @@ def compute_linear_system(
             data.res.c.f,
             data.J_values.f,
             data.C_values.f,
+            data.friction_w,
         ],
         device=data.device,
     )
