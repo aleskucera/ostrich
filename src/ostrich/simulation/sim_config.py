@@ -100,14 +100,14 @@ def _keep_glx_off_the_compute_gpu():
     """
     if os.environ.get("__GLX_VENDOR_LIBRARY_NAME") != "nvidia":
         return
-    if not _has_non_nvidia_gl_vendor():
-        # Single-GPU NVIDIA box: clearing the pin would leave libglvnd with no
-        # usable vendor, so the contention is the lesser problem. Say so and
-        # leave it alone.
+    if not _has_non_nvidia_render_gpu():
+        # NVIDIA-only machine: clearing the pin would drop GL onto llvmpipe and
+        # render in software, which costs far more than the contention risk.
         print(
-            "WARNING: __GLX_VENDOR_LIBRARY_NAME=nvidia and no other GL vendor is "
-            "installed, so OpenGL and CUDA must share the GPU. Watch for NVIDIA "
-            "Xid 13 surfacing as a misleading 'CUDA error 719'. "
+            "WARNING: __GLX_VENDOR_LIBRARY_NAME=nvidia and no non-NVIDIA render "
+            "GPU is present, so OpenGL and CUDA must share the GPU. Keeping the "
+            "pin -- clearing it would fall back to software rendering. Watch for "
+            "NVIDIA Xid 13 surfacing as a misleading 'CUDA error 719'. "
             "See docs/gl_viewer_gpu_contention.md."
         )
         return
@@ -127,17 +127,35 @@ def _keep_glx_off_the_compute_gpu():
     )
 
 
-def _has_non_nvidia_gl_vendor() -> bool:
-    """Whether libglvnd has a vendor other than NVIDIA to fall back on.
+def _has_non_nvidia_render_gpu() -> bool:
+    """Whether a non-NVIDIA GPU that can actually render is present.
 
-    Clearing the GLX pin only helps if something else can drive the display.
-    Each installed vendor drops a JSON into glvnd's vendor directory, so a
-    non-NVIDIA entry there means there is an integrated or second GPU to render
-    on. Absent the directory we assume there is, since the pin is normally only
-    set on hybrid machines in the first place.
+    Clearing the GLX pin only helps if something else can drive the rendering.
+    DRM exposes a render node (``renderD*``) for every GPU with a 3D engine, so
+    a non-NVIDIA vendor id among them means a real second GPU -- an integrated
+    Intel or AMD one, typically.
+
+    Checking libglvnd's installed vendors instead is not enough, and that was
+    the earlier bug here: Mesa ships nearly everywhere, so its vendor file is
+    present even on a machine whose only GPUs are NVIDIA -- where dropping the
+    pin lands on llvmpipe and renders in software. Measured on a 2x RTX 3090
+    box driving an Xvfb display, that took a sim from real time to 0.09x.
+
+    Display-only devices, such as a server's ASPEED BMC, have no render node
+    and are correctly ignored. Absent the DRM directory we assume a second GPU
+    exists, since the pin is normally only set on hybrid machines anyway.
     """
-    vendor_dir = pathlib.Path("/usr/share/glvnd/egl_vendor.d")
-    if not vendor_dir.is_dir():
+    NVIDIA = "0x10de"
+    try:
+        nodes = sorted(pathlib.Path("/sys/class/drm").glob("renderD*"))
+    except OSError:
         return True
-    entries = [f.name for f in vendor_dir.glob("*.json")]
-    return any("nvidia" not in name.lower() for name in entries) if entries else True
+    if not nodes:
+        return True
+    for node in nodes:
+        try:
+            if (node / "device" / "vendor").read_text().strip().lower() != NVIDIA:
+                return True
+        except OSError:
+            continue
+    return False

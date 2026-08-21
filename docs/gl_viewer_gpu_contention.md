@@ -47,10 +47,19 @@ compute. It prints a line saying so.
 CUDA is unaffected: it never goes through libglvnd, and `ViewerGL` needs no
 GL/CUDA interop, so nothing is lost by moving GL off the discrete card.
 
-On a machine with no other GL vendor installed -- a single NVIDIA card --
-clearing the pin would leave libglvnd nothing to render with, so the viewer
-detects that (glvnd's vendor directory has only an NVIDIA entry), keeps the pin
-and warns instead. `OSTRICH_ALLOW_NVIDIA_GLX=1` forces that behaviour anywhere.
+On a machine whose only GPUs are NVIDIA, clearing the pin is *worse* than the
+contention: libglvnd falls back to Mesa, which without a second GPU means
+llvmpipe -- software rendering. The viewer detects this and keeps the pin,
+warning instead. `OSTRICH_ALLOW_NVIDIA_GLX=1` forces that behaviour anywhere.
+
+The detection asks DRM whether a **non-NVIDIA render node** exists
+(`/sys/class/drm/renderD*/device/vendor != 0x10de`), not whether a non-NVIDIA
+libglvnd vendor file is installed. The latter was the first version of this
+check and it was wrong: Mesa is installed nearly everywhere, so it reported
+"second GPU available" on a 2x RTX 3090 box and dropped GL to llvmpipe, taking
+a sim from real time to 0.09x. Render nodes exist only for GPUs with a 3D
+engine, so display-only hardware -- a server's ASPEED BMC, say -- is correctly
+ignored.
 
 Machines that never set the variable, which is most of them, see none of this:
 the check is a no-op and the viewer starts exactly as before.
