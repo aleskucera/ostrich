@@ -1,4 +1,5 @@
 import os
+import pathlib
 from dataclasses import dataclass
 from enum import Enum
 from typing import Literal
@@ -99,6 +100,17 @@ def _keep_glx_off_the_compute_gpu():
     """
     if os.environ.get("__GLX_VENDOR_LIBRARY_NAME") != "nvidia":
         return
+    if not _has_non_nvidia_gl_vendor():
+        # Single-GPU NVIDIA box: clearing the pin would leave libglvnd with no
+        # usable vendor, so the contention is the lesser problem. Say so and
+        # leave it alone.
+        print(
+            "WARNING: __GLX_VENDOR_LIBRARY_NAME=nvidia and no other GL vendor is "
+            "installed, so OpenGL and CUDA must share the GPU. Watch for NVIDIA "
+            "Xid 13 surfacing as a misleading 'CUDA error 719'. "
+            "See docs/gl_viewer_gpu_contention.md."
+        )
+        return
     if os.environ.get("OSTRICH_ALLOW_NVIDIA_GLX") == "1":
         print(
             "WARNING: __GLX_VENDOR_LIBRARY_NAME=nvidia with OSTRICH_ALLOW_NVIDIA_GLX=1. "
@@ -113,3 +125,19 @@ def _keep_glx_off_the_compute_gpu():
         "NVIDIA Xid 13, which surfaces as a misleading 'CUDA error 719'. "
         "Set OSTRICH_ALLOW_NVIDIA_GLX=1 to keep the pin (single-GPU machines)."
     )
+
+
+def _has_non_nvidia_gl_vendor() -> bool:
+    """Whether libglvnd has a vendor other than NVIDIA to fall back on.
+
+    Clearing the GLX pin only helps if something else can drive the display.
+    Each installed vendor drops a JSON into glvnd's vendor directory, so a
+    non-NVIDIA entry there means there is an integrated or second GPU to render
+    on. Absent the directory we assume there is, since the pin is normally only
+    set on hybrid machines in the first place.
+    """
+    vendor_dir = pathlib.Path("/usr/share/glvnd/egl_vendor.d")
+    if not vendor_dir.is_dir():
+        return True
+    entries = [f.name for f in vendor_dir.glob("*.json")]
+    return any("nvidia" not in name.lower() for name in entries) if entries else True

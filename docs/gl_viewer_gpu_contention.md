@@ -47,9 +47,32 @@ compute. It prints a line saying so.
 CUDA is unaffected: it never goes through libglvnd, and `ViewerGL` needs no
 GL/CUDA interop, so nothing is lost by moving GL off the discrete card.
 
-**Single-GPU NVIDIA machines** have no second vendor to fall back to. Set
-`OSTRICH_ALLOW_NVIDIA_GLX=1` to keep the pin; the viewer then warns instead of
-clearing it, and the contention above applies.
+On a machine with no other GL vendor installed -- a single NVIDIA card --
+clearing the pin would leave libglvnd nothing to render with, so the viewer
+detects that (glvnd's vendor directory has only an NVIDIA entry), keeps the pin
+and warns instead. `OSTRICH_ALLOW_NVIDIA_GLX=1` forces that behaviour anywhere.
+
+Machines that never set the variable, which is most of them, see none of this:
+the check is a no-op and the viewer starts exactly as before.
+
+## Desktop-wide controls (this project's dev machine)
+
+Independent of ostrich, three helpers manage the same pin for everything else:
+
+| command | effect |
+|---|---|
+| `glx-pin on \| off \| status` | session default, by writing a Hyprland `env` line. Affects apps started afterwards; turning it off fully applies at next login. `status` also lists which processes are on the dGPU. |
+| `nvidia-gl <cmd>` | run one app on the discrete GPU. Do not use while a CUDA job is running. |
+| `igpu-only <cmd>` | force one app onto the integrated GPU |
+
+`igpu-only` exists because clearing the variable is **not always enough**:
+Chromium/Electron apps (Spotify) pick the discrete GPU themselves and ignore
+the pin. It also restricts glvnd's EGL to the Mesa ICD, removing the NVIDIA GPU
+from the set they can choose at all. Worth knowing if a long physics run dies
+while such an app is open.
+
+Note that ostrich's own guard overrides `glx-pin on` for its GL viewer: it
+treats the pin as unsafe whenever it is about to run CUDA alongside GL.
 
 ## Related: pinned host memory without a CUDA device
 
