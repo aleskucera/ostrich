@@ -6,13 +6,13 @@ import hydra
 import newton
 import numpy as np
 import warp as wp
-from ostrich import OstrichEngine
+from omegaconf import DictConfig
 from ostrich import EngineConfig
 from ostrich import InteractiveSimulator
 from ostrich import LoggingConfig
+from ostrich import OstrichEngine
 from ostrich import RenderingConfig
 from ostrich import SimulationConfig
-from omegaconf import DictConfig
 
 try:
     from examples.helhest_junior.common import create_helhest_junior_model
@@ -213,10 +213,10 @@ class HelhestJuniorControlSimulator(InteractiveSimulator):
             wp.copy(self.control.joint_target_pos, self.joint_target_buffer)
 
     def build_model(self) -> newton.Model:
-        self.builder.rigid_gap = 1.0
+        self.builder.rigid_gap = 0.2
         # --- 1. Ground ---
         ground_cfg = newton.ModelBuilder.ShapeConfig(
-            mu=0.3,
+            mu=0.8,
             ke=4e4,
             kd=4e3,
             kf=1e3,
@@ -299,8 +299,11 @@ class HelhestJuniorControlSimulator(InteractiveSimulator):
             control_mode=self.control_mode,
             k_p=self.k_p,
             k_d=self.k_d,
-            friction_left_right=self.friction,
-            friction_rear=self.friction * 0.5,  # Keep rear wheel slippery
+            friction_left_right=0.6,  # front wheels, LATERAL (skid along the axle direction)
+            friction_rear=0.3,  # rear wheel, lateral
+            friction_long_left_right=0.9,  # front wheels, LONGITUDINAL (rolling direction)
+            friction_long_rear=0.6,  # rear wheel, longitudinal
+            mu_rolling=0.7,  # rolling resistance
         )
 
         return self.builder.finalize_replicated(num_worlds=self.simulation_config.num_worlds)
