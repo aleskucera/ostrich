@@ -222,8 +222,10 @@ class InteractiveSimulator(BaseSimulator, ABC):
         #     self.solver.events.record_timings()
 
     def _run_segment_with_graph(self, segment_num: int):
+        captured_now = False
         if self.cuda_graph is None:
             self._capture_cuda_graphs()
+            captured_now = True
 
         # Coarse segment timer lives on engine.profiling.segment_timing
         # for OstrichEngine; for non-Ostrich solvers there's no profiling
@@ -249,6 +251,14 @@ class InteractiveSimulator(BaseSimulator, ABC):
         # the unrolled copies and only the last copy's times survive.
         if isinstance(self.solver, OstrichEngine) and self.solver.profiler.enabled:
             self.solver.profiler.collect()
+
+        # Graph replay skips the Python side of _single_physics_step, so the
+        # clock (and anything phase-scripted on clock.time) would freeze at
+        # the capture-time value. The capture call above already advanced the
+        # clock for this segment's steps; advance manually on replays only.
+        if not captured_now:
+            for _ in range(self.steps_per_segment):
+                self.clock.advance()
 
     def _capture_cuda_graphs(self):
         n_steps = self.steps_per_segment
