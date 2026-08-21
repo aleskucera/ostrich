@@ -36,6 +36,12 @@ class SimulationConfig:
 class RenderingConfig:
     """Parameters for rendering the simulation to a USD file.
 
+    ``viewer_width``/``viewer_height`` size the ``gl`` window. They default to
+    1280x720 rather than newton's 1920x1080 because the per-frame present cost
+    scales with pixels, and on a host-memory framebuffer (Xvfb, VNC) that
+    dominates: measured on an RTX 3090, 1920x1080 held a sim to 0.88x real time
+    and 1280x720 reached 0.98x, while 1024x576 gained nothing further.
+
     ``real_time`` only affects the ``gl`` viewer: it paces the interactive
     loop so one rendered frame takes as long in wall-clock as it covers in
     sim time. Off, the loop runs as fast as the solver does, which for a
@@ -48,6 +54,8 @@ class RenderingConfig:
     usd_scaling: float | None = 100.0
     start_paused: bool = True
     real_time: bool = True
+    viewer_width: int = 1280
+    viewer_height: int = 720
     world_offset_x: float = 20.0
     world_offset_y: float = 20.0
 
@@ -66,7 +74,7 @@ class RenderingConfig:
                 num_frames=num_segments,
             )
         elif self.vis_type == "gl":
-            return newton.viewer.ViewerGL()
+            return newton.viewer.ViewerGL(width=self.viewer_width, height=self.viewer_height)
         elif self.vis_type == "null" or self.vis_type is None:
             return newton.viewer.ViewerNull(num_segments)
         else:
