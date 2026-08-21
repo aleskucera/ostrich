@@ -116,6 +116,12 @@ cd ostrich
 # Pull the newton submodule
 git submodule update --init --recursive
 
+# Apply the local newton viewer fixes. The submodule points at upstream
+# newton-physics/newton, so these cannot travel with this repo -- without them
+# the GL viewer crashes on machines with no CUDA device.
+# See docs/gl_viewer_gpu_contention.md
+./scripts/apply_newton_patch.sh
+
 # Install (CMake 3.x as default)
 uv sync --extra sim
 

@@ -1,3 +1,4 @@
+import os
 from dataclasses import dataclass
 from enum import Enum
 from typing import Literal
@@ -53,6 +54,9 @@ class RenderingConfig:
         """
         Factory method to create the appropriate viewer instance.
         """
+        if self.vis_type == "gl":
+            _keep_glx_off_the_compute_gpu()
+
         if self.vis_type == "usd":
             return newton.viewer.ViewerUSD(
                 output_path=self.usd_file,
@@ -68,3 +72,44 @@ class RenderingConfig:
             raise ValueError(f"Unsupported rendering type: {self.vis_type}")
 
 
+
+
+def _keep_glx_off_the_compute_gpu():
+    """Stop OpenGL being pinned to the same NVIDIA GPU warp computes on.
+
+    With ``__GLX_VENDOR_LIBRARY_NAME=nvidia`` (a common setting on hybrid
+    laptops, and a Hyprland/omarchy default), GL rendering and warp's CUDA
+    graph launches contend for one GPU. The NVIDIA scheduler eventually fails
+    to invalidate an active compute QMD and kills the context::
+
+        NVRM: Xid 13, Graphics Exception: SKEDCHECK22_INVALIDATE_ACTIVE_QMD failed
+
+    The process only notices one readback later, as **CUDA error 719** -- which
+    reads as a physics divergence, not a driver fault, and has cost real
+    debugging time. Any GL example dies within ~60 s of starting; headless runs
+    never do.
+
+    Clearing the variable sends GL to the integrated GPU and leaves the discrete
+    one for compute. CUDA is unaffected: it never goes through libglvnd, and
+    ViewerGL needs no GL/CUDA interop.
+
+    On a machine whose *only* GPU is the NVIDIA one there is no second vendor to
+    fall back to, so set ``OSTRICH_ALLOW_NVIDIA_GLX=1`` to keep the pin. See
+    docs/gl_viewer_gpu_contention.md.
+    """
+    if os.environ.get("__GLX_VENDOR_LIBRARY_NAME") != "nvidia":
+        return
+    if os.environ.get("OSTRICH_ALLOW_NVIDIA_GLX") == "1":
+        print(
+            "WARNING: __GLX_VENDOR_LIBRARY_NAME=nvidia with OSTRICH_ALLOW_NVIDIA_GLX=1. "
+            "GL and CUDA share the discrete GPU; expect Xid 13 surfacing as "
+            "'CUDA error 719' within ~60s. See docs/gl_viewer_gpu_contention.md."
+        )
+        return
+    del os.environ["__GLX_VENDOR_LIBRARY_NAME"]
+    print(
+        "INFO: cleared __GLX_VENDOR_LIBRARY_NAME=nvidia so OpenGL renders on the "
+        "integrated GPU and leaves the discrete one for CUDA. Sharing them trips "
+        "NVIDIA Xid 13, which surfaces as a misleading 'CUDA error 719'. "
+        "Set OSTRICH_ALLOW_NVIDIA_GLX=1 to keep the pin (single-GPU machines)."
+    )
