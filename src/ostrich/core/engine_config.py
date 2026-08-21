@@ -110,12 +110,14 @@ class NewtonRaphsonConfig:
     #   w_used = (1 - theta) * w_prev + theta * w_raw
     # with w_prev a persistent per-contact buffer zeroed at each step start
     # (EngineData.friction_w). Damps the w oscillation of sliding contacts
-    # near the cone boundary at truncated NR iteration counts. 1.0 (default)
-    # is bit-exact with the unrelaxed solver. Threaded to the kernels as a
+    # near the cone boundary at truncated NR iteration counts. 1.0 recovers
+    # the unrelaxed solver bit-exactly; 0.5 (default) is the measured sweet
+    # spot (spin residual 0.28 -> 0.11, cone p90 5 -> 1.6 at nr 16, forward
+    # driving also improves). Threaded to the kernels as a
     # plain float argument (CUDA-graph-safe, per-engine-instance). The
     # batched linesearch-candidate kernels ignore it (known gap; they always
     # run unrelaxed).
-    w_relaxation: float = 1.0
+    w_relaxation: float = 0.5
 
     def __post_init__(self):
         if self.max_iters < 1:
