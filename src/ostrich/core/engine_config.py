@@ -180,7 +180,12 @@ class ComplianceConfig:
     """Per-constraint-type compliance (regularization on the FB block)."""
 
     joint: float = 1e-5
-    contact: float = 1e-4
+    # Newton-step damper on the normal rows (the residual does not contain
+    # it). 1e-4 stalled Newton on loaded contacts (0.3 mm residual penetration
+    # at 20 iterations, 41 mm and a 1.6 m/s spurious rebound on a 5 m box
+    # drop); 1e-6 converges in <=10 iterations, is stable to dt=0.1, and is
+    # what conf/engine/ostrich.yaml already uses.
+    contact: float = 1e-6
     friction: float = 1e-6
     # Smoothing parameter inside the contact-FB norm:
     #   φ_ε(a, b) = α·a + β·b − √((α·a)² + (β·b)² + fb_smooth_eps_sq).

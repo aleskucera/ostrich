@@ -16,7 +16,7 @@ import newton
 
 from ostrich.core.engine import OstrichEngine
 from ostrich.core.engine_config import (
-    AdjointConfig, OstrichEngineConfig, LinearSolverConfig, NewtonRaphsonConfig,
+    AdjointConfig, ComplianceConfig, OstrichEngineConfig, LinearSolverConfig, NewtonRaphsonConfig,
 )
 from ostrich.core.logging_config import LoggingConfig
 from ostrich.simulation.trajectory_buffer import TrajectoryBuffer
@@ -39,6 +39,10 @@ def _gradient_errors(adjoint=AdjointConfig()):
             nr=NewtonRaphsonConfig(max_iters=100),
             linear=LinearSolverConfig(max_iters=200, tol=1e-8, atol=1e-8),
             adjoint=adjoint,
+            # The forward's contact compliance is pinned away from the adjoint's
+            # (1e-6) so the test can tell them apart: an adjoint that reused the
+            # forward's Newton damper would differentiate a 1e-4 spring.
+            compliance=ComplianceConfig(contact=1e-4),
         ),
         logging_config=LoggingConfig(),
         differentiable_simulation=True,
