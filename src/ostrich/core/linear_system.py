@@ -143,7 +143,15 @@ def compute_linear_system(
     data: EngineData,
     config: EngineConfig,
     dims: EngineDimensions,
+    contact_compliance: float = None,
 ):
+    # contact_compliance overrides config.compliance.contact in the normal
+    # rows' C. The forward uses compliance.contact only as a Newton-step
+    # damper (the residual phi/dt does not contain it); the adjoint passes its
+    # own, much smaller value so it differentiates the contact the forward
+    # actually solves rather than a spring.
+    if contact_compliance is None:
+        contact_compliance = config.compliance.contact
 
     wp.launch(
         kernel=compute_world_inv_inertia_kernel,
@@ -262,7 +270,7 @@ def compute_linear_system(
             contacts.contact_thickness1,
             contacts.contact_normal,
             data.dt,
-            config.compliance.contact,
+            contact_compliance,
             config.compliance.contact_fb_smooth_eps_sq,
             config.relaxation.contact_mode,
         ],

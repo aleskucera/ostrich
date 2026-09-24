@@ -441,6 +441,14 @@ class AdjointConfig:
     regularization: float = 0.0
     gradient_normalization: bool = False
 
+    # Contact compliance used in the adjoint's normal rows instead of
+    # compliance.contact. The forward's compliance.contact (1e-4) is a
+    # Newton-step damper that the residual does not contain, so reusing it
+    # made the adjoint differentiate a spring contact (28% error against
+    # per-step FD on a loaded Helhest). Zero leaves the system near-singular
+    # for redundant contact points (55%); 1e-6 measured 1.7%.
+    contact_compliance: float = 1e-6
+
     def __post_init__(self):
         if self.friction_linearization not in ("true", "frozen"):
             raise ValueError(
@@ -456,6 +464,11 @@ class AdjointConfig:
             raise ValueError(
                 "adjoint.regularization must be >= 0, "
                 f"got {self.regularization}"
+            )
+        if self.contact_compliance < 0:
+            raise ValueError(
+                "adjoint.contact_compliance must be >= 0, "
+                f"got {self.contact_compliance}"
             )
 
     @classmethod

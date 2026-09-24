@@ -31,6 +31,7 @@ TESTS=(
     test_stribeck_friction.py
     test_helhest_gradient.py
     test_friction_w_backward.py
+    test_loaded_contact_gradient.py
 )
 
 PASSED=0

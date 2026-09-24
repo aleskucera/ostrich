@@ -535,7 +535,8 @@ class OstrichEngineBase(SolverBase):
         from ostrich.adjoint import freeze_contact_mode_soft_kernel
 
         compute_linear_system(
-            self.ostrich_model, self.ostrich_contacts, self.data, self.config, self.dims
+            self.ostrich_model, self.ostrich_contacts, self.data, self.config, self.dims,
+            contact_compliance=self.config.adjoint.contact_compliance,
         )
 
         # Freeze friction mode for the adjoint: replace FB-derived compliance
