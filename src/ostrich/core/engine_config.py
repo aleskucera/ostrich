@@ -447,11 +447,14 @@ class AdjointConfig:
     gradient_normalization: bool = False
 
     # Contact compliance used in the adjoint's normal rows instead of
-    # compliance.contact. The forward's compliance.contact (1e-4) is a
-    # Newton-step damper that the residual does not contain, so reusing it
-    # made the adjoint differentiate a spring contact (28% error against
-    # per-step FD on a loaded Helhest). Zero leaves the system near-singular
-    # for redundant contact points (55%); 1e-6 measured 1.7%.
+    # compliance.contact, which in the forward is only a Newton-step damper
+    # (the residual does not contain it); reusing it made the adjoint
+    # differentiate a spring contact. Against a tightly converged forward
+    # (nr.atol ~1e-9) the exact value 0 matches per-step FD best (0.3-1.3%);
+    # at the default nr.atol=1e-3 Newton stops early and the forward behaves
+    # slightly soft. 1e-6 is kept: on the real tasks, with their 16-iteration
+    # backward solve, it differs from 0 by 4-12% (cos >= 0.9997) and the
+    # backward solve converges better.
     contact_compliance: float = 1e-6
 
     def __post_init__(self):
