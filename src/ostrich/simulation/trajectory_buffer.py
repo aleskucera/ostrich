@@ -159,6 +159,10 @@ class TrajectoryBuffer:
         # =========================================================================
         self._constr_force = _alloc_buffer(data._constr_force)
         self._constr_force_prev_iter = _alloc_buffer(data._constr_force)
+        # Damped friction weight (nr.w_relaxation). The friction kernels read
+        # and rewrite it on every call, so the adjoint of step i must see the
+        # value the forward converged to at step i.
+        self.friction_w = _alloc_buffer(data.friction_w)
 
         # =========================================================================
         # 4. Contact Data
@@ -221,6 +225,7 @@ class TrajectoryBuffer:
         # --- Lambdas ---
         wp.copy(self._constr_force[step_idx], data._constr_force)
         wp.copy(self._constr_force_prev_iter[step_idx], data._constr_force_prev_iter)
+        wp.copy(self.friction_w[step_idx], data.friction_w)
 
         # --- Contacts ---
         wp.copy(self.contact_count[step_idx], contacts.contact_count)
@@ -257,6 +262,7 @@ class TrajectoryBuffer:
         # --- Lambdas ---
         wp.copy(data._constr_force, self._constr_force[step_idx])
         wp.copy(data._constr_force_prev_iter, self._constr_force_prev_iter[step_idx])
+        wp.copy(data.friction_w, self.friction_w[step_idx])
 
         # --- Contacts ---
         wp.copy(contacts.contact_count, self.contact_count[step_idx])
