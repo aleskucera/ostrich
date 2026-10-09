@@ -31,6 +31,12 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "3_gradient
 os.environ.setdefault("DISPLAY", ":1")
 os.environ.pop("WAYLAND_DISPLAY", None)
 os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"  # essential for NVML poller
+# Opt-in (OSTRICH_MJX_PLATFORM_ALLOC=1): the default caching allocator never
+# returns freed memory to the driver, so NVML reports the compile-time
+# high-water mark forever; the platform allocator fixes that but slows
+# execution, so leave it off when timings matter.
+if os.environ.get("OSTRICH_MJX_PLATFORM_ALLOC") == "1":
+    os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
 
 import jax
 import jax.numpy as jnp
@@ -152,25 +158,37 @@ def _nvml_poller():
                 peak[0] = used
             time.sleep(0.01)
 
-    th = threading.Thread(target=_poll, daemon=True); th.start()
+    th = threading.Thread(target=_poll, daemon=True)
+
+    # Polling is started explicitly (after compilation) so that XLA
+    # autotuning scratch does not contaminate the steady-state peak; the
+    # baseline is still captured here, before JAX allocates anything big.
+    def start():
+        peak[0] = pynvml.nvmlDeviceGetMemoryInfo(h).used / 1024**2
+        th.start()
 
     def finalize():
         stop.set(); th.join(timeout=1.0)
         return float(peak[0]), float(peak[0] - baseline)
 
-    return finalize
+    return start, finalize
 
 
 def main():
+    global DT, T
     ap = argparse.ArgumentParser()
     ap.add_argument("--num-worlds", type=int, default=1)
+    ap.add_argument("--dt", type=float, default=DT)
     ap.add_argument("--checkpoint", choices=["none", "step", "sqrt"], default="step")
     ap.add_argument("--gt", default=str(pathlib.Path(__file__).resolve().parents[1]
                                          / "1_sim_to_real_box" / "data"
                                          / "run_2026_05_20-18_10_33.json"))
     ap.add_argument("--save", default=None)
+    ap.add_argument("--iterations", type=int, default=ITERATIONS)
     args = ap.parse_args()
     num_worlds = args.num_worlds
+    DT = args.dt
+    T = int(DURATION / DT)
 
     with open(args.gt) as f:
         gt = json.load(f)
@@ -210,7 +228,8 @@ def main():
     value_and_grad = jax.jit(jax.value_and_grad(trajectory_loss))
     params = jnp.tile(jnp.array([2.0, 2.0, 2.0]), (K, 1))
 
-    finalize_nvml = _nvml_poller()
+    nvml = _nvml_poller()
+    start_nvml, finalize_nvml = nvml if nvml is not None else (None, None)
 
     print("Compiling...")
     t_compile = time.perf_counter()
@@ -218,6 +237,8 @@ def main():
     loss.block_until_ready(); grad.block_until_ready()
     compile_s = time.perf_counter() - t_compile
     print(f"  compile: {compile_s:.1f}s")
+    if start_nvml is not None:
+        start_nvml()
 
     optimizer = optax.adam(learning_rate=0.05)
     opt_state = optimizer.init(params)
@@ -225,7 +246,7 @@ def main():
 
     peak_mem_mb = 0.0
     time_ms_list = []
-    for i in range(ITERATIONS):
+    for i in range(args.iterations):
         t0 = time.perf_counter()
         loss, grad = value_and_grad(params)
         loss.block_until_ready(); grad.block_until_ready()
@@ -252,7 +273,7 @@ def main():
         "peak_gpu_mb_nvml": nvml_delta,
         "compile_s": compile_s,
         "time_ms": time_ms_list,
-        "K": K, "dt": DT, "duration_s": DURATION, "iterations": ITERATIONS,
+        "K": K, "dt": DT, "duration_s": DURATION, "iterations": args.iterations,
     }
     if nvml_abs is not None:
         print(f"NVML peak: {nvml_abs:.0f} MB (delta {nvml_delta:.0f} MB)")

@@ -66,7 +66,15 @@ RESULTS_DIR = pathlib.Path(__file__).parent / "results"
 REF_JSON = REPO / "experiments/3_gradient_quality_box2/results/ostrich_postfix_vjp.json"
 
 # ----------------------------- SAME task as the FO reference -----------------
-K = 10
+def load_trial(idx):
+    """IC/target/seed of FO trial `idx` from the reference JSON (ES_TRIAL env var)."""
+    with open(REF_JSON) as f:
+        tr = json.load(f)["trials"][idx]
+    return (tr["ic"]["xy"], tr["ic"]["yaw"], tr["target"]["xy"], tr["target"]["yaw"],
+            tr["seed"], tr)
+
+TRIAL_IDX = int(os.environ.get("ES_TRIAL", "0"))
+K = int(os.environ.get("ES_K", "10"))  # knots per wheel; params = K * NUM_WHEEL_DOFS
 HORIZON_S = 6.0
 DT = 0.1
 IC_XY = [0.05479120971119267, -0.012224312049589542]
@@ -441,7 +449,7 @@ def run_openai_es(sim, mean0, seed, wall_budget_s, sigma=0.3, lr=0.2, log_every_
 
 
 # ----------------------------- local FO timing ---------------------------------
-def time_local_first_order(n_iters=8):
+def time_local_first_order(n_iters=8, base_seed=1042):
     """Locally measure per-iter wall time of the FO (Adam) optimizer on the
     SAME task/settings as the reference JSON, so the zeroth-order wall-clock
     budget is matched on THIS machine (the reference 0.664 s/iter was measured
@@ -454,7 +462,7 @@ def time_local_first_order(n_iters=8):
         ic_xy=IC_XY, ic_yaw=IC_YAW, target_xy=TARGET_XY, target_yaw=TARGET_YAW,
         weights=WEIGHTS, K=K,
     )
-    sim.spline_params = initial_spline(K, NUM_WHEEL_DOFS, 1042, INIT_TYPE, TARGET_XY,
+    sim.spline_params = initial_spline(K, NUM_WHEEL_DOFS, base_seed, INIT_TYPE, TARGET_XY,
                                         HORIZON_S, noise_std=INIT_NOISE_STD)
     sim.spline_adam = SplineAdam(K=K, num_dofs=NUM_WHEEL_DOFS, lr=0.3, lr_min_ratio=0.2,
                                   total_steps=50)
@@ -480,9 +488,12 @@ def checkpoint_at(history, budget_s):
 
 
 def main():
+    global IC_XY, IC_YAW, TARGET_XY, TARGET_YAW
+    IC_XY, IC_YAW, TARGET_XY, TARGET_YAW, base_seed, ref_trial = load_trial(TRIAL_IDX)
+    print(f"ES_TRIAL={TRIAL_IDX}: FO seed {base_seed}, ic {IC_XY}, target {TARGET_XY}")
     print("=" * 70)
     print("Measuring local per-iter FO wall time (for a hardware-matched budget)...")
-    local_per_iter = time_local_first_order(n_iters=8)
+    local_per_iter = time_local_first_order(n_iters=8, base_seed=base_seed)
     print(f"Local FO per-iter: {local_per_iter:.4f} s  (reference 3090: 0.664 s/iter)")
     local_budget_s = local_per_iter * 50  # reference used 50 iterations
     budget_multipliers = [1, 5, 10]
@@ -504,7 +515,7 @@ def main():
     all_results = []
     for seed in seeds:
         print(f"\n--- ES seed {seed} (running to max budget {max_budget_s:.1f}s) ---")
-        mean0 = initial_spline(K, NUM_WHEEL_DOFS, 1042 + seed, INIT_TYPE, TARGET_XY,
+        mean0 = initial_spline(K, NUM_WHEEL_DOFS, base_seed + seed, INIT_TYPE, TARGET_XY,
                                 HORIZON_S, noise_std=INIT_NOISE_STD)
         res = run_openai_es(sim, mean0, seed=seed, wall_budget_s=max_budget_s,
                              sigma=0.3, lr=0.2)
@@ -567,7 +578,10 @@ def main():
             "dt": DT, "horizon_s": HORIZON_S, "ic_xy": IC_XY, "ic_yaw": IC_YAW,
             "target_xy": TARGET_XY, "target_yaw": TARGET_YAW, "weights": WEIGHTS,
             "init_type": INIT_TYPE, "init_noise_std": INIT_NOISE_STD,
-            "source_trial": str(REF_JSON) + " trials[0] (seed=1042)",
+            "source_trial": f"{REF_JSON} trials[{TRIAL_IDX}] (seed={base_seed})",
+            "trial_idx": TRIAL_IDX,
+            "fo_trial_final_metrics": ref_trial.get("final_metrics"),
+            "fo_trial_wall_s": ref_trial.get("wall_s"),
         },
         "first_order_reference": {
             "source_file": str(REF_JSON),
@@ -593,7 +607,8 @@ def main():
             "results": all_results,
         },
     }
-    out_path = RESULTS_DIR / "zeroth_order_es.json"
+    _tag = ("_K%d" % K if K != 10 else "") + ("_trial%d" % TRIAL_IDX if TRIAL_IDX else "")
+    out_path = RESULTS_DIR / f"zeroth_order_es{_tag}.json"
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     with open(out_path, "w") as f:
         json.dump(out, f, indent=2)

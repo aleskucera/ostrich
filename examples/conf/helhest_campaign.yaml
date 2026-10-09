@@ -1,0 +1,31 @@
+defaults:
+  - simulation: helhest
+  - rendering: gl
+  - logging: disabled
+  - engine: ostrich
+  - control: helhest/velocity
+  - _self_
+
+project_name: ${hydra:job.name}
+
+# Same wheel gain as helhest_world.yaml (matches the dasenka demo).
+control:
+  k_p: 250.0
+
+# clark_paper campaign world and variant (sim_worlds/results/<world>_<variant>.npz):
+#   shadowed_trench: hidden bump control     two_gaps / blind_crest / open_field: hidden control
+#   drifting_berm: hidden control            remembered_box: hidden no_box
+#   curb_or_mound: box25 box30 box35 no_box
+world: curb_or_mound
+variant: box30
+
+# Where to spawn: "start", or a pose role/name from the spec (decision, out_of_view, abeam, ...).
+pose: start
+
+terrain_mu: 0.8
+
+friction:
+  lateral_left_right: 0.5
+  lateral_rear: 0.2
+  long_left_right: 0.9
+  long_rear: 0.6

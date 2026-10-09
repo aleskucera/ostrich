@@ -314,7 +314,14 @@ def compute_friction_model(
 
         phi_f = scaled_fisher_burmeister(d_t_norm, gap, 1.0, r)
 
-        denominator = r * raw_imp_norm + phi_f + denom_eps
+        # Normalise by the CONE LIMIT, not by the previous iterate's own force.
+        # Once the contact saturates (raw >= limit) gap is pinned at 0, so phi_f
+        # vanishes and mu would drop out of the row entirely: w = d/raw makes the
+        # fixed point scale-free in lambda_f, i.e. friction supplies whatever
+        # tangential load is applied. Using clamped_imp_norm gives w = d/limit and
+        # therefore |lambda_f| = mu*f_n at sliding. Below the limit the two are the
+        # same expression (clamped == raw), so stiction is unchanged.
+        denominator = r * clamped_imp_norm + phi_f + denom_eps
         numerator = d_t_norm - phi_f
 
         w = r * (numerator / denominator)
@@ -355,7 +362,8 @@ def compute_friction_model(
 
     phi_f = scaled_fisher_burmeister(d_t_norm, gap, 1.0, r)
 
-    denominator = r * raw_imp_norm + phi_f + denom_eps
+    # Cone-limit normalisation, as in the isotropic branch above.
+    denominator = r * clamped_imp_norm + phi_f + denom_eps
     numerator = d_t_norm - phi_f
 
     w_tilde = r * (numerator / denominator)
@@ -410,11 +418,26 @@ def compute_friction_core(
     dt: float,
     compliance: float,
     friction_mode: wp.int32,
+    w_relax: float,
+    w_prev: wp.vec2,
 ):
     """
     Computes all Jacobians and friction residuals dynamically. Per-direction
     friction coefficients (mu_x along t1, mu_y along t2) define the elliptical
     Coulomb cone; the residual and compliance are emitted per-direction.
+
+    `w_relax` / `w_prev` implement under-relaxation of the friction weight w
+    across NR-iteration kernel calls:
+
+        w_used = (1 - w_relax) * w_prev + w_relax * w_raw
+
+    where `w_prev` is a persistent per-contact buffer (EngineData.friction_w)
+    carried across the friction_residual_kernel / friction_constraint_kernel
+    calls that make up one NR iteration, and zeroed at each step start.
+    `w_relax` comes from config (nr.w_relaxation), threaded as a plain kernel
+    float like `dt`, so engine instances can differ and CUDA graphs stay
+    valid. The default 1.0 preserves current behavior bit-exactly: the w_prev
+    term vanishes ((1-1.0)*w_prev + 1.0*w_raw == w_raw in IEEE754).
 
     Everything here except `compute_friction_model` is shared by both
     relaxation rungs: the tangent Jacobians, the effective-mass weights and
@@ -459,14 +482,31 @@ def compute_friction_core(
         friction_mode,
     )
 
+    # Under-relaxation of w across NR-iteration kernel calls (see docstring).
+    # At the default w_relax=1.0 this is bit-exactly (w_x, w_y).
+    w_x_used = (1.0 - w_relax) * w_prev.x + w_relax * w_x
+    w_y_used = (1.0 - w_relax) * w_prev.y + w_relax * w_y
+
     d_res_d0 = -dt * (J_t1_0 * lambda_t1 + J_t2_0 * lambda_t2)
     d_res_d1 = -dt * (J_t1_1 * lambda_t1 + J_t2_1 * lambda_t2)
-    res_f0 = v_t.x + w_x * lambda_t1
-    res_f1 = v_t.y + w_y * lambda_t2
-    c_f0 = w_x / dt + compliance
-    c_f1 = w_y / dt + compliance
+    res_f0 = v_t.x + w_x_used * lambda_t1
+    res_f1 = v_t.y + w_y_used * lambda_t2
+    c_f0 = w_x_used / dt + compliance
+    c_f1 = w_y_used / dt + compliance
 
-    return d_res_d0, d_res_d1, res_f0, res_f1, J_t1_0, J_t2_0, J_t1_1, J_t2_1, c_f0, c_f1
+    return (
+        d_res_d0,
+        d_res_d1,
+        res_f0,
+        res_f1,
+        J_t1_0,
+        J_t2_0,
+        J_t1_1,
+        J_t2_1,
+        c_f0,
+        c_f1,
+        wp.vec2(w_x_used, w_y_used),
+    )
 
 
 # -----------------------------------------------------------------------------
@@ -508,9 +548,11 @@ def friction_residual_kernel(
     compliance: wp.float32,
     friction_mode: wp.int32,
     load_gate: wp.float32,
+    w_relax: wp.float32,
     # Outputs
     res_d: wp.array(dtype=wp.spatial_vector, ndim=2),
     res_f: wp.array(dtype=wp.float32, ndim=2),
+    friction_w: wp.array(dtype=wp.vec2, ndim=2),
 ):
     world_idx, contact_idx = wp.tid()
     constr_idx0 = 2 * contact_idx
@@ -619,7 +661,9 @@ def friction_residual_kernel(
     thickness0 = contact_thickness0[world_idx, contact_idx]
     thickness1 = contact_thickness1[world_idx, contact_idx]
 
-    d_res_d0, d_res_d1, res_f0, res_f1, J_t1_0, J_t2_0, J_t1_1, J_t2_1, c_f0, c_f1 = compute_friction_core(
+    w_prev = friction_w[world_idx, contact_idx]
+
+    d_res_d0, d_res_d1, res_f0, res_f1, J_t1_0, J_t2_0, J_t1_1, J_t2_1, c_f0, c_f1, w_used = compute_friction_core(
         body0,
         body1,
         n,
@@ -652,6 +696,8 @@ def friction_residual_kernel(
         dt,
         compliance,
         friction_mode,
+        w_relax,
+        w_prev,
     )
 
     if body0 >= 0:
@@ -661,6 +707,7 @@ def friction_residual_kernel(
 
     res_f[world_idx, constr_idx0] = res_f0
     res_f[world_idx, constr_idx1] = res_f1
+    friction_w[world_idx, contact_idx] = w_used
 
 
 @wp.kernel
@@ -697,6 +744,7 @@ def friction_constraint_kernel(
     compliance: wp.float32,
     friction_mode: wp.int32,
     load_gate: wp.float32,
+    w_relax: wp.float32,
     # Outputs
     constr_active_mask: wp.array(dtype=wp.float32, ndim=2),
     constr_body_idx: wp.array(dtype=wp.int32, ndim=3),
@@ -704,6 +752,7 @@ def friction_constraint_kernel(
     res_f: wp.array(dtype=wp.float32, ndim=2),
     J_hat_f_values: wp.array(dtype=wp.spatial_vector, ndim=3),
     C_f_values: wp.array(dtype=wp.float32, ndim=2),
+    friction_w: wp.array(dtype=wp.vec2, ndim=2),
 ):
     world_idx, contact_idx = wp.tid()
 
@@ -857,7 +906,9 @@ def friction_constraint_kernel(
     thickness0 = contact_thickness0[world_idx, contact_idx]
     thickness1 = contact_thickness1[world_idx, contact_idx]
 
-    d_res_d0, d_res_d1, res_f0, res_f1, J_t1_0, J_t2_0, J_t1_1, J_t2_1, c_f0, c_f1 = compute_friction_core(
+    w_prev = friction_w[world_idx, contact_idx]
+
+    d_res_d0, d_res_d1, res_f0, res_f1, J_t1_0, J_t2_0, J_t1_1, J_t2_1, c_f0, c_f1, w_used = compute_friction_core(
         body0,
         body1,
         n,
@@ -890,6 +941,8 @@ def friction_constraint_kernel(
         dt,
         compliance,
         friction_mode,
+        w_relax,
+        w_prev,
     )
 
     if body0 >= 0:
@@ -907,6 +960,8 @@ def friction_constraint_kernel(
 
     C_f_values[world_idx, constr_idx0] = c_f0
     C_f_values[world_idx, constr_idx1] = c_f1
+
+    friction_w[world_idx, contact_idx] = w_used
 
 
 # -----------------------------------------------------------------------------
@@ -1059,7 +1114,12 @@ def batch_friction_residual_kernel(
     thickness0 = contact_thickness0[world_idx, contact_idx]
     thickness1 = contact_thickness1[world_idx, contact_idx]
 
-    d_res_d0, d_res_d1, res_f0, res_f1, J_t1_0, J_t2_0, J_t1_1, J_t2_1, c_f0, c_f1 = compute_friction_core(
+    # KNOWN GAP: the batched linesearch-candidate kernels do not participate
+    # in the friction-w relaxation. Each candidate is an independent trial at
+    # the current NR iterate, not a step in the NR sequence, so relaxation
+    # history doesn't apply; they pass w_relax=1.0 and a dummy w_prev, which
+    # reproduces the unrelaxed weight exactly.
+    d_res_d0, d_res_d1, res_f0, res_f1, J_t1_0, J_t2_0, J_t1_1, J_t2_1, c_f0, c_f1, _w_used = compute_friction_core(
         body0,
         body1,
         n,
@@ -1092,6 +1152,8 @@ def batch_friction_residual_kernel(
         dt,
         compliance,
         friction_mode,
+        1.0,
+        wp.vec2(0.0, 0.0),
     )
 
     if body0 >= 0:
@@ -1253,7 +1315,9 @@ def fused_batch_friction_residual_kernel(
         lam_t1 = constr_force[b, world_idx, constr_idx0]
         lam_t2 = constr_force[b, world_idx, constr_idx1]
 
-        d_res_d0, d_res_d1, res_f0, res_f1, J_t1_0, J_t2_0, J_t1_1, J_t2_1, c_f0, c_f1 = (
+        # KNOWN GAP: no friction-w relaxation in the fused linesearch-candidate
+        # kernel either; see the comment in batch_friction_residual_kernel.
+        d_res_d0, d_res_d1, res_f0, res_f1, J_t1_0, J_t2_0, J_t1_1, J_t2_1, c_f0, c_f1, _w_used = (
             compute_friction_core(
                 body0,
                 body1,
@@ -1287,6 +1351,8 @@ def fused_batch_friction_residual_kernel(
                 dt,
                 compliance,
                 friction_mode,
+                1.0,
+                wp.vec2(0.0, 0.0),
             )
         )
 

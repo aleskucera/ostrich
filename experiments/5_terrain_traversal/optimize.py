@@ -220,6 +220,7 @@ class TerrainTraversalOptimizer(OstrichDifferentiableSimulator):
         roughness=1.0,
         terrain_freq=1.0,
         lr=0.005,
+        lr_min_ratio=0.1,
         check_grad=False,
         visualize=False,
     ):
@@ -230,6 +231,7 @@ class TerrainTraversalOptimizer(OstrichDifferentiableSimulator):
         self._roughness = roughness
         self._terrain_freq = terrain_freq
         self._lr = lr
+        self._lr_min_ratio = lr_min_ratio
         self._check_grad = check_grad
         self._visualize = visualize
         self._render_frame = 0
@@ -271,7 +273,10 @@ class TerrainTraversalOptimizer(OstrichDifferentiableSimulator):
             friction_rear=0.35,
         )
 
-        self.builder.add_shape_mesh(
+        # Static world mesh must live in a separate global builder so it gets
+        # shape_world=-1 and the broadphase pairs it against every world.
+        globals_builder = newton.ModelBuilder()
+        globals_builder.add_shape_mesh(
             body=-1,
             mesh=surface_mesh,
             cfg=newton.ModelBuilder.ShapeConfig(
@@ -286,6 +291,7 @@ class TerrainTraversalOptimizer(OstrichDifferentiableSimulator):
 
         return self.builder.finalize_replicated(
             num_worlds=self.simulation_config.num_worlds,
+            global_builder=globals_builder,
             requires_grad=True,
         )
 
@@ -528,7 +534,7 @@ class TerrainTraversalOptimizer(OstrichDifferentiableSimulator):
             K=self.K,
             num_dofs=NUM_WHEEL_DOFS,
             lr=self._lr,
-            lr_min_ratio=0.1,
+            lr_min_ratio=self._lr_min_ratio,
             total_steps=iterations,
         )
         self._apply_params(self.spline_params)
@@ -648,7 +654,7 @@ def run_single(args, seed):
         nr=NewtonRaphsonConfig(max_iters=14, backtrack_min_iter=10, atol=1e-3),
         linear=LinearSolverConfig(max_iters=16, tol=1e-3, atol=1e-3,
                                   regularization=1e-6),
-        compliance=ComplianceConfig(joint=6e-8, contact=0.1, friction=1e-6),
+        compliance=ComplianceConfig(joint=6e-8, contact=1e-6, friction=1e-6),
         linesearch=LinesearchConfig(enabled=False),
         contacts=ContactsConfig(max_per_world=256),
     )
@@ -666,6 +672,7 @@ def run_single(args, seed):
         roughness=args.roughness,
         terrain_freq=args.terrain_freq,
         lr=args.lr,
+        lr_min_ratio=getattr(args, "lr_min_ratio", 0.1),
         check_grad=getattr(args, "check_grad", False),
         visualize=visualize,
     )
@@ -725,6 +732,12 @@ def main():
         type=float,
         default=0.1,
         help="Adam learning rate (default: 0.1)",
+    )
+    parser.add_argument(
+        "--lr-min-ratio",
+        type=float,
+        default=0.1,
+        help="Cosine-decay floor as a fraction of --lr (default: 0.1)",
     )
     parser.add_argument(
         "--check-grad",

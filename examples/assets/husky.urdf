@@ -1,0 +1,198 @@
+<?xml version="1.0" ?>
+<!--
+  Clearpath Husky A200, hand-expanded to plain URDF.
+
+  Source: github.com/husky/husky, package husky_description
+    urdf/husky.urdf.xacro   (rev melodic-devel: base_[xyz]_size, wheelbase, track,
+                             wheel_vertical_offset, base_link collision boxes,
+                             inertial_link, the four husky_wheel invocations)
+    urdf/wheel.urdf.xacro   (husky_wheel macro: wheel mass, inertia, cylinder
+                             collision, continuous joint about Y)
+
+  Two deliberate differences from the upstream description, both noted in
+  examples/husky/README.md:
+
+  * The .dae visual meshes (base_link, wheel, top_chassis, bumpers, user rail,
+    top plate) are replaced by the primitives the upstream file already gives as
+    *collision* geometry, because the ostrich builder is fed primitives.
+  * `track` is 0.5708, the value in husky/husky kinetic-devel and melodic-devel.
+    noetic-devel changed it to 0.555; every other number here is identical
+    across those branches.
+
+  Nothing in ostrich parses this file: like examples/assets/helhest.urdf it is
+  the traceable record of where examples/husky/common.py's numbers come from.
+-->
+<robot name="husky">
+
+  <!-- Base link is the center of the robot's bottom plate. -->
+  <link name="base_link">
+    <!-- Lower half of the chassis shell: base_x_size x base_y_size x base_z_size/2,
+         centred at base_z_size/4. -->
+    <visual>
+      <origin xyz="0 0 0.061875" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.987400 0.570900 0.123750"/>
+      </geometry>
+      <material name="husky_yellow">
+        <color rgba="0.8 0.8 0.0 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0.061875" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.987400 0.570900 0.123750"/>
+      </geometry>
+    </collision>
+
+    <!-- Upper half: base_x_size*4/5 x base_y_size x base_z_size/2 - 0.02,
+         centred at base_z_size*3/4 - 0.01. -->
+    <visual>
+      <origin xyz="0 0 0.175625" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.789920 0.570900 0.103750"/>
+      </geometry>
+      <material name="husky_dark_grey">
+        <color rgba="0.2 0.2 0.2 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0.175625" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.789920 0.570900 0.103750"/>
+      </geometry>
+    </collision>
+
+    <!-- Upstream carries this on a fixed-jointed `inertial_link`; folded onto
+         base_link here (the fixed joint has a zero origin, so the values are
+         unchanged). Inertia is about the center of mass. -->
+    <inertial>
+      <mass value="46.034"/>
+      <origin xyz="-0.00065 -0.085 0.062" rpy="0 0 0"/>
+      <inertia ixx="0.6022" ixy="-0.02364" ixz="-0.1197"
+               iyy="1.7386" iyz="-0.001544" izz="2.0296"/>
+    </inertial>
+  </link>
+
+  <!-- Ground contact point: wheel_vertical_offset - wheel_radius below base_link,
+       i.e. the chassis floor sits 0.13228 m clear of flat ground. -->
+  <link name="base_footprint"/>
+  <joint name="base_footprint_joint" type="fixed">
+    <origin xyz="0 0 -0.13228" rpy="0 0 0"/>
+    <parent link="base_link"/>
+    <child link="base_footprint"/>
+  </joint>
+
+  <!-- Wheels. Joint origins are (+-wheelbase/2, +-track/2, wheel_vertical_offset)
+       = (+-0.2560, +-0.2854, 0.03282). -->
+
+  <link name="front_left_wheel_link">
+    <inertial>
+      <mass value="2.637"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.02467" ixy="0" ixz="0" iyy="0.04411" iyz="0" izz="0.02467"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="1.5707963267948966 0 0"/>
+      <geometry>
+        <cylinder length="0.1143" radius="0.1651"/>
+      </geometry>
+      <material name="husky_black">
+        <color rgba="0.15 0.15 0.15 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="1.5707963267948966 0 0"/>
+      <geometry>
+        <cylinder length="0.1143" radius="0.1651"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="front_left_wheel" type="continuous">
+    <parent link="base_link"/>
+    <child link="front_left_wheel_link"/>
+    <origin xyz="0.2560 0.2854 0.03282" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+  </joint>
+
+  <link name="front_right_wheel_link">
+    <inertial>
+      <mass value="2.637"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.02467" ixy="0" ixz="0" iyy="0.04411" iyz="0" izz="0.02467"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="1.5707963267948966 0 0"/>
+      <geometry>
+        <cylinder length="0.1143" radius="0.1651"/>
+      </geometry>
+      <material name="husky_black"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="1.5707963267948966 0 0"/>
+      <geometry>
+        <cylinder length="0.1143" radius="0.1651"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="front_right_wheel" type="continuous">
+    <parent link="base_link"/>
+    <child link="front_right_wheel_link"/>
+    <origin xyz="0.2560 -0.2854 0.03282" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+  </joint>
+
+  <link name="rear_left_wheel_link">
+    <inertial>
+      <mass value="2.637"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.02467" ixy="0" ixz="0" iyy="0.04411" iyz="0" izz="0.02467"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="1.5707963267948966 0 0"/>
+      <geometry>
+        <cylinder length="0.1143" radius="0.1651"/>
+      </geometry>
+      <material name="husky_black"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="1.5707963267948966 0 0"/>
+      <geometry>
+        <cylinder length="0.1143" radius="0.1651"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="rear_left_wheel" type="continuous">
+    <parent link="base_link"/>
+    <child link="rear_left_wheel_link"/>
+    <origin xyz="-0.2560 0.2854 0.03282" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+  </joint>
+
+  <link name="rear_right_wheel_link">
+    <inertial>
+      <mass value="2.637"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.02467" ixy="0" ixz="0" iyy="0.04411" iyz="0" izz="0.02467"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="1.5707963267948966 0 0"/>
+      <geometry>
+        <cylinder length="0.1143" radius="0.1651"/>
+      </geometry>
+      <material name="husky_black"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="1.5707963267948966 0 0"/>
+      <geometry>
+        <cylinder length="0.1143" radius="0.1651"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="rear_right_wheel" type="continuous">
+    <parent link="base_link"/>
+    <child link="rear_right_wheel_link"/>
+    <origin xyz="-0.2560 -0.2854 0.03282" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+  </joint>
+
+</robot>

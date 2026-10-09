@@ -327,6 +327,10 @@ class OstrichEngineBase(SolverBase):
         # boundary; tried and reverted in d4889f3 follow-up).
         self.data._constr_force_prev_iter.zero_()
 
+        # Cold reset of the persistent friction-w relaxation buffer (see
+        # EngineData.friction_w). Same step-start-only reset as above.
+        self.data.friction_w.zero_()
+
         # Cross-step warm-start of contact normal/friction forces.
         # When disabled, this is a Python-side return (no kernel
         # launches). When enabled, populates _constr_force_prev_iter
