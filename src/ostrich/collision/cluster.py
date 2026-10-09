@@ -202,6 +202,10 @@ def cluster_per_pair_kernel(
         sj1 = contact_shape1[world_idx, j]
         bj0 = _resolve_body(world_idx, sj0, shape_body)
         bj1 = _resolve_body(world_idx, sj1, shape_body)
+        # Only this leader's pair: without this, a leader demotes OTHER pairs'
+        # contacts too, and a lightly loaded body loses all of them.
+        if bj0 != b0 or bj1 != b1:
+            continue
 
         depth_j, _mp_unused_j = _depth_and_midpoint(
             world_idx, j,
