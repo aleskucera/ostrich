@@ -35,17 +35,18 @@ K = 16
 GCRODR_M = 16
 
 
-def z_sources(S, d, va):
-    """{name: {i: Z_i}} for every held-out system i (Z in i's active space)."""
+def z_sources(S, d, va, k=K):
+    """{name: {i: Z_i}} for every held-out system i (Z in i's active space).
+    k = columns kept by the cross-step / recycle / harmonic / GCRO-DR sources."""
     n = len(S)
     acts = [np.nonzero(d["constr_active_mask"][s, 0] > 0.0)[0] for s in range(n)]
     off_n = int(d["meta"][0]["offset_n"])
-    Q16 = [bad_subspace(S[i].A, min(K, S[i].n)) for i in range(n)]
+    Q16 = [bad_subspace(S[i].A, min(k, S[i].n)) for i in range(n)]
     E16 = [embed(Q16[i], acts[i]) for i in range(n)]
     src = {}
 
-    for k in (4, 8, 16, 32):
-        src[f"exact k={k}"] = {i: bad_subspace(S[i].A, min(k, S[i].n)) for i in va}
+    for ke in (4, 8, 16, 32):
+        src[f"exact k={ke}"] = {i: bad_subspace(S[i].A, min(ke, S[i].n)) for i in va}
 
     step_idx = d["step_idx"]
     last_of_step = {}
@@ -61,7 +62,7 @@ def z_sources(S, d, va):
     torch.manual_seed(0)                       # approx_subspace draws a random RHS
     for m in (16, 24, 32):
         src[f"harmonic m={m}"] = {
-            i: restrict(embed(approx_subspace(S[i - 1].A, m, K), acts[i - 1]), acts[i])
+            i: restrict(embed(approx_subspace(S[i - 1].A, m, k), acts[i - 1]), acts[i])
             for i in va}
 
     # GCRO-DR: U only depends on the Krylov harvests, not on how the solve
@@ -75,7 +76,7 @@ def z_sources(S, d, va):
             g[i] = restrict(U, acts[i]) if U is not None else torch.zeros(S[i].n, 0, dtype=DT)
         Vi = krylov_residual_basis(As, D * S[i].b, GCRODR_M)
         Cand = torch.linalg.qr(torch.cat([restrict(U, acts[i]), Vi], 1))[0] if U is not None else Vi
-        Y = torch.linalg.qr(harmonic_ritz(As, Cand, K))[0]
+        Y = torch.linalg.qr(harmonic_ritz(As, Cand, k))[0]
         U = embed(torch.linalg.qr(D.unsqueeze(1) * Y)[0], acts[i])
     src["gcrodr accumulated"] = g
 
