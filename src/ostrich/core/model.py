@@ -118,7 +118,7 @@ def compute_joint_constraint_offsets(joint_types: wp.array):
         device=joint_types.device,
     )
 
-    return constraint_offsets_wp, total_constraints[0]
+    return constraint_offsets_wp, int(total_constraints[0])
 
 
 @wp.kernel
