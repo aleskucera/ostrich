@@ -1,0 +1,2641 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="High-performance differentiable physics simulator for robotics and machine learning">
+      
+      
+      
+      
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.21">
+    
+    
+      
+        <title>Why Helhest Junior jitters when it turns - Ostrich Simulator</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.2a3383ac.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Merriweather+Sans:300,300i,400,400i,700,700i%7CRed+Hat+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Merriweather Sans";--md-code-font:"Red Hat Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="red" data-md-color-accent="deep-purple">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#why-helhest-junior-jitters-when-it-turns" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Ostrich Simulator" class="md-header__button md-logo" aria-label="Ostrich Simulator" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Ostrich Simulator
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Why Helhest Junior jitters when it turns
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="red" data-md-color-accent="deep-purple"  aria-label="Dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="red" data-md-color-accent="deep-orange"  aria-label="Light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/aleskucera/ostrich.git" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.0.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    aleskucera/ostrich
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../getting-started/installation/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../theory/core-concepts/" class="md-tabs__link">
+          
+  
+  
+  Theory
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../implementation/engine/" class="md-tabs__link">
+          
+  
+  
+  Implementation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../reference/ostrich/" class="md-tabs__link">
+          
+  
+  
+  Code Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Ostrich Simulator" class="md-nav__button md-logo" aria-label="Ostrich Simulator" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Ostrich Simulator
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/aleskucera/ostrich.git" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.0.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    aleskucera/ostrich
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Home
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Getting Started
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Getting Started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Installation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Quick Start
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/first-simulation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    First Simulation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Configuration System
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Theory
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Theory
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../theory/core-concepts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Core Concepts
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../theory/notation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Notation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../theory/constraints/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Constraints Formulation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../theory/gauss-least-constraint/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Gauss's Principle of Least Constraint
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../theory/non-linear-system/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Nonlinear System of Equations
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../theory/numerical-solution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Numerical Solution
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../theory/linear-solver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Linear Solver
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../theory/adjoint-method/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Adjoint Method
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Implementation
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Implementation
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../implementation/engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Engine Overview
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../implementation/parameters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Configurable Parameters
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../implementation/logging/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Logging System
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Code Reference
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Code Reference
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_1" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../reference/ostrich/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    ostrich
+    
+  </span>
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5_1" id="__nav_5_1_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_1">
+            <span class="md-nav__icon md-icon"></span>
+            ostrich
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_1_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_1_1" id="__nav_5_1_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    adjoint
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_1_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_1_1">
+            <span class="md-nav__icon md-icon"></span>
+            adjoint
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/ostrich/adjoint/adjoint_friction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    adjoint_friction
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_1_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_1_2" id="__nav_5_1_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    collision
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_1_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_1_2">
+            <span class="md-nav__icon md-icon"></span>
+            collision
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/ostrich/collision/base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    base
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/ostrich/collision/cluster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    cluster
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/ostrich/collision/config/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    config
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/ostrich/collision/fps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    fps
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/ostrich/collision/top_k/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    top_k
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/ostrich/collision/warm_start/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    warm_start
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_1_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_1_3" id="__nav_5_1_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    core
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_1_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_1_3">
+            <span class="md-nav__icon md-icon"></span>
+            core
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/ostrich/core/engine_config/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    engine_config
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/ostrich/core/logging_config/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    logging_config
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_1_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_1_4" id="__nav_5_1_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    generation
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_1_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_1_4">
+            <span class="md-nav__icon md-icon"></span>
+            generation
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/ostrich/generation/placement_scene_generator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    placement_scene_generator
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/ostrich/generation/random_scene_generator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    random_scene_generator
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_1_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_1_5" id="__nav_5_1_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    learning
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_1_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_1_5">
+            <span class="md-nav__icon md-icon"></span>
+            learning
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/ostrich/learning/differentiable_linear_solve/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    differentiable_linear_solve
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/ostrich/learning/differentiable_newton_step/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    differentiable_newton_step
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/ostrich/learning/torch_residual_ad/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    torch_residual_ad
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/ostrich/learning/unrolled_newton/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    unrolled_newton
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_1_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_1_6" id="__nav_5_1_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    optim
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_1_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_1_6">
+            <span class="md-nav__icon md-icon"></span>
+            optim
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/ostrich/optim/per_body_pair_preconditioner/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    per_body_pair_preconditioner
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/ostrich/optim/preconditioner/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    preconditioner
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_1_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_1_7" id="__nav_5_1_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    profiling
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_1_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_1_7">
+            <span class="md-nav__icon md-icon"></span>
+            profiling
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/ostrich/profiling/engine_profiler/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    engine_profiler
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-short-answer" class="md-nav__link">
+    <span class="md-ellipsis">
+      The short answer
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reconciling-the-two-harnesses-a-is-right-b-is-broken-three-ways" class="md-nav__link">
+    <span class="md-ellipsis">
+      Reconciling the two harnesses: A is right, B is broken three ways
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#defect-1-the-friction-cone-is-one-sided" class="md-nav__link">
+    <span class="md-ellipsis">
+      Defect 1 — the friction cone is one-sided
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Defect 1 — the friction cone is one-sided">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-one-line-fix" class="md-nav__link">
+    <span class="md-ellipsis">
+      The one-line fix
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#defect-2-the-anisotropic-branch-is-discontinuous-at-mu_x-mu_y" class="md-nav__link">
+    <span class="md-ellipsis">
+      Defect 2 — the anisotropic branch is discontinuous at mu_x == mu_y
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#defect-3-cluster-reduction-is-unstable-on-a-flat-mesh" class="md-nav__link">
+    <span class="md-ellipsis">
+      Defect 3 — cluster reduction is unstable on a flat mesh
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-severity-scales-with-tangential-demand-not-with-turning" class="md-nav__link">
+    <span class="md-ellipsis">
+      The severity scales with tangential demand, not with turning
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-note-on-the-metric" class="md-nav__link">
+    <span class="md-ellipsis">
+      A note on the metric
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-holds-in-both-harnesses" class="md-nav__link">
+    <span class="md-ellipsis">
+      What holds in both harnesses
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#recommended-order-of-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      Recommended order of work
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reproducing" class="md-nav__link">
+    <span class="md-ellipsis">
+      Reproducing
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#resolution-added-2026-08-21-same-day" class="md-nav__link">
+    <span class="md-ellipsis">
+      Resolution (added 2026-08-21, same day)
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="why-helhest-junior-jitters-when-it-turns">Why Helhest Junior jitters when it turns<a class="headerlink" href="#why-helhest-junior-jitters-when-it-turns" title="Permanent link">&para;</a></h1>
+<p>Answer to <code>jitter_investigation_brief.md</code>. Everything below was re-derived on
+this machine, headless, against this working tree. Where the brief's numbers
+are quoted they are labelled as such.</p>
+<h2 id="the-short-answer">The short answer<a class="headerlink" href="#the-short-answer" title="Permanent link">&para;</a></h2>
+<p>The turn is not what breaks. <strong>Sliding</strong> is what breaks, and a three-wheel
+skid-steer cannot rotate without sliding while it can drive in a straight line
+without sliding at all.</p>
+<p>Ostrich's friction row does not bound the tangential force by <code>mu * f_n</code>. It
+bounds it from <em>below</em> at slip and not at all from above. The moment a contact's
+tangential impulse reaches the Coulomb limit, <code>mu</code> drops out of the row entirely
+and the row degenerates into "<code>v_t</code> antiparallel to <code>lambda_f</code>" — a condition any
+magnitude satisfies. The force is then set by whatever tangential load the rest
+of the system happens to apply. In effect every loaded wheel is <em>welded</em> to the
+ground, in both directions, with unbounded strength.</p>
+<p>A straight line never notices: rolling is compatible with a weld, so <code>v_t ~ 0</code>,
+the force stays inside the cone, and the model is correct there. A spin-in-place
+requires all three wheels to slide, so it drives every contact into exactly the
+saturated branch where the model has lost <code>mu</code>. The robot then fights its own
+welds: it reaches 7-25 % of the yaw rate its wheel command implies, its wheels
+reach only ~45 % of their <em>own</em> commanded speed, and the yaw only advances in
+bursts, on the steps where a weld is broken by a wheel losing normal load.</p>
+<p>That is the mechanism. Two further defects amplify it, and both are specific to
+harness B — which is why the two harnesses disagree.</p>
+<h2 id="reconciling-the-two-harnesses-a-is-right-b-is-broken-three-ways">Reconciling the two harnesses: A is right, B is broken three ways<a class="headerlink" href="#reconciling-the-two-harnesses-a-is-right-b-is-broken-three-ways" title="Permanent link">&para;</a></h2>
+<p>The engine sources are byte-identical between the two checkouts
+(<code>ostrich-odinsim</code> is a git worktree of this repo; <code>md5sum</code> of
+<code>friction_constraint.py</code>, <code>contact_constraint.py</code> and <code>base_engine.py</code> all
+match). So the divergence is entirely scene and config, and harness A can be
+reproduced here. It reproduces on every row:</p>
+<table>
+<thead>
+<tr>
+<th>harness A row</th>
+<th>A reported (yaw / std / jerk)</th>
+<th>reproduced here</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>contact 1e-10</td>
+<td>−1.171 / 0.392 / 11.4</td>
+<td>−1.214 / 0.349 / 9.28</td>
+</tr>
+<tr>
+<td>contact 1e-6</td>
+<td>−1.210 / 0.033 / 1.2</td>
+<td>−1.211 / 0.038 / 1.22</td>
+</tr>
+<tr>
+<td>1e-10, newton_iters 32</td>
+<td>— / — / 20.5</td>
+<td>−1.094 / 0.588 / 17.68</td>
+</tr>
+<tr>
+<td>1e-10, dt 0.01</td>
+<td>— / — / 28.5</td>
+<td>−0.773 / 0.675 / 27.52</td>
+</tr>
+</tbody>
+</table>
+<p>(Harness A's own configuration and metric: analytic ground plane, isotropic
+wheels 0.8/0.4, k_p 250, dt 0.02, 1.5 s settle, 4 s window, sampled every
+2 steps.)</p>
+<p><strong>Harness A's numbers are correct and its compliance result is real.</strong> Nothing
+in it needs discarding.</p>
+<p>Harness B differs from A in three ways, and <em>each one independently</em> destroys
+the turn. All rows below are harness A's metric at contact compliance 1e-6, so
+only the named variable moves:</p>
+<table>
+<thead>
+<tr>
+<th>configuration</th>
+<th>rate_std</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>plane, isotropic 0.8/0.4 — <strong>harness A</strong></td>
+<td><strong>0.035</strong></td>
+</tr>
+<tr>
+<td>plane, isotropic 0.5/0.2</td>
+<td>0.030</td>
+</tr>
+<tr>
+<td>plane, <strong>anisotropic</strong> 0.8/0.4 lat + 0.9/0.6 long</td>
+<td>0.444</td>
+</tr>
+<tr>
+<td>plane, "anisotropic" 0.8/0.4 + 0.8000001/0.4000001</td>
+<td>0.180</td>
+</tr>
+<tr>
+<td>plane, anisotropic 0.5/0.2 + 0.9/0.6 (B's wheels)</td>
+<td>0.484</td>
+</tr>
+<tr>
+<td><strong>mesh</strong>, isotropic, reduction <code>none</code></td>
+<td>0.462</td>
+</tr>
+<tr>
+<td>mesh, isotropic, <code>fps</code> K=8</td>
+<td>0.365</td>
+</tr>
+<tr>
+<td>mesh, isotropic, <code>cluster</code> K=8 (B's default)</td>
+<td>0.755</td>
+</tr>
+<tr>
+<td>mesh, anisotropic, cluster K=8 — <strong>harness B</strong></td>
+<td>0.75-0.79</td>
+</tr>
+</tbody>
+</table>
+<p>Lateral friction magnitude does nothing (0.035 vs 0.030) — the brief already
+observed this, and the mechanism above explains <em>why</em>: once saturated, <code>mu</code> is
+not in the row.</p>
+<p>Harness B stacks anisotropy <strong>and</strong> the mesh <strong>and</strong> cluster reduction. Its
+jitter is saturated by whichever defect you did not turn off, which is exactly
+why nothing in harness B ever responded to any knob. Every "ruled out" line in
+the brief was measured inside that saturated regime.</p>
+<h2 id="defect-1-the-friction-cone-is-one-sided">Defect 1 — the friction cone is one-sided<a class="headerlink" href="#defect-1-the-friction-cone-is-one-sided" title="Permanent link">&para;</a></h2>
+<p><code>src/ostrich/constraints/friction_constraint.py</code>, <code>compute_friction_model</code>,
+both the isotropic (line ~311) and elliptical (line ~352) branches:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">clamped_imp_norm</span> <span class="o">=</span> <span class="n">wp</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">raw_imp_norm</span><span class="p">,</span> <span class="n">limit</span><span class="p">)</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">gap</span> <span class="o">=</span> <span class="n">limit</span> <span class="o">-</span> <span class="n">clamped_imp_norm</span>          <span class="c1"># == max(0, limit - |f|), never negative</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">phi_f</span> <span class="o">=</span> <span class="n">scaled_fisher_burmeister</span><span class="p">(</span><span class="n">d_t_norm</span><span class="p">,</span> <span class="n">gap</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">r</span><span class="p">)</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">denominator</span> <span class="o">=</span> <span class="n">r</span> <span class="o">*</span> <span class="n">raw_imp_norm</span> <span class="o">+</span> <span class="n">phi_f</span> <span class="o">+</span> <span class="n">denom_eps</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">w</span> <span class="o">=</span> <span class="n">r</span> <span class="o">*</span> <span class="p">(</span><span class="n">d_t_norm</span> <span class="o">-</span> <span class="n">phi_f</span><span class="p">)</span> <span class="o">/</span> <span class="n">denominator</span>
+</span></code></pre></div>
+<p>The row the solver actually enforces is <code>res_f = v_t + w * lambda_f = 0</code>.
+Setting <code>res_f = 0</code> and substituting <code>w</code> gives <code>phi_f * (d + r*raw) = -d*eps</code>,
+i.e. <code>phi_f = 0</code>, i.e. <code>d_t_norm * gap = 0</code>. Because <code>gap</code> is clamped at zero
+from below, that is satisfied by</p>
+<ul>
+<li><code>d_t_norm = 0</code> (stick) with <strong>any</strong> <code>|f|</code>, including <code>|f| &gt; mu*f_n</code>; or</li>
+<li><code>gap = 0</code>, which means <code>|f| &gt;= mu*f_n</code> — again with no upper bound.</li>
+</ul>
+<p>Unclamping <code>gap</code> does not fix it (it drives <code>w</code> to 0 and welds harder). The
+defect is that in the saturated regime the <em>denominator</em> normalises by the
+previous iterate's own force magnitude, so <code>w = |v_t| / |lambda_prev|</code> and the
+fixed point is scale-free in <code>lambda_f</code>.</p>
+<p><strong>Standalone confirmation.</strong> One mass, one contact, <code>mu*N = 800 N</code>, one step,
+iterating exactly this update:</p>
+<table>
+<thead>
+<tr>
+<th>tangential load</th>
+<th>ostrich <code>f_t</code></th>
+<th>ostrich <code>v_t</code></th>
+<th>exact Coulomb <code>f_t</code></th>
+<th>exact <code>v_t</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200 N</td>
+<td>−200.0</td>
+<td>0.0000</td>
+<td>−200.0</td>
+<td>0.0000</td>
+</tr>
+<tr>
+<td>700 N</td>
+<td>−700.0</td>
+<td>0.0000</td>
+<td>−700.0</td>
+<td>0.0000</td>
+</tr>
+<tr>
+<td>900 N</td>
+<td>−817.3</td>
+<td>0.0248</td>
+<td>−800.0</td>
+<td>0.0300</td>
+</tr>
+<tr>
+<td>2000 N</td>
+<td>−1912.5</td>
+<td>0.0263</td>
+<td>−800.0</td>
+<td>0.3600</td>
+</tr>
+<tr>
+<td>5000 N</td>
+<td>−4826.7</td>
+<td>0.0520</td>
+<td>−800.0</td>
+<td>1.2600</td>
+</tr>
+<tr>
+<td>20000 N</td>
+<td>−17768.9</td>
+<td>0.6693</td>
+<td>−800.0</td>
+<td>5.7600</td>
+</tr>
+</tbody>
+</table>
+<p>Below the limit it is exact. Above it, <code>f_t</code> tracks the applied load instead of
+saturating, and the contact barely slips.</p>
+<p><strong>Confirmation in the sim.</strong> Cone occupancy is
+<code>||(f_x/mu_x, f_y/mu_y)|| / f_n</code> per loaded contact — 1.0 is the Coulomb
+boundary. Mesh harness, correct engine-side contact indexing:</p>
+<table>
+<thead>
+<tr>
+<th>command</th>
+<th>cone median</th>
+<th>frac &gt; 1</th>
+<th>total |f_t| / robot weight</th>
+<th>rel. jitter (std/mean)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>settle</td>
+<td>0.00</td>
+<td>0 %</td>
+<td>0.00</td>
+<td>—</td>
+</tr>
+<tr>
+<td>forward 1 rad/s</td>
+<td>0.03</td>
+<td>2 %</td>
+<td>0.05</td>
+<td>0.04</td>
+</tr>
+<tr>
+<td>forward 5 rad/s</td>
+<td>0.67</td>
+<td>21 %</td>
+<td>0.50</td>
+<td>0.09</td>
+</tr>
+<tr>
+<td>spin 0.5 rad/s</td>
+<td>1.29</td>
+<td>80 %</td>
+<td>0.99</td>
+<td>0.37</td>
+</tr>
+<tr>
+<td>spin 3 rad/s</td>
+<td>3.48</td>
+<td>93 %</td>
+<td>2.50</td>
+<td>1.00</td>
+</tr>
+</tbody>
+</table>
+<p>This is the whole "why a turn and not a straight line" in one table. Even the
+<em>gentlest</em> spin — 0.5 rad/s on the wheels, achieving a pathetic 0.034 rad/s of
+yaw, 7 % of kinematic — is already 80 % outside the cone, whereas forward
+driving at ten times the ground speed is 21 % outside.</p>
+<p>Downstream consequences, measured during a commanded 3 rad/s spin:</p>
+<ul>
+<li>Wheels reach +1.5 / −1.5 rad/s of a commanded +3 / −3 (a straight line tracks
+  4.95 of 5.00). The joint servo (<code>lambda = ke * (target - qd)</code>, k_p = 250)
+  is applying ~440 N·m per wheel and still losing — 3.3x the Coulomb torque
+  that wheel's normal load can support.</li>
+<li>Chassis yaw reaches 23-41 % of the rate implied by the wheels it does turn.</li>
+<li>Total tangential contact force is 2.5-3.5x the robot's weight, applied
+  0.35 m below the CoM.</li>
+</ul>
+<p><strong>It is not a convergence artifact.</strong> Solving ten times harder converges <em>onto</em>
+the wrong fixed point:</p>
+<table>
+<thead>
+<tr>
+<th>solver settings</th>
+<th>‖residual‖</th>
+<th>yaw std / |mean|</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>nr 16, linear 26, tol 1e-3 (default)</td>
+<td>1.41e-2</td>
+<td>1.03</td>
+</tr>
+<tr>
+<td>nr 64</td>
+<td>5.71e-3</td>
+<td>0.95</td>
+</tr>
+<tr>
+<td>nr 64, linear 200, tol 1e-8</td>
+<td>1.40e-3</td>
+<td>1.14</td>
+</tr>
+</tbody>
+</table>
+<p>Residual down 10x, jitter unchanged, cone violation slightly <em>worse</em>. Also
+falsified as causes by direct measurement: contact compliance, friction
+compliance (1e-8 → 1e-2), warm start, linesearch, linear-solver iterations,
+triangle size.</p>
+<h3 id="the-one-line-fix">The one-line fix<a class="headerlink" href="#the-one-line-fix" title="Permanent link">&para;</a></h3>
+<p>Normalise by the cone limit, not by the previous iterate's force — i.e. use
+<code>clamped_imp_norm</code> in the denominator. Sub-limit behaviour is untouched
+(<code>clamped == raw</code> there), and in the saturated regime
+<code>w = d/limit = |v_t| / (mu * f_n)</code>, so <code>|lambda_f| = mu * f_n</code> exactly. In the
+toy above it reproduces exact Coulomb to within 2 % at every load. In the sim:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>|f_t| / weight</th>
+<th>wheels (cmd ±3)</th>
+<th>yaw, % of kinematic</th>
+<th>cone median</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>current</td>
+<td>3.47</td>
+<td>+1.46 / −1.50</td>
+<td>41 %</td>
+<td>3.5-5.8</td>
+</tr>
+<tr>
+<td>with the fix</td>
+<td>1.18</td>
+<td>+2.52 / −2.65</td>
+<td>64 %</td>
+<td>1.2-1.4</td>
+</tr>
+</tbody>
+</table>
+<p>Relative yaw jitter also flattens from 0.85-1.06 (turn-speed dependent) to a
+constant 0.59. It does <strong>not</strong> remove the rocking — that is defect 3.</p>
+<p>The patch is saved at
+<code>/tmp/claude-1000/-home-kuceral4-projects-ostrich/387b76fc-a730-442f-80c9-07ef3f7701f9/scratchpad/cone_fix.patch</code> (env-gated on <code>OSTRICH_FRICTION_SLIP_NORM=clamped</code>,
+default bit-exact with today). <strong>It is not applied.</strong> It changes every sliding
+contact in the engine, so the paper's terrain and scalability numbers would all
+move; that is a decision, not a bug fix to land quietly.</p>
+<h2 id="defect-2-the-anisotropic-branch-is-discontinuous-at-mu_x-mu_y">Defect 2 — the anisotropic branch is discontinuous at <code>mu_x == mu_y</code><a class="headerlink" href="#defect-2-the-anisotropic-branch-is-discontinuous-at-mu_x-mu_y" title="Permanent link">&para;</a></h2>
+<p>The row in the table above worth staring at:</p>
+<ul>
+<li>plane, isotropic <code>mu = 0.8 / 0.4</code> → rate_std <strong>0.035</strong></li>
+<li>plane, anisotropic <code>mu_x = 0.8/0.4</code>, <code>mu_y = 0.8000001/0.4000001</code> → <strong>0.180</strong></li>
+</ul>
+<p>The coefficients are numerically the same to seven digits. The only thing that
+changed is which branch of <code>compute_friction_model</code> runs — and the answer gets
+5x worse. The two branches are not the same function in the limit: the
+isotropic branch pairs <code>FB(|v_t|dt, mu*f_n*dt - |f|dt)</code>, the elliptical branch
+pairs <code>FB(mu*|v_t|dt, f_n*dt - |f|dt/mu)</code>. They differ by a factor of <code>mu^2</code> in
+how force slack is weighted against slip, and the weights come back as
+<code>w_x = w_tilde/mu_x^2</code>, <code>w_y = w_tilde/mu_y^2</code>.</p>
+<p>This is consistent with the existing note that the <code>mu_x == mu_y</code> hard branch
+must not be unified: the branches genuinely disagree, and the hard branch is
+hiding the disagreement rather than resolving it. With real anisotropy
+(0.9/0.6 longitudinal) the penalty is 13x (0.035 → 0.444).</p>
+<p>Harness A never applied anisotropy (the brief verified this) — so harness A has
+been running the good branch all along. Harness B applies it. That is the single
+largest difference between them.</p>
+<h2 id="defect-3-cluster-reduction-is-unstable-on-a-flat-mesh">Defect 3 — cluster reduction is unstable on a flat mesh<a class="headerlink" href="#defect-3-cluster-reduction-is-unstable-on-a-flat-mesh" title="Permanent link">&para;</a></h2>
+<p>Every contact a wheel makes with the flat mesh has the <em>same</em> normal, so
+<code>cluster_normal_dot_thresh = 0.996</code> matches all of them, and any two within
+<code>cluster_pos_thresh = 5 mm</code> are declared duplicates. The reducer keeps "the
+deepest" of each cluster — but on a perfectly flat mesh the depth differences
+are geometric noise, so <em>which</em> points survive changes every step. The wheel's
+support set (5-6 kept out of ~12 candidates) hops around its contact patch,
+the friction lever arms jump with it, and normal load sloshes between wheels.</p>
+<p>Mesh, 3 rad/s spin, measured per physics step:</p>
+<table>
+<thead>
+<tr>
+<th>reduction</th>
+<th>chassis roll peak-to-peak</th>
+<th>steps with a wheel unloaded</th>
+<th>yaw std/|mean|</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cluster</code> K=8 (default)</td>
+<td><strong>6.33°</strong></td>
+<td><strong>27.5 %</strong></td>
+<td>1.02</td>
+</tr>
+<tr>
+<td><code>fps</code> K=8</td>
+<td>0.36°</td>
+<td>5.8 %</td>
+<td>0.80</td>
+</tr>
+<tr>
+<td><code>cluster</code> K=32</td>
+<td>0.28°</td>
+<td>4.4 %</td>
+<td>0.82</td>
+</tr>
+<tr>
+<td><code>none</code></td>
+<td>0.34°</td>
+<td>5.8 %</td>
+<td>0.91</td>
+</tr>
+<tr>
+<td>analytic plane (6 contacts, reducer is a no-op)</td>
+<td>0.34°</td>
+<td>—</td>
+<td>0.50</td>
+</tr>
+</tbody>
+</table>
+<p>The plane never had this problem because a cylinder-plane contact yields 2
+points per wheel, below the reduction budget, so the reducer never fires.</p>
+<p><strong>This is the release valve for the stick-slip.</strong> A per-step trace makes the
+cycle explicit — the rear wheel is the only wheel whose lateral direction
+opposes the spin, and the yaw rate is high exactly on the steps its contact set
+is empty:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>   t      wz  |   N_L    N_R   N_rear |   z_L    z_R  z_rear | contacts per wheel
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>3.00  -1.410  |    71   1043       -0 | 0.349  0.350   0.351 | [5, 7, 8]
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>3.03  -1.955  |   241    721        0 | 0.349  0.349   0.347 | [8, 4, 0]   &lt;- rear airborne
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>3.06  -0.233  |   647      0      872 | 0.350  0.354   0.350 | [7, 8, 7]   &lt;- right lifted 4 mm
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>3.09  -0.118  |   356      0      335 | 0.350  0.355   0.350 | [8, 0, 5]
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>3.12  -0.105  |   380      0      412 | 0.350  0.350   0.350 | [8, 0, 4]
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>3.15  -1.302  |    30   1375        0 | 0.349  0.350   0.353 | [3, 8, 4]   &lt;- right lands, rear lifts
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>3.18  -1.999  |   298    595        0 | 0.350  0.350   0.352 | [8, 5, 0]
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>3.21  -0.133  |   701      0      613 | 0.350  0.356   0.350 | [7, 7, 8]
+</span></code></pre></div>
+<p>Yaw is welded near −0.1 rad/s while the rear wheel is down, and releases to
+−2.0 (near the kinematic 2.88) the moment it is not. Wheel lift is 4-46 mm and
+chassis roll reaches ±3° — real motion, not solver noise.</p>
+<h2 id="the-severity-scales-with-tangential-demand-not-with-turning">The severity scales with tangential demand, not with turning<a class="headerlink" href="#the-severity-scales-with-tangential-demand-not-with-turning" title="Permanent link">&para;</a></h2>
+<p>Mesh harness, chassis roll peak-to-peak and wheel vertical excursion:</p>
+<table>
+<thead>
+<tr>
+<th>command</th>
+<th>achieved</th>
+<th>roll p-p</th>
+<th>wheel z p-p</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>spin 0.5 rad/s</td>
+<td>−0.033 (7 % kin)</td>
+<td>0.00°</td>
+<td>0.0 mm</td>
+</tr>
+<tr>
+<td>spin 1.0</td>
+<td>−0.061 (6 %)</td>
+<td>0.00°</td>
+<td>0.1 mm</td>
+</tr>
+<tr>
+<td>spin 2.0</td>
+<td>−0.157 (9 %)</td>
+<td>0.02°</td>
+<td>0.5 mm</td>
+</tr>
+<tr>
+<td>spin 3.0</td>
+<td>−0.645 (22 %)</td>
+<td>4.82°</td>
+<td>44 mm</td>
+</tr>
+<tr>
+<td>spin 6.0</td>
+<td>−1.904 (33 %)</td>
+<td>15.65°</td>
+<td>172 mm</td>
+</tr>
+<tr>
+<td><strong>forward 10 rad/s</strong></td>
+<td>3.43 m/s</td>
+<td><strong>178.5°</strong></td>
+<td><strong>4.6 m</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Driving <em>straight</em> at 3.5 m/s on flat ground throws the robot 4.6 m into the air
+and flips it. Turning is not special — it is just the cheapest way for this
+robot to demand a large tangential force, because rotating requires slip at
+every wheel and driving requires none.</p>
+<h2 id="a-note-on-the-metric">A note on the metric<a class="headerlink" href="#a-note-on-the-metric" title="Permanent link">&para;</a></h2>
+<p><code>jerk_rms</code> carries no information beyond <code>rate_std</code> and the sampling interval.
+For rate noise that decorrelates between samples, <code>jerk_rms ≈ rate_std·√2/Δt</code>:</p>
+<ul>
+<li>harness A: 0.392·√2/0.04 = 13.9 vs 11.4 reported</li>
+<li>harness B: 0.75·√2/0.03 = 35 vs 24-38 reported</li>
+</ul>
+<p>Two consequences. First, the brief's item 3 is correct and the two harnesses'
+jerk numbers were never commensurable. Second — and this is what hid defect 3 —
+<code>jerk_rms</code> <strong>inverts the ordering</strong> on ground representation, because it also
+rewards a slower turn:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>jerk_rms</th>
+<th>rate_std/|mean|</th>
+<th>roll p-p</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>plane</td>
+<td>51-59</td>
+<td>0.50</td>
+<td>0.34°</td>
+</tr>
+<tr>
+<td>mesh</td>
+<td>36-38</td>
+<td>1.02</td>
+<td>6.33°</td>
+</tr>
+</tbody>
+</table>
+<p>The mesh has <em>lower</em> <code>jerk_rms</code> and is unambiguously worse. That is why "not the
+ground representation, &lt;15 % in jerk_rms" was recorded as ruled out when it is
+in fact one of the three causes.</p>
+<p>Also worth knowing: harness A samples every 2 steps, which aliases away half the
+variance. Its clean configuration reads <code>rate_std</code> 0.035 at <code>chunk=2</code> and 0.173
+sampled every step.</p>
+<p>Use <code>rate_std / |yaw_rate|</code>, or band-limited yaw-rate power on a fixed grid, or
+— best of all, because it is the actual physics — <strong>cone occupancy</strong>.</p>
+<h2 id="what-holds-in-both-harnesses">What holds in both harnesses<a class="headerlink" href="#what-holds-in-both-harnesses" title="Permanent link">&para;</a></h2>
+<p>Predictions, all verified here on both grounds:</p>
+<ol>
+<li>Lateral <code>mu</code> has no effect on a saturated turn, on either ground, at any
+   compliance. (Because <code>mu</code> is not in the row.) Confirmed: 0.035 vs 0.030.</li>
+<li>Contact compliance is worth ~10x <strong>only</strong> in the clean configuration
+   (analytic plane, isotropic wheels). Add either anisotropy or the mesh and the
+   effect vanishes. Confirmed on both.</li>
+<li>Anisotropic wheels cost ~13x on the plane, and nothing on the mesh (already
+   saturated by the reducer). Confirmed.</li>
+<li><code>fps</code> or a large <code>cluster</code> K removes 20x of the chassis rocking on the mesh
+   and none on the plane. Confirmed.</li>
+<li>The fix to defect 1 raises achieved yaw rate 1.5-6x and cuts total tangential
+   force from ~3x to ~1.2x robot weight, on both grounds. Confirmed.</li>
+</ol>
+<h2 id="recommended-order-of-work">Recommended order of work<a class="headerlink" href="#recommended-order-of-work" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>Defect 1</strong> (cone) — this is the physics bug and it is present in every
+   scene the engine simulates, including the paper's. Patch is written and
+   validated against analytic Coulomb; the question is what it does to the
+   published results, which needs a rerun, not a decision here.</li>
+<li><strong>Defect 2</strong> (anisotropic branch) — reformulate the elliptical branch so it
+   reduces continuously to the isotropic one. The <code>mu_x == mu_y</code> hard branch
+   currently masks a real discrepancy. A regression test on the
+   <code>mu_y = mu_x*(1+1e-7)</code> case would have caught this.</li>
+<li><strong>Defect 3</strong> (cluster reducer) — either switch the default to <code>fps</code>, or make
+   the cluster representative selection deterministic under ties instead of
+   "deepest", which is noise on a flat surface. Cheap and low-risk.</li>
+<li>Then retire <code>jerk_rms</code> from <code>turn_jitter.py</code> and report <code>rate_std/|rate|</code>
+   plus cone occupancy.</li>
+</ol>
+<h2 id="reproducing">Reproducing<a class="headerlink" href="#reproducing" title="Permanent link">&para;</a></h2>
+<p>Scratch harnesses (headless, <code>RenderingConfig(vis_type="null")</code>), in
+<code>/tmp/claude-1000/-home-kuceral4-projects-ostrich/387b76fc-a730-442f-80c9-07ef3f7701f9/scratchpad/</code>:</p>
+<table>
+<thead>
+<tr>
+<th>file</th>
+<th>what it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>harness.py</code></td>
+<td>instrumented <code>TurnJitterSimulator</code>, scriptable command sequence</td>
+</tr>
+<tr>
+<td><code>toy.py</code> / <code>toy2.py</code></td>
+<td>one-contact friction row vs analytic Coulomb; no engine needed</td>
+</tr>
+<tr>
+<td><code>repro_A.py</code></td>
+<td>reproduces harness A exactly (plane, isotropic, A's metric)</td>
+</tr>
+<tr>
+<td><code>final.py</code></td>
+<td>the three-way disentangling table</td>
+</tr>
+<tr>
+<td><code>straight.py</code></td>
+<td>cone occupancy, straight vs spin, correct engine-side indexing</td>
+</tr>
+<tr>
+<td><code>sweep3.py</code></td>
+<td>contact-reduction policy sweep</td>
+</tr>
+<tr>
+<td><code>sweep4.py</code></td>
+<td>solver-hardness sweep</td>
+</tr>
+<tr>
+<td><code>trace.py</code></td>
+<td>per-step stick-slip trace</td>
+</tr>
+<tr>
+<td><code>cone_fix.patch</code></td>
+<td>the defect-1 patch, env-gated, not applied</td>
+</tr>
+</tbody>
+</table>
+<p>Read cone occupancy and per-wheel loads from <code>solver.data.constr_force.n/.f</code>
+indexed against <code>solver.ostrich_contacts.contact_shape0/1</code> — <strong>not</strong> against
+<code>sim.contacts</code>, which is the pre-reduction Newton contact list and does not
+share indices with the force vector.</p>
+<hr />
+<h2 id="resolution-added-2026-08-21-same-day">Resolution (added 2026-08-21, same day)<a class="headerlink" href="#resolution-added-2026-08-21-same-day" title="Permanent link">&para;</a></h2>
+<p>All three defects were addressed; the engine is Macklin et al. 2019
+(arXiv:1907.04587) and the cone defect is a one-line deviation from its Eq. 32
+(the clamped FB slack makes phi_FB(d, 0) = 0 identically, amputating the
+paper's Fig. 6 beyond-cone penalization).</p>
+<p>Shipped (branch <code>relaxation</code>):
+1. <strong>Cone fix</strong> — <code>clamped_imp_norm</code> in the w denominator: evaluates the
+   paper's Eq. 35 W at its own fixed point, so |f_t| = mu*f_n at sliding.
+2. <strong><code>nr.w_relaxation</code> = 0.5</strong> — damped Picard on w across NR iterations;
+   restores convergence the corrected cone costs (residual 0.28 -&gt; 0.11 at
+   nr 16, cone p90 -&gt; 1.6, jitter halved again). Default 1.0 is bit-exact.
+3. <strong>fps K=8 reducer</strong> as the wheeled-robot default (roll 4-7 deg -&gt; ~1 deg).
+4. <strong>Regression test</strong> <code>tests/test_friction_cone_bound.py</code> (fails on the old
+   formulation at 2.9x the cone).
+5. <strong>Viewer clock fix</strong> — CUDA-graph replays froze <code>clock.time</code>, so scripted
+   demos never left their first phase in the GL viewer.</p>
+<p>End state on this harness (mesh spin, dt 0.03, aniso wheels): yaw −2.15 rad/s
+(75 % of kinematic, was 23 %), rate_std/|mean| 0.10 (was ~1.0), roll 0.14°
+(was 4–7°), cone occupancy p90 ≈ 1.2 (was 13–19). The mu_x==mu_y branch
+discontinuity (defect 2) no longer measurably bites once the solve converges
+(eps-anisotropy within noise); anisotropic wheels are now the smoothest
+configuration. Wheels stay cylinders: a capsule doubles mesh turn rate again
+(−2.15 vs −1.1, jitter 0.11 vs 0.35) but adds ~0.8 m phantom lateral width —
+per-scene choice, documented in common.py. Rejected along the way:
+post-hoc cone projection, lambda_n step-lag (superseded by w-relaxation),
+and the scalar C-fold (docs/friction_cfold_negative_result.md).</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      <script id="__config" type="application/json">{"base": "..", "features": ["search.suggest", "search.highlight", "content.code.copy", "content.code.select", "navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "toc.follow"], "search": "../assets/javascripts/workers/search.973d3a69.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.f55a23d4.min.js"></script>
+      
+        <script src="../javascripts/mathjax.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
