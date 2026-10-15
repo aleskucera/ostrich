@@ -133,3 +133,16 @@ not used in the headline plot (it understates real GPU footprint).
   spline setup, gradient quality at num_worlds=1.
 - `experiments/4_scalability/` — flat-ground counterpart (Ostrich + MJX only,
   K=30 spline to synthetic chassis-pose target).
+
+## Note: non-monotone MJX memory below 256 worlds
+
+The MJX + checkpoint NVML curve dips at 32–64 worlds (310 MB vs 566 MB at
+1–16 and 128 worlds). This is real, deterministic behavior, not a
+measurement artifact: XLA autotunes kernel selection per batch shape, and
+the chosen kernels' fixed workspace differs by ~250 MB between these
+shapes. Verified by rerunning every point with
+`XLA_PYTHON_CLIENT_ALLOCATOR=platform` (caching allocator disabled, so
+NVML tracks live memory) and NVML polling started only after compilation —
+all points reproduce the original values bit-for-bit, dip included
+(`mjx_sim_ckpt.py` supports this via its post-compile poller start).
+Per-world state dominates from 256 worlds on.

@@ -8,12 +8,14 @@ optimize_ostrich.py / optimize_mjx.py / optimize_semi_implicit.py.
 Specifically picks `ostrich_all_fixes.json`, `mjx_all_fixes.json`, etc. when
 present (the final tuned runs) and falls back to `<engine>.json` otherwise.
 
-Caveat (inherited from box1): the per-trial wall_s is a single total, so
-per-iter time is approximated as ``min(wall_s) / iterations`` per engine
-(the warmest trial's average). Within an engine all trials use the same
-per-iter estimate so the loss IQR band reflects only loss-curve variance,
-not wall-clock variance. Absolute x-axis times exclude one-time JIT compile
-or CUDA-graph capture costs.
+Per-iteration time comes from PER_ITER_S below: an exclusive measurement
+(one job, one GPU) fitted over 5 and 15 iterations, which separates the
+marginal per-iteration cost from each engine's one-time setup and EXCLUDES
+that setup from the x-axis. This replaces the old min(wall_s)/iterations
+estimate, which took the single fastest trial and amortised setup into every
+iteration (badly wrong for Semi-Implicit, whose setup is ~29 min per trial).
+Within an engine all trials share one per-iter estimate, so the IQR band
+reflects loss-curve variance only, not wall-clock variance.
 
 Usage:
     python experiments/3_gradient_quality_box2/plot_convergence.py
@@ -21,31 +23,34 @@ Usage:
 import argparse
 import json
 import pathlib
+import sys
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+import paper_style as ps  # noqa: E402
+
 RESULTS_DIR = pathlib.Path(__file__).parent / "results"
 PAPER_DIR = pathlib.Path(__file__).resolve().parents[2] / ".." / "ostrich_paper" / "figures"
 
-plt.rcParams.update({
-    "text.usetex": True,
-    "text.latex.preamble": r"\usepackage{amsmath}",
-    "font.family": "serif",
-    "font.size": 12,
-    "axes.labelsize": 12,
-    "xtick.labelsize": 11,
-    "ytick.labelsize": 11,
-    "legend.fontsize": 11,
-    "axes.spines.top": False,
-    "axes.spines.right": False,
-})
+# savefig crops with bbox_inches="tight", so what LaTeX scales to
+# \columnwidth is the CROPPED width, which itself moves with the font sizes.
+# DRAWN_IN is that cropped width, measured from the emitted PNG and pinned
+# here; the script prints the measured value and the achieved printed text
+# size on every run, so a drift is visible immediately.
+FIG_W = 7.0
+DRAWN_IN = 6.23
+S = ps.apply(drawn_in=DRAWN_IN)
 
 STYLES = {
-    "Ostrich":         {"color": "#2196F3", "marker": "o", "lw": 2.0, "zorder": 5},
-    "MJX":           {"color": "#E91E63", "marker": "s", "lw": 1.8, "zorder": 4},
-    "Semi-Implicit": {"color": "#FF9800", "marker": "^", "lw": 1.8, "zorder": 3},
+    "Ostrich":       {"color": ps.COLORS["Ostrich"], "marker": ps.MARKERS["Ostrich"],
+                      "zorder": 5},
+    "MJX":           {"color": ps.COLORS["MJX"], "marker": ps.MARKERS["MJX"],
+                      "zorder": 4},
+    "Semi-Implicit": {"color": ps.COLORS["Semi-Implicit"],
+                      "marker": ps.MARKERS["Semi-Implicit"], "zorder": 3},
 }
 LABELS = {
     "Ostrich":         r"\textbf{Ostrich}",
@@ -53,6 +58,19 @@ LABELS = {
     "Semi-Implicit": "Semi-Impl.",
 }
 SIM_ORDER = ["Ostrich", "MJX", "Semi-Implicit"]
+
+# Paper figure pinning (RA-L revision). Explicit rather than glob-preferred so
+# the figure is reproducible from a named result set.
+PAPER_JSON = {
+    "Ostrich":       "ostrich_postfix_vjp.json",
+    "MJX":           "mjx_2ms_lr0.3_final.json",   # 2 ms, swept lr = 0.3
+    "Semi-Implicit": "semi_implicit_all_fixes.json",
+}
+
+# Warm per-iteration seconds, measured exclusively (one job alone on one GPU)
+# as marginal = (wall_15 - wall_5) / 10. Setup is EXCLUDED from the x-axis;
+# it is 1.2 s (Ostrich), 84 s (MJX), 1731 s (Semi-Implicit).
+PER_ITER_S = {"Ostrich": 0.552, "MJX": 116.393, "Semi-Implicit": 2.559}
 
 N_GRID = 80
 
@@ -109,6 +127,9 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                   formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--save", default=str(RESULTS_DIR / "convergence_box2.png"))
+    ap.add_argument("--fig-h", type=float, default=2.6,
+                    help="canvas height in inches; the printed height is "
+                         "3.40 in / (cropped width / cropped height)")
     ap.add_argument("--min-iters", type=int, default=10,
                     help="skip engine JSONs with fewer iters than this "
                     "(filters out sanity-test JSONs).")
@@ -133,7 +154,9 @@ def main():
 
     engines = {}
     for sim in sim_order:
-        path = _pick_json_for_engine(engine_file_keys[sim])
+        pinned = RESULTS_DIR / PAPER_JSON.get(sim, "")
+        path = pinned if pinned.is_file() \
+               else _pick_json_for_engine(engine_file_keys[sim])
         if path is None:
             print(f"  [skip] {sim}: no <engine>.json or <engine>_all_fixes.json found")
             continue
@@ -142,9 +165,10 @@ def main():
             print(f"  [skip] {path.name} ({sim}): only {d.get('iterations')} iters "
                   f"(< {args.min_iters}) — sanity run, not production.")
             continue
-        # Use warmest-trial per-iter time as the uniform x-axis estimate.
-        warm_wall_s = min(t["wall_s"] for t in d["trials"])
-        per_iter_s = warm_wall_s / d["iterations"]
+        # Exclusive measured marginal per-iteration time (setup excluded).
+        per_iter_s = PER_ITER_S.get(sim)
+        if per_iter_s is None:
+            per_iter_s = min(t["wall_s"] for t in d["trials"]) / d["iterations"]
         eff_iters = d["iterations"] if args.max_iters is None \
                     else min(args.max_iters, d["iterations"])
         curves = []
@@ -167,7 +191,7 @@ def main():
         print(f"No production results in {RESULTS_DIR} — run optimize_*.py first.")
         return
 
-    fig, ax = plt.subplots(figsize=(7.0, 3.4))
+    fig, ax = plt.subplots(figsize=(FIG_W, args.fig_h))
 
     for sim in sim_order:
         if sim not in engines:
@@ -177,7 +201,7 @@ def main():
         if len(curves) == 1:
             cum, best = curves[0]
             ax.plot(cum, best, color=st["color"], marker=st["marker"],
-                    linewidth=st["lw"], markersize=4,
+                    linewidth=ps.LW * S, markersize=ps.MS * S,
                     markevery=max(1, len(cum) // 12),
                     label=LABELS[sim], zorder=st["zorder"])
             continue
@@ -185,26 +209,34 @@ def main():
         ax.fill_between(t_grid, q1, q3, color=st["color"], alpha=0.18,
                         linewidth=0, zorder=st["zorder"] - 1)
         ax.plot(t_grid, median, color=st["color"], marker=st["marker"],
-                linewidth=st["lw"], markersize=4,
+                linewidth=ps.LW * S, markersize=ps.MS * S,
                 markevery=max(1, len(t_grid) // 12),
                 label=LABELS[sim], zorder=st["zorder"])
 
-    ax.set_xlabel("Wall-clock time (s)")
+    ax.set_xlabel("Wall-clock time [s]")
     ax.set_ylabel(r"Running-best loss")
     ax.set_xscale("log")
     ax.set_yscale("log")
-    ax.grid(True, which="both", alpha=0.35, linewidth=0.6)
+    ax.grid(True, which="major", alpha=ps.GRID_MAJOR["alpha"],
+            linewidth=ps.GRID_MAJOR["lw"] * S)
+    ax.grid(True, which="minor", alpha=ps.GRID_MINOR["alpha"],
+            linewidth=ps.GRID_MINOR["lw"] * S)
     ax.xaxis.set_major_formatter(ticker.LogFormatterSciNotation())
 
     handles, labels = ax.get_legend_handles_labels()
     ax.legend(handles, labels, loc="upper center",
               bbox_to_anchor=(0.5, -0.22), ncol=len(handles),
-              fontsize=11, frameon=False, columnspacing=1.5, handlelength=1.5)
+              fontsize=ps.PRINT["legend"] * S, frameon=False,
+              columnspacing=1.5, handlelength=1.5)
 
     out = pathlib.Path(args.save)
     out.parent.mkdir(parents=True, exist_ok=True)
     plt.savefig(out, dpi=200, bbox_inches="tight")
-    print(f"\nSaved {out}")
+    _px = plt.imread(out)
+    _w, _h = _px.shape[1] / 200.0, _px.shape[0] / 200.0
+    print(f"\nSaved {out}  (cropped canvas {_w:.2f} x {_h:.2f} in -> printed "
+          f"{ps.COLUMN_IN:.2f} x {ps.COLUMN_IN * _h / _w:.2f} in; DRAWN_IN is "
+          f"{DRAWN_IN:.2f}, printed label {ps.PRINT['label'] * DRAWN_IN / _w:.2f} pt)")
 
     paper_dir = PAPER_DIR.resolve()
     if paper_dir.is_dir():

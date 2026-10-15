@@ -33,7 +33,10 @@ def _patched_init(self, *a, **kw):
     _orig_init(self, *a, **kw)
 
 
-rr.HelhestJuniorReplaySimulator.__init__ = _patched_init
+def _apply_best_patch():
+    # Applied in main() only: patching at import time leaks BEST into every
+    # other script that imports this module (e.g. for _run_mj_c3).
+    rr.HelhestJuniorReplaySimulator.__init__ = _patched_init
 
 
 def _run_mj_c3(gt):
@@ -81,6 +84,7 @@ def _run_mj_c3(gt):
 
 
 def main():
+    _apply_best_patch()
     runs = [f"ostrich{i}" for i in range(14)]
     fig, axes = plt.subplots(7, 2, figsize=(13, 26))
     errs = []

@@ -92,6 +92,13 @@ class EngineData:
         self._constr_body_idx = _alloc((dims.num_constraints, 2), wp.int32)
         self._constr_active_mask = _alloc((dims.num_constraints,), wp.float32)
 
+        # Persistent per-contact friction weight (w_x, w_y), carried across
+        # the NR-iteration friction kernel calls for the nr.w_relaxation
+        # under-relaxation (see compute_friction_core in
+        # constraints/friction_constraint.py). Zeroed at the start of each
+        # step in base_engine.load_data.
+        self.friction_w = _alloc((dims.contact_count,), wp.vec2)
+
         self.constr_force = ConstraintView(self._constr_force, dims)
         self.constr_force_prev_iter = ConstraintView(self._constr_force_prev_iter, dims)
         self.constr_body_idx = ConstraintView(self._constr_body_idx, dims, axis=-2)

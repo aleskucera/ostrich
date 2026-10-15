@@ -162,10 +162,12 @@ def compute_residual(
             config.compliance.friction,
             config.relaxation.friction_mode,
             config.relaxation.friction_load_gate,
+            config.nr.w_relaxation,
         ],
         outputs=[
             data.res.d_spatial,
             data.res.c.f,
+            data.friction_w,
         ],
         device=data.device,
     )

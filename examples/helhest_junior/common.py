@@ -151,6 +151,7 @@ def _add_wheel(
         cfg=newton.ModelBuilder.ShapeConfig(
             density=0.0,
             collision_group=0,
+            has_shape_collision=False,
             is_visible=is_visible,
         ),
     )
@@ -184,6 +185,15 @@ def _add_wheel(
     if stribeck_lateral_only is not None:
         shape_custom_attrs["stribeck_lateral_only"] = stribeck_lateral_only
 
+    # Cylinder vs capsule is a real trade-off, decided here for the cylinder.
+    # Against mesh terrain the cylinder's sharp rim yields one ill-conditioned
+    # contact per triangle (normal tilt p90 76deg, vs 6.5deg for a capsule),
+    # and with a converged friction solve that costs turning: mesh spin-in-
+    # place measures yaw -1.1 rad/s, jitter 0.35 (cylinder) vs -2.15 / 0.11
+    # (capsule). The capsule's price is its hemispherical caps: they bulge
+    # WHEEL_RADIUS laterally past each rim (~0.80 m total phantom width) and
+    # hit obstacles/curbs the real tread never would, with wrong rim-first
+    # contact geometry. Flat/smooth-terrain work may prefer add_shape_capsule.
     builder.add_shape_cylinder(
         body=wheel_link,
         xform=wp.transform(wp.vec3(0.0, 0.0, 0.0), HelhestJuniorConfig.WHEEL_ROT),

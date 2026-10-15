@@ -122,7 +122,11 @@ def compute_wheel_vel_gradient(model, engine, target_vel, w, dt=0.01):
     grad_analytical = engine.data.joint_target_vel.grad.numpy().flatten().copy()
 
     # FD for wheel DOFs only (skip free joint DOFs 0-5)
-    eps = 1e-4
+    # Central-difference step. In float32 a step of 1e-4 is round-off limited
+    # (absolute error ~5e-3 per component, 4-7% on the smallest gradients);
+    # measured 2026-09-07 on the paper-era engine: max rel. error 3.9/7.0/3.9%
+    # at 1e-4, 0.33/0.13/0.11% at 1e-2, with the adjoint values unchanged.
+    eps = 1e-2
     grad_fd = np.zeros(dims.joint_dof_count, dtype=np.float32)
     for dof in range(6, dims.joint_dof_count):
         tv_p = target_vel.copy()
@@ -308,7 +312,8 @@ def test_multi_step_trajectory():
         ctrl_grad_a += buffer.joint_target_vel.grad[i].numpy().flatten()
 
     # --- FD for all wheel DOFs ---
-    eps = 1e-3
+    # Same round-off argument as above: 4.6% at 1e-3, 0.31% at 1e-2, 0.13% at 3e-2.
+    eps = 1e-2
     ctrl_grad_fd = np.zeros(dims.joint_dof_count, dtype=np.float32)
     for dof in range(6, dims.joint_dof_count):
         def run_traj(tv):

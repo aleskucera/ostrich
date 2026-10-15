@@ -1,0 +1,67 @@
+{
+ "engine": "semi_implicit",
+ "runs": [
+  "ostrich3",
+  "ostrich5",
+  "ostrich9",
+  "ostrich12"
+ ],
+ "cmd_scale": 0.9193,
+ "rows": [
+  {
+   "h": 0.0001,
+   "per_run": {
+    "ostrich3": 0.22438067921018204,
+    "ostrich5": 0.14908323907447324,
+    "ostrich9": 0.16615004712229742,
+    "ostrich12": 0.14788960590304825
+   },
+   "mean_combined": 0.17187589282750024,
+   "n_diverged": 0
+  },
+  {
+   "h": 0.0002,
+   "per_run": {
+    "ostrich3": 0.2245088062535173,
+    "ostrich5": 0.14911255312577976,
+    "ostrich9": 0.16607946714051552,
+    "ostrich12": 0.1479141258666194
+   },
+   "mean_combined": 0.17190373809660803,
+   "n_diverged": 0
+  },
+  {
+   "h": 0.0005,
+   "per_run": {
+    "ostrich3": 0.3858210591096537,
+    "ostrich5": 0.528070716541449,
+    "ostrich9": 0.19816931136579827,
+    "ostrich12": 0.1733212761937521
+   },
+   "mean_combined": 0.3213455908026633,
+   "n_diverged": 0
+  },
+  {
+   "h": 0.001,
+   "per_run": {
+    "ostrich3": null,
+    "ostrich5": null,
+    "ostrich9": null,
+    "ostrich12": null
+   },
+   "mean_combined": null,
+   "n_diverged": 4
+  },
+  {
+   "h": 0.002,
+   "per_run": {
+    "ostrich3": null,
+    "ostrich5": null,
+    "ostrich9": null,
+    "ostrich12": null
+   },
+   "mean_combined": null,
+   "n_diverged": 4
+  }
+ ]
+}

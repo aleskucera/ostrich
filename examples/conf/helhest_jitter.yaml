@@ -1,0 +1,36 @@
+defaults:
+  - simulation: helhest
+  - rendering: gl
+  - logging: disabled
+  - engine: ostrich
+  - control: helhest/velocity
+  - _self_
+
+project_name: ${hydra:job.name}
+
+# 250 matches the dasenka sim. The gain dominates turning: at 150 the robot
+# barely rotates at all, so there is little jitter to look at.
+control:
+  k_p: 250.0
+
+# Flat ground, triangulated. `cell` sets how often a wheel crosses a triangle
+# edge. Measured, it barely matters for the TURNING jitter (jerk_rms 27.8 at
+# 0.06, 21.8 at 0.12, 24.1 at 0.25) -- it is exposed because it is the obvious
+# suspect and someone will want to rule it out, not because it is the fix.
+ground:
+  extent: 20.0
+  cell: 0.06
+
+terrain_mu: 0.8
+
+# Anisotropic wheel friction: `lateral` resists sliding along the projected
+# wheel spin axis, `long` resists rolling. Raise lateral to make a skid-steer
+# fight its own turn (friction.lateral_left_right=0.8 is the isotropic-ish case).
+friction:
+  lateral_left_right: 0.5
+  lateral_rear: 0.2
+  long_left_right: 0.9
+  long_rear: 0.6
+
+turn_speed: 3.0   # rad/s on the wheels, opposed -> spin in place
+drive_speed: 5.0  # rad/s on the wheels, together -> straight line

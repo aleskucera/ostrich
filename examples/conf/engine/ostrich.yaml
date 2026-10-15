@@ -5,6 +5,10 @@ nr:
   max_iters: 16
   backtrack_min_iter: 4
   atol: 1e-5
+  # Friction-w under-relaxation (docs/friction_cfold_negative_result.md, "What
+  # actually works"): at nr 16, spin residual 0.28->0.11, cone p90 5->1.6,
+  # jitter 0.67->0.35.
+  w_relaxation: 0.5
 
 linear:
   max_iters: 26
@@ -14,13 +18,15 @@ linear:
 
 compliance:
   joint: 6e-10
-  contact: 1e-10
+  contact: 1e-6
   friction: 1e-8
 
 contacts:
   max_per_world: 256
   reduction:
-    policy: cluster
+    # fps halves unloaded-wheel steps and cuts mesh spin roll 4-6deg -> ~1deg;
+    # cluster reshuffles flat-mesh patches.
+    policy: fps
     max_per_pair: 8
 
 warm_start:

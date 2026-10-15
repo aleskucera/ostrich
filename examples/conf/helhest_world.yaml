@@ -1,0 +1,39 @@
+defaults:
+  - simulation: helhest
+  - rendering: gl
+  - logging: disabled
+  - engine: ostrich
+  - control: helhest/velocity
+  - _self_
+
+project_name: ${hydra:job.name}
+
+# The dasenka sim drives its wheels at k_p 250, not the 150 that
+# control/helhest/velocity.yaml carries, and the gain dominates turning here:
+# on the pillars heightfield, spinning in place at 3 rad/s gives
+#
+#   k_p 150   yaw_rate -0.13 rad/s   jerk  5.4
+#   k_p 250   yaw_rate -0.84 rad/s   jerk 27.9
+#
+# so 150 barely turns and 250 turns but chatters. Matching dasenka is the point
+# of this demo, so 250 it is; drop it if you care more about smoothness than
+# about comparing against the robot. Forward speed is unaffected either way
+# (6.2 m in 4 s at both).
+control:
+  k_p: 250.0
+
+# helhest_stack world to drive in: gap slalom pillars pocket ridge bumpy
+world: pillars
+
+# Ground friction of the terrain and obstacle shapes; combines with the wheels'.
+terrain_mu: 0.8
+
+# Anisotropic wheel friction, as tuned on the dasenka demo. `lateral` resists
+# sliding along the projected wheel spin axis, `long` resists rolling. Keeping
+# lateral well below long is what lets a three-wheel skid-steer turn without
+# stick-slip.
+friction:
+  lateral_left_right: 0.5
+  lateral_rear: 0.2
+  long_left_right: 0.9
+  long_rear: 0.6

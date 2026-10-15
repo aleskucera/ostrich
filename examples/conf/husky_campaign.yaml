@@ -1,0 +1,32 @@
+defaults:
+  - simulation: helhest
+  - rendering: gl
+  - logging: disabled
+  - engine: ostrich
+  - control: helhest/velocity
+  - _self_
+
+project_name: ${hydra:job.name}
+
+# Untuned: same wheel gain as helhest_campaign.yaml. In velocity mode k_p is the
+# only gain the engine reads (control compliance = 1 / (dt * k_p)).
+control:
+  k_p: 250.0
+
+# clark_paper campaign world and variant (sim_worlds/results/<world>_<variant>.npz):
+#   shadowed_trench: hidden bump control     two_gaps / blind_crest / open_field: hidden control
+#   drifting_berm: hidden control            remembered_box: hidden no_box
+#   curb_or_mound: box25 box30 box35 no_box
+world: curb_or_mound
+variant: box30
+
+# Where to spawn: "start", or a pose role/name from the spec (decision, out_of_view, abeam, ...).
+pose: start
+
+terrain_mu: 0.8
+
+# Untuned: the Helhest campaign's front-wheel pair, applied to all four wheels.
+# lateral = along the axle (skid), long = rolling direction.
+friction:
+  lateral: 0.5
+  long: 0.9
