@@ -1,0 +1,161 @@
+\section{Hybrid Methods}
+\label{sec:hybrid-methods}
+
+A hybrid method combines the two classes of Section~\ref{sec:solvers}: a
+small direct solve handles the few directions where a Krylov method is slow,
+and the Krylov method handles the rest. The established form of this idea is
+\emph{deflation}.
+
+\subsection{Deflated Conjugate Gradient}
+\label{sec:deflated-cg}
+
+Deflated CG was introduced by \citet{nicolaides1987deflation} and developed
+further by \citet{saad2000deflated} and \citet{frank2001construction};
+\citet{tang2009comparison} compare it with related two-level methods. It
+assumes $\mathbf{A}$ is SPD, which holds for $\mathbf{A}$ in
+\eqref{eq:ostrich-system}.
+
+\paragraph{Setup.}
+Choose a full-rank $\mathbf{Z} \in \mathbb{R}^{n \times k}$, $k \ll n$, whose
+columns span the ``bad'' subspace, i.e.\ the directions that slow CG down.
+Define
+\begin{equation}
+  \begin{aligned}
+    \mathbf{E} &= \mathbf{Z}^\top \mathbf{A} \mathbf{Z}, \\
+    \mathbf{Q} &= \mathbf{Z} \mathbf{E}^{-1} \mathbf{Z}^\top, \\
+    \tilde{\mathbf{P}} &= \mathbf{I} - \mathbf{A}\mathbf{Q} .
+  \end{aligned}
+  \label{eq:deflation-setup}
+\end{equation}
+The $k \times k$ \emph{coarse matrix} $\mathbf{E}$ is SPD; $\mathbf{Q}$ is
+symmetric with rank $k$; $\tilde{\mathbf{P}}$ is the \emph{deflation projector}.
+Multiplying out with $\mathbf{Q}\mathbf{A}\mathbf{Q} = \mathbf{Q}$ gives
+\begin{equation}
+  \begin{aligned}
+    \tilde{\mathbf{P}}^2 &= \tilde{\mathbf{P}}, \\
+    \tilde{\mathbf{P}} \mathbf{A} &= \mathbf{A} \tilde{\mathbf{P}}^\top \quad (\text{symmetric}), \\
+    \tilde{\mathbf{P}} \mathbf{A} \mathbf{Z} &= \mathbf{0}, \\
+    \mathbf{Z}^\top \tilde{\mathbf{P}} &= \mathbf{0}, \\
+    \tilde{\mathbf{P}}^\top \mathbf{Z} &= \mathbf{0} .
+  \end{aligned}
+  \label{eq:deflation-identities}
+\end{equation}
+So $\tilde{\mathbf{P}}\mathbf{A}$ is symmetric positive semidefinite, with
+$\operatorname{span}(\mathbf{Z})$ in its null space.
+
+\paragraph{Splitting the solution.}
+Write $\mathbf{x} = (\mathbf{I} - \tilde{\mathbf{P}}^\top)\mathbf{x} + \tilde{\mathbf{P}}^\top\mathbf{x}$.
+Since $\mathbf{I} - \tilde{\mathbf{P}}^\top = \mathbf{Q}\mathbf{A}$, the first part
+needs no knowledge of $\mathbf{x}$:
+$(\mathbf{I} - \tilde{\mathbf{P}}^\top)\mathbf{x} = \mathbf{Q}\mathbf{b}$, one
+$k \times k$ solve. For the second part,
+$\mathbf{A}\tilde{\mathbf{P}}^\top\mathbf{x} = \tilde{\mathbf{P}}\mathbf{A}\mathbf{x} = \tilde{\mathbf{P}}\mathbf{b}$,
+so one solves the singular but consistent system
+\begin{equation}
+  \tilde{\mathbf{P}} \mathbf{A} \hat{\mathbf{x}} = \tilde{\mathbf{P}} \mathbf{b}
+  \label{eq:deflated-system}
+\end{equation}
+with CG. Any solution works: $\tilde{\mathbf{P}}\mathbf{A}(\hat{\mathbf{x}} - \mathbf{x}) = \mathbf{0}$
+means $\mathbf{A}\tilde{\mathbf{P}}^\top(\hat{\mathbf{x}} - \mathbf{x}) = \mathbf{0}$, hence
+$\tilde{\mathbf{P}}^\top\hat{\mathbf{x}} = \tilde{\mathbf{P}}^\top\mathbf{x}$. Therefore
+\begin{equation}
+  \mathbf{x} = \mathbf{Q}\mathbf{b} + \tilde{\mathbf{P}}^\top \hat{\mathbf{x}} .
+  \label{eq:deflated-solution}
+\end{equation}
+Geometrically, $\mathbf{Q}\mathbf{b}$ is the Galerkin solution in
+$\operatorname{span}(\mathbf{Z})$, i.e.\
+$\mathbf{Z}^\top(\mathbf{b} - \mathbf{A}\mathbf{Q}\mathbf{b}) = \mathbf{0}$, and
+$\tilde{\mathbf{P}}^\top = \mathbf{I} - \mathbf{Q}\mathbf{A}$ is the
+$\mathbf{A}$-orthogonal projector that removes $\operatorname{span}(\mathbf{Z})$.
+
+\paragraph{Why it converges faster.}
+In the ideal case, $\operatorname{span}(\mathbf{Z})$ is the eigenspace of the
+$k$ smallest eigenvalues of $\mathbf{A}$. Then the spectrum of $\tilde{\mathbf{P}}\mathbf{A}$ is
+$\{0, \dots, 0, \lambda_{k+1}(\mathbf{A}), \dots, \lambda_n(\mathbf{A})\}$, with
+eigenvalues in ascending order. Because \eqref{eq:deflated-system} is
+consistent, the Krylov space stays in $\operatorname{range}(\tilde{\mathbf{P}}\mathbf{A})$,
+CG never sees the zeros, and \eqref{eq:cg-bound} holds with the effective
+condition number
+\begin{equation}
+  \kappa_{\mathrm{eff}} = \frac{\lambda_n(\mathbf{A})}{\lambda_{k+1}(\mathbf{A})}
+  \quad \text{instead of} \quad
+  \kappa = \frac{\lambda_n(\mathbf{A})}{\lambda_1(\mathbf{A})} .
+\end{equation}
+Since the iteration count scales with $\sqrt{\kappa}$, deflating outliers that
+reduce $\kappa$ from $10^5$ to $10^3$ saves about a factor of $10$ in iterations.
+
+For a general full-rank $\mathbf{Z}$, whose columns need not be eigenvectors,
+$\tilde{\mathbf{P}}\mathbf{A} = \mathbf{A}^{1/2}(\mathbf{I} - \mathbf{A}^{1/2}\mathbf{Q}\mathbf{A}^{1/2})\mathbf{A}^{1/2}$,
+where $\mathbf{A}^{1/2}\mathbf{Q}\mathbf{A}^{1/2}$ is the orthogonal projector
+onto $\operatorname{range}(\mathbf{A}^{1/2}\mathbf{Z})$. The nonzero eigenvalues
+$\mu_1 \le \dots \le \mu_{n-k}$ of $\tilde{\mathbf{P}}\mathbf{A}$ are therefore those of
+$\mathbf{A}$ compressed to an $(n-k)$-dimensional subspace, and Cauchy
+interlacing \citep{golub2013matrix} gives
+\begin{equation}
+  \lambda_j(\mathbf{A}) \le \mu_j \le \lambda_{j+k}(\mathbf{A}),
+  \qquad j = 1, \dots, n-k .
+  \label{eq:deflation-interlacing}
+\end{equation}
+Hence $\kappa_{\mathrm{eff}} = \mu_{n-k}/\mu_1 \le \kappa$ for \emph{any}
+full-rank $\mathbf{Z}$: deflation never worsens the conditioning. The better
+$\operatorname{span}(\mathbf{Z})$ covers the bad eigenvectors, measured in the
+$\mathbf{A}$-inner product, the closer $\mu_1$ gets to $\lambda_{k+1}(\mathbf{A})$.
+\citet{frank2001construction} give the corresponding bounds when a
+preconditioner $\mathbf{P}$ is also applied.
+
+\paragraph{Example.}
+Let $\mathbf{A} = \begin{bmatrix} 1.01 & 0.99 \\ 0.99 & 1.01 \end{bmatrix}$,
+with eigenvalue $2$ along $(1,1)$ and $0.02$ along $(1,-1)$, so $\kappa = 100$.
+Take $\mathbf{b} = (1, 0)$ and $\mathbf{Z} = (1, -1)^\top$. Then
+$\mathbf{E} = 0.04$, $\mathbf{Q}\mathbf{b} = (25, -25)$ and
+$\tilde{\mathbf{P}}\mathbf{b} = \mathbf{b} - \mathbf{A}\mathbf{Q}\mathbf{b} = (0.5, 0.5)$,
+which lies entirely in the well-conditioned direction. $\tilde{\mathbf{P}}\mathbf{A}$
+has the single nonzero eigenvalue $2$, so CG converges in one step to
+$\hat{\mathbf{x}} = (0.25, 0.25) = \tilde{\mathbf{P}}^\top\hat{\mathbf{x}}$, and
+\eqref{eq:deflated-solution} gives $\mathbf{x} = (25.25, -24.75) = \mathbf{A}^{-1}\mathbf{b}$.
+
+\paragraph{Algorithm.}
+Algorithm~\ref{alg:dpcg} is deflated preconditioned CG (DPCG)
+\citep{tang2009comparison}: ordinary PCG on \eqref{eq:deflated-system},
+followed by \eqref{eq:deflated-solution}. The residual $\hat{\mathbf{r}}$ of the deflated
+system equals the true residual $\mathbf{b} - \mathbf{A}\mathbf{x}$ of the
+assembled solution, so the stopping test is unchanged. The setup computes
+$\mathbf{A}\mathbf{Z}$ ($k$ products with $\mathbf{A}$), $\mathbf{E} = \mathbf{Z}^\top(\mathbf{A}\mathbf{Z})$
+and a Cholesky factorization of $\mathbf{E}$ ($\mathcal{O}(k^3)$). Applying
+$\tilde{\mathbf{P}}\mathbf{d} = \mathbf{d} - (\mathbf{A}\mathbf{Z})\,\mathbf{E}^{-1}(\mathbf{Z}^\top\mathbf{d})$
+costs $\mathcal{O}(nk + k^2)$, which each iteration adds to the product with
+$\mathbf{A}$ and the application of $\mathbf{P}^{-1}$. The final step costs the
+same, since $\tilde{\mathbf{P}}^\top\hat{\mathbf{x}} = \hat{\mathbf{x}} - \mathbf{Z}\mathbf{E}^{-1}(\mathbf{A}\mathbf{Z})^\top\hat{\mathbf{x}}$.
+An equivalent variant \citep{saad2000deflated} starts from
+$\mathbf{x}_0 = \mathbf{Q}\mathbf{b}$, whose residual is already orthogonal to
+$\mathbf{Z}$, and projects the search directions instead.
+
+\begin{algorithm}[h]
+  \caption{Deflated preconditioned conjugate gradient (DPCG)}
+  \label{alg:dpcg}
+  \begin{algorithmic}[1]
+    \Require SPD $\mathbf{A}$, right-hand side $\mathbf{b}$, SPD preconditioner $\mathbf{P}$, full-rank $\mathbf{Z}$, tolerance, budget $k_{\max}$
+    \State $\mathbf{E} \gets \mathbf{Z}^\top(\mathbf{A}\mathbf{Z})$, Cholesky-factor $\mathbf{E}$ \Comment{setup, once per $\mathbf{A}$}
+    \State $\hat{\mathbf{x}} \gets \mathbf{0}$, \quad $\hat{\mathbf{r}} \gets \tilde{\mathbf{P}}\mathbf{b}$
+    \State $\mathbf{z} \gets \mathbf{P}^{-1}\hat{\mathbf{r}}$, \quad $\mathbf{p} \gets \mathbf{z}$, \quad $\rho \gets \hat{\mathbf{r}}^\top\mathbf{z}$, \quad $k \gets 0$
+    \Repeat
+      \State $\mathbf{v} \gets \tilde{\mathbf{P}}(\mathbf{A}\mathbf{p})$ \Comment{one extra $\tilde{\mathbf{P}}$ per iteration} \label{alg:dpcg:project}
+      \State $\gamma \gets \rho / (\mathbf{p}^\top\mathbf{v})$
+      \State $\hat{\mathbf{x}} \gets \hat{\mathbf{x}} + \gamma\mathbf{p}$, \quad $\hat{\mathbf{r}} \gets \hat{\mathbf{r}} - \gamma\mathbf{v}$
+      \State $\mathbf{z} \gets \mathbf{P}^{-1}\hat{\mathbf{r}}$, \quad $\rho_{\text{new}} \gets \hat{\mathbf{r}}^\top\mathbf{z}$
+      \State $\beta \gets \rho_{\text{new}} / \rho$, \quad $\mathbf{p} \gets \mathbf{z} + \beta\mathbf{p}$
+      \State $\rho \gets \rho_{\text{new}}$, \quad $k \gets k + 1$
+    \Until{$\|\hat{\mathbf{r}}\|_2$ below tolerance \textbf{or} $k = k_{\max}$}
+    \State \Return $\mathbf{x} = \mathbf{Q}\mathbf{b} + \tilde{\mathbf{P}}^\top\hat{\mathbf{x}}$
+  \end{algorithmic}
+\end{algorithm}
+
+\paragraph{The role of $\tilde{\mathbf{P}}$ in each iteration.}
+The components of the solution in $\operatorname{span}(\mathbf{Z})$ are already
+solved exactly by the coarse solve $\mathbf{Q}\mathbf{b}$. In every iteration,
+$\tilde{\mathbf{P}}$ removes this already-solved part from the new search
+information $\mathbf{A}\mathbf{p}$ (line~\ref{alg:dpcg:project} of Algorithm~\ref{alg:dpcg}), so the
+residual stays orthogonal to $\mathbf{Z}$ and CG never spends iterations on
+those directions. The price is the projection itself: one application of
+$\tilde{\mathbf{P}}$, $\mathcal{O}(nk + k^2)$, in every iteration, on top of the
+one-off setup.

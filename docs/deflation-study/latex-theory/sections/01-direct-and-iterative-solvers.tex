@@ -1,0 +1,169 @@
+\section{Direct and Iterative Solvers in Linear System Solving}
+\label{sec:solvers}
+
+We consider the linear system $\mathbf{A}\mathbf{x} = \mathbf{b}$ with
+$\mathbf{A} \in \mathbb{R}^{n \times n}$ nonsingular. In ostrich this is the
+Schur-complement system solved in every Newton iteration
+\citep[eq.~(12)]{kucera2026ostrich}:
+\begin{equation}
+  \underbrace{\left(\mathbf{J}\tilde{\mathbf{M}}^{-1}\mathbf{J}^\top + \mathbf{C}\right)}_{\mathbf{A}}
+  \underbrace{\Delta\boldsymbol{\lambda}}_{\mathbf{x}}
+  = \underbrace{\frac{1}{h}\left(\mathbf{J}\tilde{\mathbf{M}}^{-1}\mathbf{r}_{\text{dyn}} - \mathbf{r}_{\text{con}}\right)}_{\mathbf{b}} ,
+  \label{eq:ostrich-system}
+\end{equation}
+where $n$ is the number of active constraint rows, i.e.\ the dimension of
+$\boldsymbol{\lambda}$. The same matrix $\mathbf{A}$ appears in the adjoint
+solve \citep[eq.~(18)]{kucera2026ostrich}. In the linear-algebra sections we
+use the generic names $\mathbf{x}$ and $\mathbf{b}$, and $\mathbf{r} =
+\mathbf{b} - \mathbf{A}\mathbf{x}$ denotes the residual of the \emph{linear}
+system, not the Newton residual $\mathbf{r}(\mathbf{s})$.
+
+A \emph{direct} solver computes $\mathbf{x}$ with a finite, fixed
+sequence of operations, usually by factorizing $\mathbf{A}$ into triangular factors.
+Up to rounding errors the result is exact. An \emph{iterative} solver instead
+improves an approximation $\mathbf{x}_k$ step by step and stops when the residual
+$\mathbf{r}_k = \mathbf{b} - \mathbf{A}\mathbf{x}_k$ is small enough.
+
+\subsection{Direct solvers}
+\label{sec:direct-solvers}
+
+\paragraph{Gaussian elimination.}
+Gaussian elimination applies row operations that reduce $\mathbf{A}$ to an upper
+triangular matrix $\mathbf{U}$. The unknowns are then recovered by back substitution
+\citep{wiki:gaussian-elimination}. Recording the row operations gives the LU
+factorization $\boldsymbol{\Pi}\mathbf{A} = \mathbf{L}\mathbf{U}$. Here
+$\mathbf{L}$ is unit lower triangular, and $\boldsymbol{\Pi}$ is a
+permutation matrix from row pivoting, which is needed for numerical
+stability in general \citep{golub2013matrix,trefethen1997numerical}. The
+method works for any nonsingular square matrix. Factorizing costs about
+$\tfrac{2}{3}n^3$ floating-point operations. After that, each right-hand side
+needs one forward and one back substitution, about $2n^2$ operations in total
+\citep{wiki:gaussian-elimination,golub2013matrix}.
+
+\paragraph{Cholesky factorization.}
+If $\mathbf{A}$ is symmetric positive definite (SPD), i.e.\ $\mathbf{A} = \mathbf{A}^\top$ and
+$\mathbf{d}^\top \mathbf{A} \mathbf{d} > 0$ for all $\mathbf{d} \neq \mathbf{0}$, it can be written as
+\begin{equation}
+  \mathbf{A} = \mathbf{L} \mathbf{L}^\top ,
+  \label{eq:cholesky}
+\end{equation}
+where $\mathbf{L}$ is lower triangular with a positive diagonal. This factorization
+exists and is unique exactly when $\mathbf{A}$ is SPD \citep{wiki:cholesky,golub2013matrix}.
+A solve therefore needs an SPD matrix. The system is then solved by two
+triangular solves:
+\begin{equation}
+  \mathbf{L}\mathbf{y} = \mathbf{b} \quad \text{(forward substitution)}, \qquad
+  \mathbf{L}^\top \mathbf{x} = \mathbf{y} \quad \text{(back substitution)} .
+\end{equation}
+Cholesky exploits symmetry and costs about $\tfrac{1}{3}n^3$ operations,
+half of Gaussian elimination. It is numerically stable without pivoting
+\citep{wiki:cholesky,trefethen1997numerical}. Like LU, it costs $\mathcal{O}(n^2)$ per
+additional right-hand side once $\mathbf{L}$ is known. So one factor can be reused
+for several solves with the same matrix, such as a forward solve and an
+adjoint solve with the same symmetric $\mathbf{A}$.
+
+Table~\ref{tab:direct-cost} summarizes the costs. Both factorizations need
+$\mathcal{O}(n^2)$ memory for a dense $\mathbf{A}$. The cubic factorization cost is why direct
+solvers are attractive for small or well-structured systems, while iterative
+methods are preferred when $n$ is large.
+
+\begin{table}[h]
+  \centering
+  \begin{tabular}{@{}lccc@{}}
+    \toprule
+    Method & Requirement on $\mathbf{A}$ & Factorization & Solve per right-hand side \\
+    \midrule
+    Gaussian elimination (LU) & nonsingular & $\approx \tfrac{2}{3}n^3$ & $\approx 2n^2$ \\
+    Cholesky & SPD & $\approx \tfrac{1}{3}n^3$ & $\approx 2n^2$ \\
+    \bottomrule
+  \end{tabular}
+  \caption{Leading-order floating-point operation counts of dense direct solvers
+    \citep{golub2013matrix,trefethen1997numerical}.}
+  \label{tab:direct-cost}
+\end{table}
+
+\subsection{Iterative solvers}
+\label{sec:iterative-solvers}
+
+Krylov subspace methods build the iterate $\mathbf{x}_k$ from the affine space
+\begin{equation}
+  \mathbf{x}_k \in \mathbf{x}_0 + \mathcal{K}_k(\mathbf{A}, \mathbf{r}_0), \qquad
+  \mathcal{K}_k(\mathbf{A}, \mathbf{r}_0) = \operatorname{span}\{\mathbf{r}_0, \mathbf{A}\mathbf{r}_0, \dots, \mathbf{A}^{k-1}\mathbf{r}_0\},
+\end{equation}
+where $\mathbf{r}_0 = \mathbf{b} - \mathbf{A}\mathbf{x}_0$ \citep{saad2003iterative}. They access $\mathbf{A}$ only through
+matrix--vector products, so they need neither $\mathbf{A}$ in explicit form nor
+$\mathcal{O}(n^2)$ memory, and they can stop as soon as the solution is accurate
+enough. Their cost is (number of iterations) $\times$ (cost of one
+iteration), and the number of iterations depends on the spectrum of $\mathbf{A}$. Reducing it is the purpose of preconditioning
+(Section~\ref{sec:preconditioning}).
+
+\paragraph{Conjugate gradient (CG).}
+For SPD $\mathbf{A}$, CG \citep{hestenes1952methods,wiki:cg} chooses the $\mathbf{x}_k$ that
+minimizes the $\mathbf{A}$-norm of the error, $\|\mathbf{x} - \mathbf{x}_k\|_{\mathbf{A}}$, over the
+Krylov space, using short recurrences: one matrix--vector product per
+iteration and a few vectors of storage. Its convergence is bounded through the
+condition number $\kappa = \lambda_{\max}(\mathbf{A})/\lambda_{\min}(\mathbf{A})$
+\citep{saad2003iterative,trefethen1997numerical}:
+\begin{equation}
+  \frac{\|\mathbf{x} - \mathbf{x}_k\|_{\mathbf{A}}}{\|\mathbf{x} - \mathbf{x}_0\|_{\mathbf{A}}}
+  \le 2 \left( \frac{\sqrt{\kappa} - 1}{\sqrt{\kappa} + 1} \right)^{k} .
+  \label{eq:cg-bound}
+\end{equation}
+
+\paragraph{Conjugate residual (CR) and its preconditioned form (PCR).}
+The conjugate residual method \citep{stiefel1955relaxationsmethoden,saad2003iterative}
+uses the same Krylov space but minimizes the norm of the \emph{residual}
+instead of the $\mathbf{A}$-norm of the error. Its search directions are
+$\mathbf{A}$-orthogonal in the sense $(\mathbf{A}\mathbf{p}_i)^\top (\mathbf{A}\mathbf{p}_j) = 0$ for $i \ne j$,
+instead of CG's $\mathbf{p}_i^\top \mathbf{A} \mathbf{p}_j = 0$. With an SPD preconditioner $\mathbf{P} \approx \mathbf{A}$, PCR runs CR on
+$\mathbf{P}^{-1}\mathbf{A}\mathbf{x} = \mathbf{P}^{-1}\mathbf{b}$ in the $\mathbf{P}$-inner product
+$\langle \mathbf{d}_1, \mathbf{d}_2 \rangle_{\mathbf{P}} = \mathbf{d}_1^\top \mathbf{P} \mathbf{d}_2$, in which
+$\mathbf{P}^{-1}\mathbf{A}$ is self-adjoint. The $k$-th iterate minimizes
+\begin{equation}
+  \|\mathbf{r}_k\|_{\mathbf{P}^{-1}} = \sqrt{\mathbf{r}_k^\top \mathbf{P}^{-1} \mathbf{r}_k}
+  \quad \text{over} \quad
+  \mathbf{x}_k \in \mathbf{x}_0 + \mathcal{K}_k(\mathbf{P}^{-1}\mathbf{A},\, \mathbf{P}^{-1}\mathbf{r}_0) .
+\end{equation}
+Because this residual norm decreases monotonically, CR suits solvers that
+stop on a residual tolerance or a fixed iteration budget, such as an
+inner solver inside a Newton loop \citep{macklin2019nonsmooth}. One
+iteration costs one product with $\mathbf{A}$, one application of $\mathbf{P}^{-1}$, three
+inner products and five vector updates. CR keeps the extra recurrence
+$\mathbf{v} = \mathbf{A}\mathbf{p}$ so that no second product with $\mathbf{A}$ is needed.
+
+Algorithm~\ref{alg:pcr} is the PCR variant used by default in the ostrich
+engine: $\mathbf{P}$ is the Jacobi preconditioner $\operatorname{diag}(\mathbf{A})$
+(Section~\ref{sec:preconditioning}), $\mathbf{x}_0 = \mathbf{0}$,
+$\mathrm{tol} = \mathrm{atol} = 10^{-5}$ and $k_{\max} = 16$. It differs
+from the textbook form in three details. The preconditioned
+residual $\mathbf{z} = \mathbf{P}^{-1}\mathbf{r}$ is updated by its own recurrence
+(line~\ref{alg:pcr:update}) instead of being recomputed. The step sizes fall
+back to $0$ if a denominator is not positive, as a safeguard in finite
+precision. The stopping test is on the unpreconditioned residual, and it is
+evaluated after each iteration, so at least one iteration is always performed. When many independent systems are solved in a batch, all of them
+iterate until the slowest one meets its tolerance or the budget $k_{\max}$
+is reached.
+
+\begin{algorithm}[h]
+  \caption{Preconditioned conjugate residual (PCR), as used in ostrich}
+  \label{alg:pcr}
+  \begin{algorithmic}[1]
+    \Require SPD $\mathbf{A}$, right-hand side $\mathbf{b}$, SPD preconditioner $\mathbf{P}$, initial guess $\mathbf{x}_0$, tolerances $\mathrm{tol}, \mathrm{atol}$, budget $k_{\max}$
+    \State $\mathbf{x} \gets \mathbf{x}_0$, \quad $\mathbf{r} \gets \mathbf{b} - \mathbf{A}\mathbf{x}$
+    \State $\mathbf{z} \gets \mathbf{P}^{-1}\mathbf{r}$, \quad $\mathbf{t} \gets \mathbf{A}\mathbf{z}$
+    \State $\mathbf{p} \gets \mathbf{z}$, \quad $\mathbf{v} \gets \mathbf{t}$ \Comment{$\mathbf{v} = \mathbf{A}\mathbf{p}$}
+    \State $\rho \gets \mathbf{z}^\top \mathbf{t}$, \quad $k \gets 0$
+    \Repeat
+      \State $\mathbf{y} \gets \mathbf{P}^{-1}\mathbf{v}$
+      \State $\gamma \gets \rho / (\mathbf{y}^\top \mathbf{v})$ \textbf{if} $\mathbf{y}^\top \mathbf{v} > 0$ \textbf{else} $0$
+      \State $\mathbf{x} \gets \mathbf{x} + \gamma \mathbf{p}$, \quad $\mathbf{r} \gets \mathbf{r} - \gamma \mathbf{v}$
+      \State $\mathbf{z} \gets \mathbf{z} - \gamma \mathbf{y}$ \Comment{$= \mathbf{P}^{-1}\mathbf{r}$} \label{alg:pcr:update}
+      \State $\mathbf{t} \gets \mathbf{A}\mathbf{z}$
+      \State $\rho_{\text{new}} \gets \mathbf{z}^\top \mathbf{t}$
+      \State $\beta \gets \rho_{\text{new}} / \rho$ \textbf{if} $\rho > 0$ \textbf{else} $0$
+      \State $\mathbf{p} \gets \mathbf{z} + \beta \mathbf{p}$, \quad $\mathbf{v} \gets \mathbf{t} + \beta \mathbf{v}$
+      \State $\rho \gets \rho_{\text{new}}$, \quad $k \gets k + 1$
+    \Until{$\|\mathbf{r}\|_2 \le \max(\mathrm{atol},\, \mathrm{tol}\,\|\mathbf{b}\|_2)$ \textbf{or} $k = k_{\max}$}
+    \State \Return $\mathbf{x}$
+  \end{algorithmic}
+\end{algorithm}
