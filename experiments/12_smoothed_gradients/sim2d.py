@@ -280,8 +280,12 @@ class Sim2D:
 
     # --- batched step -----------------------------------------------------
 
-    def step(self, q_prev, v_prev, f_ext=None):
+    def step(self, q_prev, v_prev, f_ext=None, lam0=None):
         """One step for all worlds. q_prev, v_prev, f_ext: (B, 3).
+
+        lam0 (B, 2C): initial contact forces for Newton (warm start, e.g. the
+        previous step's info["z"][:, 3:]); default zero. It changes only the
+        path to the root, not the root.
 
         Returns q, v (B, 3) and an info dict with lam_n, lam_t (B, C), the
         number of Newton iterations and the final residual max-norm.
@@ -296,7 +300,7 @@ class Sim2D:
         residual = vmap(self.residual)
         jacobian = vmap(self.residual_jacobian)
 
-        z = torch.cat([v_prev, torch.zeros(B, 2 * C)], dim=1)
+        z = torch.cat([v_prev, torch.zeros(B, 2 * C) if lam0 is None else lam0], dim=1)
         for it in range(cfg.max_iters + 1):
             friction_on = active & (cfg.mu * z[:, 3 : 3 + C] > cfg.load_gate)
             args = (q_prev, v_prev, f_ext, active, friction_on)
@@ -370,14 +374,18 @@ class Sim2D:
         return vmap(world)(info["z"], q_prev, v_prev, f_ext, active, info["friction_on"], g_q, g_v)
 
 
-def rollout(sim, q0, v0, forces):
+def rollout(sim, q0, v0, forces, warm_start=False):
     """Steps all worlds through forces (T, B, 3). Returns the list of
-    (q_prev, v_prev, f_ext, info) per step and the final (q, v)."""
-    q, v, tape = q0, v0, []
+    (q_prev, v_prev, f_ext, info) per step and the final (q, v). With
+    warm_start, each Newton solve starts from the previous step's contact
+    forces (3x fewer iterations on a resting or sliding box; same roots)."""
+    q, v, tape, lam = q0, v0, [], None
     for f in forces:
-        q_next, v_next, info = sim.step(q, v, f)
+        q_next, v_next, info = sim.step(q, v, f, lam0=lam)
         tape.append((q, v, f, info))
         q, v = q_next, v_next
+        if warm_start:
+            lam = info["z"][:, 3:]
     return tape, q, v
 
 

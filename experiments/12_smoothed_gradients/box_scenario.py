@@ -72,9 +72,11 @@ def loss(sim, u, chunk=4096, return_residual=False):
     out, worst = [], 0.0
     for u_c in torch.split(u, chunk):
         q, v = initial_state(len(u_c))
+        lam = None  # warm start from the previous step's contact forces
         for f in forces(u_c):
-            q, v, info = sim.step(q, v, f)
+            q, v, info = sim.step(q, v, f, lam0=lam)
             worst = max(worst, info["residual"])
+            lam = info["z"][:, 3:]
         out.append((q[:, 0] - X_TARGET) ** 2)
     return (torch.cat(out), worst) if return_residual else torch.cat(out)
 
@@ -82,7 +84,7 @@ def loss(sim, u, chunk=4096, return_residual=False):
 def loss_and_grad(sim, u, **adjoint):
     """L(u) and dL/du through the adjoint (adjoint kwargs as Sim2D.step_vjp)."""
     q0, v0 = initial_state(len(u))
-    tape, q, _ = sim2d.rollout(sim, q0, v0, forces(u))
+    tape, q, _ = sim2d.rollout(sim, q0, v0, forces(u), warm_start=True)
     L = (q[:, 0] - X_TARGET) ** 2
     g_qT = torch.zeros(len(u), 3, dtype=torch.float64)
     g_qT[:, 0] = 2 * (q[:, 0] - X_TARGET)
