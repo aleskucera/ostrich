@@ -409,6 +409,7 @@ def compute_friction_core(
     force_n_prev: float,
     dt: float,
     compliance: float,
+    fb_r_scale: float,
     friction_mode: wp.int32,
 ):
     """
@@ -450,7 +451,7 @@ def compute_friction_core(
     )
 
     effective_mass = (w_t1 + w_t2) * 0.5
-    precond = effective_mass  # dt-independent for impulse-level FB
+    precond = effective_mass * fb_r_scale  # dt-independent for impulse-level FB
     force_f_prev = wp.vec2(lambda_t1_prev, lambda_t2_prev)
 
     v_t, w_x, w_y = compute_friction_model(
@@ -506,6 +507,7 @@ def friction_residual_kernel(
     # Simulation parameters
     dt: wp.float32,
     compliance: wp.float32,
+    fb_r_scale: wp.float32,
     friction_mode: wp.int32,
     load_gate: wp.float32,
     # Outputs
@@ -651,6 +653,7 @@ def friction_residual_kernel(
         force_n_prev,
         dt,
         compliance,
+        fb_r_scale,
         friction_mode,
     )
 
@@ -695,6 +698,7 @@ def friction_constraint_kernel(
     # Simulation parameters
     dt: wp.float32,
     compliance: wp.float32,
+    fb_r_scale: wp.float32,
     friction_mode: wp.int32,
     load_gate: wp.float32,
     # Outputs
@@ -889,6 +893,7 @@ def friction_constraint_kernel(
         force_n_prev,
         dt,
         compliance,
+        fb_r_scale,
         friction_mode,
     )
 
@@ -946,6 +951,7 @@ def batch_friction_residual_kernel(
     # Simulation parameters
     dt: wp.float32,
     compliance: wp.float32,
+    fb_r_scale: wp.float32,
     friction_mode: wp.int32,
     load_gate: wp.float32,
     # Outputs (3D)
@@ -1091,6 +1097,7 @@ def batch_friction_residual_kernel(
         force_n_prev,
         dt,
         compliance,
+        fb_r_scale,
         friction_mode,
     )
 
@@ -1135,6 +1142,7 @@ def fused_batch_friction_residual_kernel(
     # Simulation parameters
     dt: wp.float32,
     compliance: wp.float32,
+    fb_r_scale: wp.float32,
     friction_mode: wp.int32,
     load_gate: wp.float32,
     num_batches: int,
@@ -1286,6 +1294,7 @@ def fused_batch_friction_residual_kernel(
                 force_n_prev,
                 dt,
                 compliance,
+                fb_r_scale,
                 friction_mode,
             )
         )

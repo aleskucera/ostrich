@@ -68,6 +68,7 @@ def compute_contact_core(
     dt: float,
     compliance: float,
     fb_eps_sq: float,
+    fb_r_scale: float,
     contact_mode: wp.int32,
 ):
     """
@@ -106,7 +107,7 @@ def compute_contact_core(
     effective_mass = compute_effective_mass(
         pose0_prev, pose1_prev, J0, J1, m_inv0, I_inv0, m_inv1, I_inv1, body0, body1
     )
-    precond = wp.pow(dt, 2.0) * effective_mass
+    precond = wp.pow(dt, 2.0) * effective_mass * fb_r_scale
 
     # --- 3. Fisher-Burmeister Complementarity ---
     if contact_mode == CONTACT_EQUALITY:
@@ -170,6 +171,7 @@ def contact_residual_kernel(
     dt: wp.float32,
     compliance: wp.float32,
     fb_eps_sq: wp.float32,
+    fb_r_scale: wp.float32,
     contact_mode: wp.int32,
     # Outputs
     res_d: wp.array(dtype=wp.spatial_vector, ndim=2),
@@ -237,6 +239,7 @@ def contact_residual_kernel(
         dt,
         compliance,
         fb_eps_sq,
+        fb_r_scale,
         contact_mode,
     )
 
@@ -275,6 +278,7 @@ def contact_constraint_kernel(
     dt: wp.float32,
     compliance: wp.float32,
     fb_eps_sq: wp.float32,
+    fb_r_scale: wp.float32,
     contact_mode: wp.int32,
     # Outputs
     constr_active_mask: wp.array(dtype=wp.float32, ndim=2),
@@ -356,6 +360,7 @@ def contact_constraint_kernel(
         dt,
         compliance,
         fb_eps_sq,
+        fb_r_scale,
         contact_mode,
     )
 
@@ -406,6 +411,7 @@ def batch_contact_residual_kernel(
     dt: wp.float32,
     compliance: wp.float32,
     fb_eps_sq: wp.float32,
+    fb_r_scale: wp.float32,
     contact_mode: wp.int32,
     # Outputs (3D)
     res_d: wp.array(dtype=wp.spatial_vector, ndim=3),
@@ -473,6 +479,7 @@ def batch_contact_residual_kernel(
         dt,
         compliance,
         fb_eps_sq,
+        fb_r_scale,
         contact_mode,
     )
 
@@ -511,6 +518,7 @@ def fused_batch_contact_residual_kernel(
     dt: wp.float32,
     compliance: wp.float32,
     fb_eps_sq: wp.float32,
+    fb_r_scale: wp.float32,
     contact_mode: wp.int32,
     num_batches: int,
     # Outputs (3D)
@@ -590,6 +598,7 @@ def fused_batch_contact_residual_kernel(
             dt,
             compliance,
             fb_eps_sq,
+            fb_r_scale,
             contact_mode,
         )
 

@@ -122,6 +122,7 @@ def compute_residual(
             data.dt,
             config.compliance.contact,
             config.compliance.contact_fb_smooth_eps_sq,
+            config.compliance.contact_fb_r_scale,
             config.relaxation.contact_mode,
         ],
         outputs=[
@@ -160,6 +161,7 @@ def compute_residual(
             contacts.contact_normal,
             data.dt,
             config.compliance.friction,
+            config.compliance.friction_fb_r_scale,
             config.relaxation.friction_mode,
             config.relaxation.friction_load_gate,
         ],

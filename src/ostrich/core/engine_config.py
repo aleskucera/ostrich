@@ -173,8 +173,18 @@ class ComplianceConfig:
     # place seeded warm-starts land — at the cost of slightly soft
     # complementarity (λ·g ≈ fb_smooth_eps_sq at convergence).
     contact_fb_smooth_eps_sq: float = 1e-8
+    # Multipliers on the FB complementarity-preconditioning factor r
+    # (Macklin et al. 2019, §7): contact r = fb_r_scale·dt²·[J M⁻¹ Jᵀ]_ii,
+    # friction r = fb_r_scale·[J M⁻¹ Jᵀ]_ii. Any r > 0 leaves the
+    # complementarity solution unchanged; only the Newton path changes.
+    # Default 1.0 reproduces pre-existing behavior bit-exactly.
+    contact_fb_r_scale: float = 1.0
+    friction_fb_r_scale: float = 1.0
 
     def __post_init__(self):
+        for name in ("contact_fb_r_scale", "friction_fb_r_scale"):
+            if getattr(self, name) <= 0:
+                raise ValueError(f"compliance.{name} must be > 0, got {getattr(self, name)}")
         for name in ("joint", "contact", "friction"):
             v = getattr(self, name)
             if v < 0:
