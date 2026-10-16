@@ -61,7 +61,8 @@ def starts(gen):
     return 0.05 + 0.9 * torch.rand(STARTS, 2, generator=gen, dtype=torch.float64)
 
 
-def optimize(loss_grad, u0, sigmas, gen, n_pairs=N_PAIRS, iters=ITERS, project=None, extra_hard=()):
+def optimize(loss_grad, u0, sigmas, gen, n_pairs=N_PAIRS, iters=ITERS, project=None, extra_hard=(),
+             methods=SAMPLED):
     """Adam with every sampled estimator x sigma schedule from the starts u0,
     plus the exact gradient (loss_grad itself) and any `extra_hard` runs
     ((name, loss_grad) pairs, e.g. another adjoint mode). All sample points,
@@ -70,7 +71,7 @@ def optimize(loss_grad, u0, sigmas, gen, n_pairs=N_PAIRS, iters=ITERS, project=N
     dominates at these batch sizes. `project` maps sample points into the
     parameter box before evaluation (None: no clamping)."""
     starts_n = len(u0)
-    configs = [(m, name) for m in SAMPLED for name in sigmas]
+    configs = [(m, name) for m in methods for name in sigmas]
     u = u0.repeat(len(configs), 1).reshape(len(configs), starts_n, 2)
     hard_u = [u0.clone() for _ in range(1 + len(extra_hard))]
     opt, hard_opt = Adam(u.shape), [Adam(u0.shape) for _ in hard_u]
@@ -81,8 +82,9 @@ def optimize(loss_grad, u0, sigmas, gen, n_pairs=N_PAIRS, iters=ITERS, project=N
     t0 = time.time()
     for it in range(iters + 1):
         sig = torch.tensor([sched(name, min(it, iters - 1)) for _, name in configs], dtype=torch.float64)
-        eps = torch.stack([torch.stack([est.directions(n_pairs, 2, generator=gen) for _ in range(starts_n)])
-                           for _ in configs])  # (cfg, start, N, 2)
+        eps = (torch.stack([torch.stack([est.directions(n_pairs, 2, generator=gen) for _ in range(starts_n)])
+                            for _ in configs]) if configs
+               else torch.zeros(0, starts_n, n_pairs, 2, dtype=torch.float64))  # (cfg, start, N, 2)
         s = sig[:, None, None, None]
         pts = torch.cat([u[:, :, None] + s * eps, u[:, :, None] - s * eps], dim=2)  # (cfg, start, 2N, 2)
         log = it % LOG_EVERY == 0 or it == iters
