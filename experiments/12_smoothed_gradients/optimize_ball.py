@@ -230,7 +230,7 @@ def plot(d, configs):
             ax.spines[spine].set_visible(False)
     axes[0].set_ylabel(f"median deterministic loss ({STARTS} starts)", color=muted)
     fig.legend(*axes[0].get_legend_handles_labels(), frameon=False, loc="outside upper right", ncols=5, fontsize=9)
-    fig.suptitle("Ball, terminal-state loss: Adam with each gradient estimator",
+    fig.suptitle("Ball: Adam per gradient estimator",
                  color=muted, fontsize=10, x=0.01, ha="left")
     fig.savefig(bl.RESULTS / "optimize_ball.png", dpi=150)
     print(f"wrote {bl.RESULTS / 'optimize_ball.png'}")
