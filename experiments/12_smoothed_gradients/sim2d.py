@@ -24,6 +24,14 @@ corners, the 2D one two (each carrying double load), so effective masses and
 hence the eps^2 smoothing of the normal FB differ. Since the applied normal
 force is dphi/dd * lambda_n but the friction budget is mu * lambda_n, Ostrich's
 sliding box decelerates at 1.0017 mu g, this one at 1.0013 mu g.
+
+Known limitation: on violent impacts with sliding (random box states with
+|v_y| up to 3.5 m/s, |omega| up to 5 rad/s) ~2-4 % of steps do not converge.
+Newton overshoots outside the friction cone into a region where the slip is
+below the slip floor, w ~ 1e-5, and the Jacobian is nearly singular: a
+stationary point of ||R||^2 that is not a root. Projecting onto the cone or
+falling back to the frozen-w direction made it worse. Check
+info["residual_world"].
 """
 
 from dataclasses import dataclass
@@ -66,7 +74,18 @@ class SimConfig:
     dt: float = 0.01
     mu: float = 0.5
     gravity: float = 9.81
-    margin: float = 0.01  # builder.rigid_gap: contact detected if gap < margin
+    # builder.rigid_gap. A contact is detected if its gap at the start of the
+    # step, or the gap the unconstrained step would reach, is below it (the
+    # latter is not in Ostrich: without it a fast fall tunnels through the
+    # margin and is pushed out next step, a spurious bounce).
+    margin: float = 0.01
+    # Restitution: an impacting contact (v_n^free < -restitution_v_thr and
+    # d_free < 0) targets the end-of-step gap d* = d_k - e h v_n^- instead of
+    # 0, so the step's displacement gives the outgoing normal velocity
+    # e |v_n^-| (v_n^- at the start of the step). e = 0 is Ostrich (target 0);
+    # note the jump at e -> 0+, where the ball stops at d_k for one step.
+    restitution: float = 0.0
+    restitution_v_thr: float = 0.2
     fb_eps_sq: float = 1e-8  # compliance.contact_fb_smooth_eps_sq
     load_gate: float = 1e-6  # relaxation.friction_load_gate
     # Regularisers hard-coded in compute_friction_model: under the slip norm
@@ -120,6 +139,25 @@ class Sim2D:
     def split(self, z):
         return z[:3], z[3 : 3 + self.C], z[3 + self.C :]
 
+    def free_gap(self, q_prev, v_prev, f_ext):
+        """Start-of-step gap, unconstrained-step gap d_free and normal velocity
+        of the unconstrained step v_free = v_prev + h M^-1 (f_ext + gravity)."""
+        h = self.cfg.dt
+        v_free = v_prev + h * (f_ext + self.f_gravity) / self.m_diag
+        J_n, _ = self.jacobians(q_prev)
+        v_n = J_n @ v_free
+        d0 = self.gap(q_prev)
+        return d0, d0 + h * v_n, v_n
+
+    def gap_target(self, q_prev, v_prev, f_ext):
+        """Restitution target d* = d_k - e h v_n^- for impacting contacts."""
+        if self.cfg.restitution == 0.0:
+            return torch.zeros(self.C)
+        d0, d_free, v_n_free = self.free_gap(q_prev, v_prev, f_ext)
+        v_n_prev = self.jacobians(q_prev)[0] @ v_prev
+        impact = (v_n_free < -self.cfg.restitution_v_thr) & (d_free < 0.0)
+        return torch.where(impact, d0 - self.cfg.restitution * self.cfg.dt * v_n_prev, 0.0)
+
     def residual(self, z, q_prev, v_prev, f_ext, active, friction_on):
         h = self.cfg.dt
         v, lam_n, lam_t = self.split(z)
@@ -128,7 +166,7 @@ class Sim2D:
 
         # Normal: scaled FB on (gap at end of step, lambda_n), alpha = 1,
         # beta = h^2 * effective mass, residual divided by h.
-        d = self.gap(integrate(q_prev, v, h))
+        d = self.gap(integrate(q_prev, v, h)) - self.gap_target(q_prev, v_prev, f_ext)
         beta = h**2 * self.effective_mass(J_n)
         norm = torch.sqrt(d**2 + (beta * lam_n) ** 2 + self.cfg.fb_eps_sq)
         phi = d + beta * lam_n - norm
@@ -172,7 +210,8 @@ class Sim2D:
         if f_ext is None:
             f_ext = torch.zeros(B, 3)
 
-        active = vmap(self.gap)(q_prev) < cfg.margin
+        d0, d_free, _ = vmap(self.free_gap)(q_prev, v_prev, f_ext)
+        active = torch.minimum(d0, d_free) < cfg.margin
         residual = vmap(self.residual)
         jacobian = vmap(jacrev(self.residual))
 
@@ -181,7 +220,8 @@ class Sim2D:
             friction_on = active & (cfg.mu * z[:, 3 : 3 + C] > cfg.load_gate)
             args = (q_prev, v_prev, f_ext, active, friction_on)
             r = residual(z, *args)
-            res = r.abs().amax()
+            res_world = r.abs().amax(dim=1)
+            res = res_world.amax()
             if it > 0 and res < cfg.tol or it == cfg.max_iters:
                 break
             dz = torch.linalg.solve(jacobian(z, *args), r)
@@ -202,5 +242,6 @@ class Sim2D:
             "active": active,
             "iters": it,
             "residual": res.item(),
+            "residual_world": res_world,
         }
         return integrate(q_prev, v, cfg.dt), v, info

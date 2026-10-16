@@ -176,17 +176,17 @@ def test_ball_slide_to_roll(name):
 # --- free fall and inelastic landing ----------------------------------------
 
 
-def discrete_drop(y0, m, r, margin, eps_sq, n_steps):
-    """Free flight; a contact detected at the start of a step (gap < margin)
-    stops the ball on the surface at the end of that step (position-level,
-    inelastic). An undetected contact lets the step penetrate; the next step
-    then pushes the ball back to the surface. "Surface" is r + d with the
+def discrete_drop(y0, m, r, eps_sq, n_steps):
+    """Free flight until the free step would end below the surface; that step
+    ends on the surface (position-level, inelastic). Detection covers the
+    free step's gap, so no step penetrates (`margin` only matters for the
+    start-of-step gap, which is irrelevant here). "Surface" is r + d with the
     eps^2 gap d = eps^2 / (2 beta lambda) of that step's contact impulse."""
     beta = H**2 / m
     y, v, ys, vs = y0, 0.0, [], []
     for _ in range(n_steps):
         v_free = v - G * H
-        if y - r < margin and y + H * v_free < r:
+        if y + H * v_free < r:
             v = (r - y) / H
             for _ in range(5):
                 lam = m * (v - v_free) / H
@@ -200,15 +200,18 @@ def discrete_drop(y0, m, r, margin, eps_sq, n_steps):
 
 
 @pytest.mark.parametrize("name", CONFIGS)
+# 0.3123: the landing step starts above the margin and would tunnel 8.5 mm
+# with start-of-step detection only (Ostrich), then pop out at +0.85 m/s.
 @pytest.mark.parametrize("y0", [0.3, 0.3123])
 def test_drop(name, y0):
     _, atol_q, atol_v = TOL[name]
     r = 0.05
     sim = sim2d.Sim2D(sim2d.ball(1.0, r), CONFIGS[name])
     qs, vs, _ = run(sim, [0.0, y0, 0.0], [0.0, 0.0, 0.0], 40)
-    ys, vs_exact = discrete_drop(y0, 1.0, r, sim.cfg.margin, sim.cfg.fb_eps_sq, 40)
+    ys, vs_exact = discrete_drop(y0, 1.0, r, sim.cfg.fb_eps_sq, 40)
     assert np.abs(qs[:, 1] - ys).max() < atol_q
     assert np.abs(vs[:, 1] - vs_exact).max() < atol_v
+    assert qs[:, 1].min() > r - atol_q  # no tunneling
 
     # Continuous time: free flight until y = r; the discrete parabola lags it
     # by O(h) in time.
