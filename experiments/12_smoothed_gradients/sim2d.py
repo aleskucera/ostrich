@@ -230,10 +230,13 @@ class Sim2D:
                 break
             dz = torch.linalg.solve(jacobian(z, *args), r)
             merit = (r**2).sum(dim=1)
-            alpha = torch.ones(B)
+            # Converged worlds take no step: their merit is at rounding level,
+            # so the decrease test would fail on noise and halve 30 times.
+            done = (res_world < cfg.tol) & (it > 0)
+            alpha = torch.where(done, 0.0, 1.0)
             for _ in range(30):
                 trial = (residual(z - alpha[:, None] * dz, *args) ** 2).sum(dim=1)
-                reject = trial > (1.0 - 1e-4 * alpha) * merit
+                reject = (trial > (1.0 - 1e-4 * alpha) * merit) & ~done
                 if not reject.any():
                     break
                 alpha = torch.where(reject, 0.5 * alpha, alpha)
