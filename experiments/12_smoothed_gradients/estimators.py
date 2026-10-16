@@ -56,7 +56,7 @@ def alpha_order_from_samples(eps, L_plus, L_minus, g_plus, g_minus, sigma, gamma
     fo, zo = fo_i.mean(dim=-2), zo_i.mean(dim=-2)
     var_fo = fo_i.var(dim=-2).sum(dim=-1) / n  # trace of the covariance of the mean
     var_zo = zo_i.var(dim=-2).sum(dim=-1) / n
-    alpha = var_zo / (var_fo + var_zo)
+    alpha = var_zo / (var_fo + var_zo).clamp(min=1e-300)  # both 0 (flat region): alpha = 0
     alpha = torch.where((fo - zo).norm(dim=-1) > gamma * var_zo.sqrt(), 0.0, alpha)
     return alpha[..., None] * fo + (1 - alpha[..., None]) * zo, alpha
 

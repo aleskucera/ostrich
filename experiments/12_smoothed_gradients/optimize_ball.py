@@ -35,11 +35,6 @@ SIGMAS = {"0.02": (0.02, 0.02), "0.05": (0.05, 0.05), "0.1 -> 0.005": (0.1, 0.00
 SAMPLED = ("first", "zeroth", "alpha")
 
 
-def sigma_at(schedule, it):
-    s0, s1 = schedule
-    return s0 * (s1 / s0) ** (it / max(ITERS - 1, 1))
-
-
 class Adam:
     def __init__(self, shape, lr=LR, betas=(0.9, 0.999), eps=1e-8):
         self.lr, self.b1, self.b2, self.eps = lr, *betas, eps
@@ -66,41 +61,47 @@ def starts(gen):
     return 0.05 + 0.9 * torch.rand(STARTS, 2, generator=gen, dtype=torch.float64)
 
 
-def main():
-    sim = bl.make_sim()
-    gen = torch.Generator().manual_seed(1)
-    u0 = starts(gen)
-    loss_grad = lambda u: batched(lambda x: bl.loss_and_grad(sim, x), u)
-
-    # One run per (method, sigma schedule, start) plus the exact-gradient runs.
-    # Every iteration evaluates all sample points, the exact-gradient points and
-    # (on log iterations) the current points of every run in ONE batched
-    # rollout: the per-rollout overhead dominates at these batch sizes.
-    configs = [(m, name) for m in SAMPLED for name in SIGMAS]
-    u = u0.repeat(len(configs), 1).reshape(len(configs), STARTS, 2)
-    uh = u0.clone()
-    opt, opt_h = Adam(u.shape), Adam(uh.shape)
-    log_rollouts, log_loss, hard_loss = [], [], []
-    n_cfg, n_s = len(configs), STARTS * 2 * N_PAIRS
+def optimize(loss_grad, u0, sigmas, gen, n_pairs=N_PAIRS, iters=ITERS, project=None, extra_hard=()):
+    """Adam with every sampled estimator x sigma schedule from the starts u0,
+    plus the exact gradient (loss_grad itself) and any `extra_hard` runs
+    ((name, loss_grad) pairs, e.g. another adjoint mode). All sample points,
+    the exact-gradient points and (on log iterations) the current points share
+    ONE batched loss_grad call per iteration: the per-rollout overhead
+    dominates at these batch sizes. `project` maps sample points into the
+    parameter box before evaluation (None: no clamping)."""
+    starts_n = len(u0)
+    configs = [(m, name) for m in SAMPLED for name in sigmas]
+    u = u0.repeat(len(configs), 1).reshape(len(configs), starts_n, 2)
+    hard_u = [u0.clone() for _ in range(1 + len(extra_hard))]
+    opt, hard_opt = Adam(u.shape), [Adam(u0.shape) for _ in hard_u]
+    log_rollouts, log_loss, hard_loss = [], [], [[] for _ in hard_u]
+    n_cfg, n_s = len(configs), starts_n * 2 * n_pairs
+    proj = project or (lambda x: x)
+    sched = lambda name, it: sigmas[name][0] * (sigmas[name][1] / sigmas[name][0]) ** (it / max(iters - 1, 1))
     t0 = time.time()
-    for it in range(ITERS + 1):
-        sig = torch.tensor([sigma_at(SIGMAS[name], min(it, ITERS - 1)) for _, name in configs], dtype=torch.float64)
-        eps = torch.stack([torch.stack([est.directions(N_PAIRS, 2, generator=gen) for _ in range(STARTS)])
+    for it in range(iters + 1):
+        sig = torch.tensor([sched(name, min(it, iters - 1)) for _, name in configs], dtype=torch.float64)
+        eps = torch.stack([torch.stack([est.directions(n_pairs, 2, generator=gen) for _ in range(starts_n)])
                            for _ in configs])  # (cfg, start, N, 2)
         s = sig[:, None, None, None]
         pts = torch.cat([u[:, :, None] + s * eps, u[:, :, None] - s * eps], dim=2)  # (cfg, start, 2N, 2)
-        log = it % LOG_EVERY == 0 or it == ITERS
-        batch = [pts.reshape(-1, 2), uh] + ([u.reshape(-1, 2)] if log else [])
+        log = it % LOG_EVERY == 0 or it == iters
+        batch = [proj(pts.reshape(-1, 2)), hard_u[0]] + ([u.reshape(-1, 2)] if log else [])
         L_all, g_all = loss_grad(torch.cat(batch))
+        hard_g = [g_all[n_cfg * n_s : n_cfg * n_s + starts_n]]
+        hard_loss[0].append(L_all[n_cfg * n_s : n_cfg * n_s + starts_n])
+        for k, (_, lg) in enumerate(extra_hard, start=1):
+            L_k, g_k = lg(hard_u[k])
+            hard_loss[k].append(L_k)
+            hard_g.append(g_k)
         if log:
-            log_rollouts.append(it * 2 * N_PAIRS)
-            log_loss.append(L_all[n_cfg * n_s + STARTS:].reshape(n_cfg, STARTS))
-        hard_loss.append(L_all[n_cfg * n_s : n_cfg * n_s + STARTS])
-        if it == ITERS:
+            log_rollouts.append(it * 2 * n_pairs)
+            log_loss.append(L_all[n_cfg * n_s + starts_n :].reshape(n_cfg, starts_n))
+        if it == iters:
             break
-        L = L_all[: n_cfg * n_s].reshape(n_cfg, STARTS, 2 * N_PAIRS)
-        g = g_all[: n_cfg * n_s].reshape(n_cfg, STARTS, 2 * N_PAIRS, 2)
-        Lp, Lm, gp, gm = L[..., :N_PAIRS], L[..., N_PAIRS:], g[..., :N_PAIRS, :], g[..., N_PAIRS:, :]
+        L = L_all[: n_cfg * n_s].reshape(n_cfg, starts_n, 2 * n_pairs)
+        g = g_all[: n_cfg * n_s].reshape(n_cfg, starts_n, 2 * n_pairs, 2)
+        Lp, Lm, gp, gm = L[..., :n_pairs], L[..., n_pairs:], g[..., :n_pairs, :], g[..., n_pairs:, :]
         grads = torch.zeros_like(u)
         for ci, (m, _) in enumerate(configs):
             if m == "first":
@@ -110,17 +111,27 @@ def main():
             else:
                 grads[ci] = est.alpha_order_from_samples(eps[ci], Lp[ci], Lm[ci], gp[ci], gm[ci], sig[ci].item(), GAMMA)[0]
         u = opt.step(u, grads)
-        uh = opt_h.step(uh, g_all[n_cfg * n_s : n_cfg * n_s + STARTS])
+        hard_u = [o.step(x, gk) for o, x, gk in zip(hard_opt, hard_u, hard_g)]
         if it % 25 == 0:
             print(f"iter {it}: {time.time() - t0:.0f} s, median L per config "
                   + " ".join(f"{x:.3f}" for x in log_loss[-1].median(dim=1).values.tolist())
-                  + f" | exact {hard_loss[-1].median():.3f}", flush=True)
+                  + " | hard " + " ".join(f"{h[-1].median():.3f}" for h in hard_loss), flush=True)
     print(f"done: {time.time() - t0:.0f} s", flush=True)
+    return {"configs": np.array([f"{m}|{n}" for m, n in configs]), "rollouts": np.array(log_rollouts),
+            "loss": torch.stack(log_loss).numpy(), "u_final": u.numpy(),
+            "hard_names": np.array(["exact"] + [n for n, _ in extra_hard]),
+            "hard_rollouts": np.arange(iters + 1), "hard_loss": np.stack([torch.stack(h).numpy() for h in hard_loss]),
+            "u0": u0.numpy()}
 
-    np.savez(bl.RESULTS / "optimize_ball.npz", configs=np.array([f"{m}|{n}" for m, n in configs]),
-             rollouts=np.array(log_rollouts), loss=torch.stack(log_loss).numpy(), u_final=u.numpy(),
-             hard_rollouts=np.arange(len(hard_loss)), hard_loss=torch.stack(hard_loss).numpy(),
-             hard_u_final=uh.numpy(), u0=u0.numpy())
+
+def main():
+    sim = bl.make_sim()
+    gen = torch.Generator().manual_seed(1)
+    u0 = starts(gen)
+    loss_grad = lambda u: batched(lambda x: bl.loss_and_grad(sim, x), u)
+    out = optimize(loss_grad, u0, SIGMAS, gen)
+    out["hard_loss"] = out["hard_loss"][0]  # the ball file format: one exact run
+    np.savez(bl.RESULTS / "optimize_ball.npz", **out)
     report()
 
 

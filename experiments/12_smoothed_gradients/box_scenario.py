@@ -67,14 +67,16 @@ def initial_state(n):
     return q.expand(n, 3).clone(), v.expand(n, 3).clone()
 
 
-def loss(sim, u, chunk=4096):
-    out = []
+def loss(sim, u, chunk=4096, return_residual=False):
+    """L(u); with return_residual, also the worst Newton residual of any step."""
+    out, worst = [], 0.0
     for u_c in torch.split(u, chunk):
         q, v = initial_state(len(u_c))
         for f in forces(u_c):
-            q, v, _ = sim.step(q, v, f)
+            q, v, info = sim.step(q, v, f)
+            worst = max(worst, info["residual"])
         out.append((q[:, 0] - X_TARGET) ** 2)
-    return torch.cat(out)
+    return (torch.cat(out), worst) if return_residual else torch.cat(out)
 
 
 def loss_and_grad(sim, u, **adjoint):

@@ -5,8 +5,9 @@ Same method as ball_landscape.py: a dense loss grid over u in [0, 1]^2
 correlation; exact and Ostrich-style adjoint gradients (friction weight
 held fixed, adjoint contact compliance 1e-6) on a coarse grid of points.
 
-Run: PYTHONPATH=. python box_landscape.py   (~10 min with 4 threads)
-Writes results/box_landscape.npz and results/box_landscape.png.
+Run: PYTHONPATH=. python box_landscape.py   (~5 min with 4 threads)
+Writes results/box_landscape.{npz,png}; main(friction="tight") writes
+results/box_landscape_tight.{npz,png}.
 """
 
 import math
@@ -21,15 +22,18 @@ import box_scenario as bx
 OSTRICH = {"friction": "frozen", "contact_compliance": 1e-6}
 
 
-def main(spacing=1 / 100, sigma=0.05, n_arrows=19):
-    sim = bx.make_sim()
+def main(spacing=1 / 100, sigma=0.05, n_arrows=19, friction="ostrich"):
+    sim = bx.make_sim(friction)
+    name = "box_landscape" if friction == "ostrich" else f"box_landscape_{friction}"
     pad = int(math.ceil(bl.PAD_SIGMAS * sigma / spacing))
     axis = torch.arange(-pad, int(round(1 / spacing)) + 1 + pad, dtype=torch.float64) * spacing
     U0, U1 = torch.meshgrid(axis, axis, indexing="ij")
     t0 = time.time()
     # Outside [0, 1] the push is clamped to the parameter box (F >= 0 matters).
-    L_grid = bx.loss(sim, torch.stack([U0.flatten(), U1.flatten()], dim=1).clamp(0.0, 1.0)).reshape(U0.shape)
-    print(f"loss grid {tuple(L_grid.shape)}: {time.time() - t0:.0f} s", flush=True)
+    L_grid, worst = bx.loss(sim, torch.stack([U0.flatten(), U1.flatten()], dim=1).clamp(0.0, 1.0),
+                            return_residual=True)
+    L_grid = L_grid.reshape(U0.shape)
+    print(f"loss grid {tuple(L_grid.shape)}: {time.time() - t0:.0f} s, worst Newton residual {worst:.1e}", flush=True)
     g_smooth = bl.smoothed_gradient(L_grid, spacing, sigma)
 
     idx = torch.linspace(0, g_smooth.shape[1] - 1, n_arrows).round().long()
@@ -49,13 +53,14 @@ def main(spacing=1 / 100, sigma=0.05, n_arrows=19):
           f"cos(ostrich-style, exact) median {cos(g_ostrich, g_exact).median():.3f}, "
           f"|ostrich|/|exact| median {(g_ostrich.norm(dim=1) / g_exact.norm(dim=1)).median():.2f}")
 
-    np.savez(bl.RESULTS / "box_landscape.npz", axis=axis.numpy(), L=L_grid.numpy(), pad=pad, spacing=spacing,
+    np.savez(bl.RESULTS / f"{name}.npz", axis=axis.numpy(), L=L_grid.numpy(), pad=pad, spacing=spacing,
              sigma=sigma, g_smooth=g_smooth.numpy(), u_arrows=u_arrows.numpy(), g_exact=g_exact.numpy(),
              g_ostrich=g_ostrich.numpy(), g_sm=g_sm.numpy())
-    plot(axis.numpy(), L_grid.numpy(), pad, u_arrows.numpy(), g_exact.numpy(), g_ostrich.numpy(), g_sm.numpy(), sigma)
+    plot(axis.numpy(), L_grid.numpy(), pad, u_arrows.numpy(), g_exact.numpy(), g_ostrich.numpy(), g_sm.numpy(), sigma,
+         name, friction)
 
 
-def plot(axis, L, pad, u_arrows, g_exact, g_ostrich, g_sm, sigma):
+def plot(axis, L, pad, u_arrows, g_exact, g_ostrich, g_sm, sigma, name="box_landscape", friction="ostrich"):
     import matplotlib
 
     matplotlib.use("Agg")
@@ -89,10 +94,11 @@ def plot(axis, L, pad, u_arrows, g_exact, g_ostrich, g_sm, sigma):
         for spine in ax.spines.values():
             spine.set_visible(False)
     fig.colorbar(im, ax=axes, shrink=0.85, label="loss [m^2]")
-    fig.suptitle("Pushed box (mu = 0.5): arrows show the descent direction -grad L, unit length; dots: gradient below 1e-6",
+    fig.suptitle(f"Pushed box (mu = 0.5, {friction} friction regularisers): arrows show the descent direction -grad L, "
+                 "unit length; dots: gradient below 1e-6",
                  color=muted, fontsize=10, x=0.01, ha="left")
-    fig.savefig(bl.RESULTS / "box_landscape.png", dpi=150)
-    print(f"wrote {bl.RESULTS / 'box_landscape.png'}")
+    fig.savefig(bl.RESULTS / f"{name}.png", dpi=150)
+    print(f"wrote {bl.RESULTS / f'{name}.png'}")
 
 
 if __name__ == "__main__":
