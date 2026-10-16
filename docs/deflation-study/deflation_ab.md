@@ -171,7 +171,7 @@ expensive reference.
 
 ## Step 1d — robustness curve: how accurate must Z be?
 
-`test_scripts/deflation_robustness.py`, plot `docs/deflation_robustness.png`.
+`test_scripts/deflation_robustness.py`, plot `docs/deflation-study/deflation_robustness.png`.
 Start from the exact bottom-16 eigenvectors $V_k$ of the Jacobi-scaled
 $A_s = DAD$ and rotate them by a controlled angle:
 $Z_s = V_k\cos\theta + W\sin\theta$ with $W \perp V_k$, so every principal
@@ -559,6 +559,7 @@ The relative error of $w$ itself, for PCR Jacobi on obstacle, is p50
 - `test_scripts/deflation_ab.py` — step-1c table (~20 s on CPU).
 - `test_scripts/deflation_robustness.py` — step-1d sweep and plot (~50 s).
 - `test_scripts/deflation_cost.py` — step-2 iterations under engine settings, GPU timing, estimate (~90 s).
+- `test_scripts/deflation_hybrid.py` — hybrid Z ceiling: joint/control ‖ exact bottom-k_c of the condensed contact problem (results not written up here; `deflation_rowsel.py` and `deflation_direct.py` import from it).
 - `test_scripts/deflation_rowsel.py` — joint/control + k_c contact rows eliminated, picked by AMG strength vs leverage oracle vs random.
 - `test_scripts/deflation_direct.py` — direct-solve baseline: accuracy, GPU timing, PCR comparison (~3 min).
 - `test_scripts/adjoint_accuracy.py` — one-step adjoint accuracy: capped PCR vs body-space vs exact (~1 min, CPU).

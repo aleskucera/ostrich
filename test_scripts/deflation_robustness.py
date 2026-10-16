@@ -22,7 +22,7 @@ their RMS angle θ_eq = arccos √(mean cos²), with their per-mode angles
 printed — they turn out NOT to follow the uniform-angle curve.
 
 Held-out split (last 20% of systems), both scenes.
-Writes docs/deflation_robustness.png.
+Writes docs/deflation-study/deflation_robustness.png.
 
 Run:
     python test_scripts/deflation_robustness.py
@@ -49,7 +49,7 @@ SEEDS = (0, 1, 2)
 K16_SOURCES = ("cross-step (N-1)", "recycle-exact (prev)", "harmonic m=16",
                "harmonic m=24", "harmonic m=32", "gcrodr accumulated")
 MODES = (1, 2, 4, 8, 12, 16)
-OUT = pathlib.Path(__file__).resolve().parent.parent / "docs/deflation_robustness.png"
+OUT = pathlib.Path(__file__).resolve().parent.parent / "docs/deflation-study/deflation_robustness.png"
 
 
 def scaled_eig(A):
