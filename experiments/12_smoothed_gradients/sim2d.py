@@ -9,7 +9,8 @@ Only the residual mirrors Ostrich:
   normal     constraints/contact_constraint.py::compute_contact_core
   friction   constraints/friction_constraint.py::compute_friction_model
              (isotropic branch, 1 tangent direction)
-The solve is plain dense Newton, K = jacrev(residual), torch.linalg.solve,
+The solve is plain dense Newton (K = residual_jacobian, written by hand and
+checked against jacrev; torch.linalg.solve),
 with per-world backtracking on ||R||^2. The friction weight w is a function of
 the iterate (Ostrich lags it by one Newton iteration and under-relaxes it;
 at a converged fixed point both coincide), so here the root of R(z, w(z)) is
@@ -187,19 +188,95 @@ class Sim2D:
 
     def friction_weight(self, z, q_prev):
         """w of compute_friction_model (isotropic branch), from the iterate z."""
+        return self.friction_weight_partials(z, q_prev)[0]
+
+    def friction_weight_partials(self, z, q_prev):
+        """w and its partial derivatives dw/dv_t, dw/dlam_n, dw/dlam_t (each (C,)).
+        The derivatives follow torch's conventions (abs'(0) = 0, clamp passes
+        the gradient on [0, 1e5]), so they match autodiff of w."""
         h, mu = self.cfg.dt, self.cfg.mu
         v, lam_n, lam_t = self.split(z)
         _, J_t = self.jacobians(q_prev)
         r = self.effective_mass(J_t)
 
-        d_t_norm = torch.sqrt((J_t @ v * h) ** 2 + self.cfg.friction_slip_eps_sq)
+        v_t = J_t @ v
+        d_t_norm = torch.sqrt((v_t * h) ** 2 + self.cfg.friction_slip_eps_sq)
         raw = torch.abs(lam_t * h)
         limit = mu * lam_n * h
-        clamped = torch.minimum(raw, limit)
+        below = raw < limit
+        clamped = torch.where(below, raw, limit)  # min(raw, limit)
         gap = limit - clamped
-        phi = d_t_norm + r * gap - torch.sqrt(d_t_norm**2 + (r * gap) ** 2)
-        w = r * (d_t_norm - phi) / (r * clamped + phi + self.cfg.friction_denom_eps * h)
-        return torch.clamp(w, 0.0, 1e5)
+        S = torch.sqrt(d_t_norm**2 + (r * gap) ** 2)
+        phi = d_t_norm + r * gap - S
+        N = d_t_norm - phi
+        D = r * clamped + phi + self.cfg.friction_denom_eps * h
+        w_raw = r * N / D
+        w = torch.clamp(w_raw, 0.0, 1e5)
+
+        # Chain rule: w_raw(d_t_norm, gap, clamped), with gap and clamped
+        # functions of raw = |lam_t h| and limit = mu lam_n h.
+        phi_d = 1.0 - d_t_norm / S
+        phi_g = r * (1.0 - r * gap / S)
+        dw = lambda dN, dD: r * (dN * D - N * dD) / D**2
+        dw_dnorm = dw(1.0 - phi_d, phi_d)
+        dw_dgap = dw(-phi_g, phi_g)
+        dw_dclamped = dw(0.0, r)
+        b = below.to(z.dtype)
+        dw_draw = b * (dw_dclamped - dw_dgap)
+        dw_dlimit = (1.0 - b) * dw_dclamped + b * dw_dgap
+        inside = ((w_raw >= 0.0) & (w_raw <= 1e5)).to(z.dtype)
+        dw_dvt = inside * dw_dnorm * v_t * h**2 / d_t_norm
+        dw_dlam_n = inside * dw_dlimit * mu * h
+        dw_dlam_t = inside * dw_draw * h * torch.sign(lam_t)
+        return w, dw_dvt, dw_dlam_n, dw_dlam_t
+
+    def residual_jacobian(self, z, q_prev, v_prev, f_ext, active, friction_on):
+        """dR/dz of `residual` (exact: includes dw/dz), written out by hand;
+        equal to jacrev(self.residual) and several times cheaper."""
+        h, C = self.cfg.dt, self.C
+        v, lam_n, lam_t = self.split(z)
+        J_n, J_t = self.jacobians(q_prev)
+        a, o = active.to(z.dtype), friction_on.to(z.dtype)
+
+        # Gap at the end of the step and its derivative g = dd/dv (C, 3).
+        q1 = integrate(q_prev, v, h)
+        p = self.body.points
+        d = self.gap(q1) - self.gap_target(q_prev, v_prev, f_ext)
+        dtheta_dw = h / (1.0 + (0.5 * h * v[2]) ** 2)
+        c1, s1 = torch.cos(q1[2]), torch.sin(q1[2])
+        g = torch.stack([torch.zeros(C), torch.full((C,), h), (c1 * p[:, 0] - s1 * p[:, 1]) * dtheta_dw], dim=1)
+
+        # Scaled FB phi(d, lam_n) and its derivatives.
+        beta = h**2 * self.effective_mass(J_n)
+        norm = torch.sqrt(d**2 + (beta * lam_n) ** 2 + self.cfg.fb_eps_sq)
+        phi_d = 1.0 - d / norm
+        phi_l = beta * (1.0 - beta * lam_n / norm)
+        phi_dd = -((beta * lam_n) ** 2 + self.cfg.fb_eps_sq) / norm**3
+        phi_dl = d * beta**2 * lam_n / norm**3
+
+        w, dw_dvt, dw_dlam_n, dw_dlam_t = self.friction_weight_partials(z, q_prev)
+
+        # Blocks assembled with cat (in-place writes are not allowed under vmap).
+        # Dynamics rows: M (v - v_prev) - h (f + g) - h sum(phi_d lam_n J_n + lam_t J_t)
+        dyn = torch.cat([
+            torch.diag(self.m_diag) - h * torch.einsum("i,ij,ik->jk", a * lam_n * phi_dd, J_n, g),
+            -h * (J_n * (a * (phi_d + lam_n * phi_dl))[:, None]).T,
+            -h * (J_t * o[:, None]).T,
+        ], dim=1)
+        # Normal rows: phi / h (active) or lam_n
+        normal = torch.cat([
+            (a * phi_d / h)[:, None] * g,
+            torch.diag(a * phi_l / h + (1.0 - a)),
+            torch.zeros(C, C, dtype=z.dtype),
+        ], dim=1)
+        # Friction rows: v_t + w lam_t (friction on) or lam_t
+        friction = torch.cat([
+            (o * (1.0 + lam_t * dw_dvt))[:, None] * J_t,
+            torch.diag(o * lam_t * dw_dlam_n),
+            torch.diag(o * (w + lam_t * dw_dlam_t) + (1.0 - o)),
+        ], dim=1)
+        K = torch.cat([dyn, normal, friction], dim=0)
+        return K
 
     # --- batched step -----------------------------------------------------
 
@@ -217,7 +294,7 @@ class Sim2D:
         d0, d_free, _ = vmap(self.free_gap)(q_prev, v_prev, f_ext)
         active = torch.minimum(d0, d_free) < cfg.margin
         residual = vmap(self.residual)
-        jacobian = vmap(jacrev(self.residual))
+        jacobian = vmap(self.residual_jacobian)
 
         z = torch.cat([v_prev, torch.zeros(B, 2 * C)], dim=1)
         for it in range(cfg.max_iters + 1):

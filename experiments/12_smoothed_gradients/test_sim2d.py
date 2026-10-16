@@ -94,3 +94,30 @@ def test_batched_worlds_are_independent():
         q_i, v_i, _ = sim.step(q[i : i + 1], v[i : i + 1])
         assert torch.allclose(q_b[i], q_i[0], atol=1e-12)
         assert torch.allclose(v_b[i], v_i[0], atol=1e-12)
+
+
+@pytest.mark.parametrize("shape, e, mu", [("box", 0.0, 0.5), ("box", 0.8, 0.5), ("ball", 0.8, 0.5), ("ball", 0.8, 0.0)])
+def test_residual_jacobian_matches_jacrev(shape, e, mu):
+    """The hand-written dR/dz equals autodiff of the residual, on random
+    iterates (inside and outside the friction cone) near the ground."""
+    from torch.func import jacrev, vmap
+
+    gen = torch.Generator().manual_seed(0)
+    body = sim2d.box(17.0, HX, HY) if shape == "box" else sim2d.ball(1.0, 0.05)
+    sim = sim2d.Sim2D(body, sim2d.SimConfig(restitution=e, mu=mu))
+    B, C = 200, sim.C
+    rand = lambda *size: torch.rand(*size, generator=gen, dtype=torch.float64)
+    theta = (rand(B) - 0.5) * 0.6
+    lowest = torch.stack([sim2d._rotate(t, body.points)[:, 1] - body.thickness for t in theta]).min(dim=1).values
+    q = torch.stack([torch.zeros(B), -lowest + rand(B) * 0.03 - 0.002, theta], dim=1)
+    v = torch.stack([(rand(B) - 0.5) * 4, -rand(B) * 3 + 0.5, (rand(B) - 0.5) * 8], dim=1)
+    f = torch.zeros(B, 3)
+    d0, d_free, _ = vmap(sim.free_gap)(q, v, f)
+    active = torch.minimum(d0, d_free) < sim.cfg.margin
+    z = torch.cat([v + 0.1 * (rand(B, 3) - 0.5), rand(B, C) * 200, (rand(B, C) - 0.5) * 300], dim=1)
+    on = active & (sim.cfg.mu * z[:, 3 : 3 + C] > sim.cfg.load_gate)
+    args = (z, q, v, f, active, on)
+    K_hand = vmap(sim.residual_jacobian)(*args)
+    K_auto = vmap(jacrev(sim.residual))(*args)
+    assert active.sum() > B / 2
+    assert ((K_hand - K_auto).abs().amax(dim=(1, 2)) / K_auto.abs().amax(dim=(1, 2))).max() < 1e-12
