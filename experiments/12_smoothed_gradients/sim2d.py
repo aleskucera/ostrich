@@ -38,6 +38,7 @@ from dataclasses import dataclass
 
 import torch
 from torch.func import jacrev
+from torch.func import vjp
 from torch.func import vmap
 
 torch.set_default_dtype(torch.float64)
@@ -158,10 +159,13 @@ class Sim2D:
         impact = (v_n_free < -self.cfg.restitution_v_thr) & (d_free < 0.0)
         return torch.where(impact, d0 - self.cfg.restitution * self.cfg.dt * v_n_prev, 0.0)
 
-    def residual(self, z, q_prev, v_prev, f_ext, active, friction_on):
+    def residual(self, z, q_prev, v_prev, f_ext, active, friction_on, z_w=None):
+        """Step residual R(z) for unknowns z = (v, lam_n, lam_t). The friction
+        weight w is computed from z_w (default z); the adjoint passes a fixed
+        z_w to hold w frozen, as Ostrich's adjoint does."""
         h = self.cfg.dt
         v, lam_n, lam_t = self.split(z)
-        w = self.friction_weight(z, q_prev)
+        w = self.friction_weight(z if z_w is None else z_w, q_prev)
         J_n, J_t = self.jacobians(q_prev)
 
         # Normal: scaled FB on (gap at end of step, lambda_n), alpha = 1,
@@ -240,8 +244,68 @@ class Sim2D:
             "lam_n": z[:, 3 : 3 + C],
             "lam_t": z[:, 3 + C :],
             "active": active,
+            "z": z,
+            "friction_on": friction_on,
             "iters": it,
             "residual": res.item(),
             "residual_world": res_world,
         }
         return integrate(q_prev, v, cfg.dt), v, info
+
+    # --- adjoint ------------------------------------------------------------
+
+    def step_vjp(self, q_prev, v_prev, f_ext, info, g_q, g_v, friction="exact", contact_compliance=0.0):
+        """Pull loss gradients (g_q, g_v) on a step's outputs back to its inputs.
+
+        Implicit function theorem at the converged root z of R(z, p) = 0,
+        p = (q_prev, v_prev, f_ext): with K = dR/dz, mu = K^-T g_z and
+        dL/dp = -mu^T dR/dp, plus the explicit dependence of q = integrate(q_prev, v).
+        Contact sets (active, friction_on) are those of the forward step.
+
+        friction="exact": K contains dw/dz, the exact derivative of the
+          friction fixed point. "frozen": w held fixed in z (Ostrich's
+          adjoint, friction_linearization="true"); w's dependence on p is kept.
+        contact_compliance: added to the normal rows' dR/dlambda_n, as
+          AdjointConfig.contact_compliance (Ostrich default 1e-6; 0 = exact).
+
+        Returns gradients on q_prev, v_prev, f_ext, each (B, 3).
+        """
+        assert friction in ("exact", "frozen")
+        h, C = self.cfg.dt, self.C
+        active = info["active"]
+
+        def world(z, q_prev, v_prev, f_ext, active, friction_on, g_q, g_v):
+            z_w = None if friction == "exact" else z  # a separate argument: constant for jacrev
+            K = jacrev(self.residual)(z, q_prev, v_prev, f_ext, active, friction_on, z_w)
+            K[3 : 3 + C, 3 : 3 + C] += torch.diag(torch.where(active, contact_compliance / h, 0.0))
+            g_qprev_explicit, g_v_from_q = vjp(lambda q, v: integrate(q, v, h), q_prev, z[:3])[1](g_q)
+            g_z = torch.cat([g_v + g_v_from_q, torch.zeros(2 * C)])
+            mu = torch.linalg.solve(K.T, g_z)
+            _, pull = vjp(lambda q, v, f: self.residual(z, q, v, f, active, friction_on, z_w), q_prev, v_prev, f_ext)
+            g_qprev, g_vprev, g_f = pull(-mu)
+            return g_qprev + g_qprev_explicit, g_vprev, g_f
+
+        if f_ext is None:
+            f_ext = torch.zeros_like(q_prev)
+        return vmap(world)(info["z"], q_prev, v_prev, f_ext, active, info["friction_on"], g_q, g_v)
+
+
+def rollout(sim, q0, v0, forces):
+    """Steps all worlds through forces (T, B, 3). Returns the list of
+    (q_prev, v_prev, f_ext, info) per step and the final (q, v)."""
+    q, v, tape = q0, v0, []
+    for f in forces:
+        q_next, v_next, info = sim.step(q, v, f)
+        tape.append((q, v, f, info))
+        q, v = q_next, v_next
+    return tape, q, v
+
+
+def rollout_vjp(sim, tape, g_q, g_v, **adjoint):
+    """Backpropagates loss gradients on the final (q, v) through a rollout
+    with Sim2D.step_vjp. Returns gradients on q0, v0 and the forces (T, B, 3)."""
+    g_forces = []
+    for q_prev, v_prev, f, info in reversed(tape):
+        g_q, g_v, g_f = sim.step_vjp(q_prev, v_prev, f, info, g_q, g_v, **adjoint)
+        g_forces.append(g_f)
+    return g_q, g_v, torch.stack(g_forces[::-1])
