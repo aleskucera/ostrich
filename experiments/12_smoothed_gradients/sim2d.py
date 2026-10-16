@@ -45,7 +45,6 @@ from torch.func import vmap
 torch.set_default_dtype(torch.float64)
 
 NORMAL = torch.tensor([0.0, 1.0])
-TANGENT = torch.tensor([1.0, 0.0])
 
 
 @dataclass
@@ -111,7 +110,8 @@ def integrate(q, v, h):
 
 
 def _cross2(a, b):
-    return a[:, 0] * b[1] - a[:, 1] * b[0]
+    """z-component of a x b, row-wise for (C, 2) arrays."""
+    return a[:, 0] * b[:, 1] - a[:, 1] * b[:, 0]
 
 
 class Sim2D:
@@ -124,15 +124,27 @@ class Sim2D:
 
     # --- per-world functions (vmapped over worlds) -------------------------
 
-    def gap(self, q):
-        p = _rotate(q[2], self.body.points)
-        return q[1] + p[:, 1] - self.body.thickness
+    def contact_frame(self, q_prev):
+        """Contact candidates at the start of the step, as Ostrich's collision
+        detection fixes them: per contact a normal n (C, 2) pointing from the
+        static geometry to the body, an anchor point s (C, 2) on the geometry,
+        and whether the candidate applies at this pose (C,). Default: every
+        body point against the ground plane y = 0."""
+        return NORMAL.expand(self.C, 2), torch.zeros(self.C, 2), torch.ones(self.C, dtype=torch.bool)
+
+    def gap(self, q, frame):
+        """Signed distance along each fixed normal: n . (p(q) - s) - thickness."""
+        n, s, _ = frame
+        p = q[:2] + _rotate(q[2], self.body.points)
+        return (n * (p - s)).sum(dim=1) - self.body.thickness
 
     def jacobians(self, q_prev):
         """Normal and tangent Jacobians (C, 3), at the previous pose."""
-        lever = _rotate(q_prev[2], self.body.points) - self.body.thickness[:, None] * NORMAL
-        J_n = torch.cat([NORMAL.expand(self.C, 2), _cross2(lever, NORMAL)[:, None]], dim=1)
-        J_t = torch.cat([TANGENT.expand(self.C, 2), _cross2(lever, TANGENT)[:, None]], dim=1)
+        n, _, _ = self.contact_frame(q_prev)
+        t = torch.stack([n[:, 1], -n[:, 0]], dim=1)
+        lever = _rotate(q_prev[2], self.body.points) - self.body.thickness[:, None] * n
+        J_n = torch.cat([n, _cross2(lever, n)[:, None]], dim=1)
+        J_t = torch.cat([t, _cross2(lever, t)[:, None]], dim=1)
         return J_n, J_t
 
     def effective_mass(self, J):
@@ -148,7 +160,7 @@ class Sim2D:
         v_free = v_prev + h * (f_ext + self.f_gravity) / self.m_diag
         J_n, _ = self.jacobians(q_prev)
         v_n = J_n @ v_free
-        d0 = self.gap(q_prev)
+        d0 = self.gap(q_prev, self.contact_frame(q_prev))
         return d0, d0 + h * v_n, v_n
 
     def gap_target(self, q_prev, v_prev, f_ext):
@@ -171,7 +183,7 @@ class Sim2D:
 
         # Normal: scaled FB on (gap at end of step, lambda_n), alpha = 1,
         # beta = h^2 * effective mass, residual divided by h.
-        d = self.gap(integrate(q_prev, v, h)) - self.gap_target(q_prev, v_prev, f_ext)
+        d = self.gap(integrate(q_prev, v, h), self.contact_frame(q_prev)) - self.gap_target(q_prev, v_prev, f_ext)
         beta = h**2 * self.effective_mass(J_n)
         norm = torch.sqrt(d**2 + (beta * lam_n) ** 2 + self.cfg.fb_eps_sq)
         phi = d + beta * lam_n - norm
@@ -241,10 +253,13 @@ class Sim2D:
         # Gap at the end of the step and its derivative g = dd/dv (C, 3).
         q1 = integrate(q_prev, v, h)
         p = self.body.points
-        d = self.gap(q1) - self.gap_target(q_prev, v_prev, f_ext)
+        frame = self.contact_frame(q_prev)
+        n = frame[0]
+        d = self.gap(q1, frame) - self.gap_target(q_prev, v_prev, f_ext)
         dtheta_dw = h / (1.0 + (0.5 * h * v[2]) ** 2)
         c1, s1 = torch.cos(q1[2]), torch.sin(q1[2])
-        g = torch.stack([torch.zeros(C), torch.full((C,), h), (c1 * p[:, 0] - s1 * p[:, 1]) * dtheta_dw], dim=1)
+        dp_dtheta = torch.stack([-s1 * p[:, 0] - c1 * p[:, 1], c1 * p[:, 0] - s1 * p[:, 1]], dim=1)
+        g = torch.stack([n[:, 0] * h, n[:, 1] * h, (n * dp_dtheta).sum(dim=1) * dtheta_dw], dim=1)
 
         # Scaled FB phi(d, lam_n) and its derivatives.
         beta = h**2 * self.effective_mass(J_n)
@@ -296,7 +311,8 @@ class Sim2D:
             f_ext = torch.zeros(B, 3)
 
         d0, d_free, _ = vmap(self.free_gap)(q_prev, v_prev, f_ext)
-        active = torch.minimum(d0, d_free) < cfg.margin
+        valid = vmap(lambda q: self.contact_frame(q)[2])(q_prev)
+        active = (torch.minimum(d0, d_free) < cfg.margin) & valid
         residual = vmap(self.residual)
         jacobian = vmap(self.residual_jacobian)
 
