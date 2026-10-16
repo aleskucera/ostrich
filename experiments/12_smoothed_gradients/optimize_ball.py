@@ -15,6 +15,7 @@ Run: PYTHONPATH=. python optimize_ball.py   (heavy: ~90 min locally)
 Writes results/optimize_ball.npz and results/optimize_ball.png.
 """
 
+import math
 import time
 
 import numpy as np
@@ -61,10 +62,14 @@ def batched(fn, u, chunk=4096):
     return torch.cat(outs)
 
 
+def starts(gen):
+    return 0.05 + 0.9 * torch.rand(STARTS, 2, generator=gen, dtype=torch.float64)
+
+
 def main():
     sim = bl.make_sim()
     gen = torch.Generator().manual_seed(1)
-    u0 = 0.05 + 0.9 * torch.rand(STARTS, 2, generator=gen, dtype=torch.float64)
+    u0 = starts(gen)
     loss_grad = lambda u: batched(lambda x: bl.loss_and_grad(sim, x), u)
 
     # One run per (method, sigma schedule, start) plus the exact-gradient runs.
@@ -119,6 +124,41 @@ def main():
     report()
 
 
+EXACT_ITERS = 2000
+EXACT_VARIANTS = ("lr 0.01", "lr 0.01 -> 0.001 (cosine)")
+
+
+def exact_control():
+    """Control for the exact gradient: the same rollout budget as the sampled
+    estimators (EXACT_ITERS steps of one rollout), with a constant and a
+    cosine-decayed learning rate, from the same starts. Saves partial results
+    every 100 steps so it can be stopped early."""
+    sim = bl.make_sim()
+    u0 = starts(torch.Generator().manual_seed(1))
+    n = len(EXACT_VARIANTS)
+    u = u0.repeat(n, 1)
+    opt = Adam(u.shape)
+    lr_min = 0.1 * LR
+    rollouts, losses = [], []
+    t0 = time.time()
+    for it in range(EXACT_ITERS + 1):
+        L, g = bl.loss_and_grad(sim, u)
+        if it % LOG_EVERY == 0 or it == EXACT_ITERS:
+            rollouts.append(it)
+            losses.append(L.reshape(n, STARTS))
+        if it % 100 == 0 or it == EXACT_ITERS:
+            np.savez(bl.RESULTS / "optimize_ball_exact.npz", variants=np.array(EXACT_VARIANTS),
+                     rollouts=np.array(rollouts), loss=torch.stack(losses).numpy(), done=it == EXACT_ITERS)
+            print(f"iter {it}: {time.time() - t0:.0f} s, median L " +
+                  " ".join(f"{x:.4f}" for x in losses[-1].median(dim=1).values.tolist()), flush=True)
+        if it == EXACT_ITERS:
+            break
+        cosine = lr_min + 0.5 * (LR - lr_min) * (1 + math.cos(math.pi * it / EXACT_ITERS))
+        opt.lr = torch.tensor([LR] * STARTS + [cosine] * STARTS, dtype=torch.float64)[:, None]
+        u = opt.step(u, g)
+    report()
+
+
 def report():
     d = np.load(bl.RESULTS / "optimize_ball.npz")
     configs = [c.split("|") for c in d["configs"]]
@@ -128,7 +168,18 @@ def report():
     for k, (m, name) in enumerate(configs):
         final = d["loss"][-1, k]
         print(f"{m:>8} {name:>14} {np.median(final):9.4f} {np.mean(final < 0.01):8.0%}")
+    exact = load_exact()
+    if exact is not None:
+        for k, name in enumerate(exact["variants"]):
+            final = exact["loss"][-1, k]
+            print(f"{'exact':>8} {name:>14} {np.median(final):9.4f} {np.mean(final < 0.01):8.0%}"
+                  f"   ({exact['rollouts'][-1]} rollouts + adjoints{'' if exact['done'] else ', partial'})")
     plot(d, configs)
+
+
+def load_exact():
+    path = bl.RESULTS / "optimize_ball_exact.npz"
+    return dict(np.load(path)) if path.exists() else None
 
 
 def plot(d, configs):
@@ -142,8 +193,14 @@ def plot(d, configs):
               "alpha": ("alpha-order", "#1baf7a", "^")}
     fig, axes = plt.subplots(1, len(SIGMAS), figsize=(12, 3.9), sharey=True, constrained_layout=True)
     for ax, name in zip(axes, SIGMAS):
-        ax.plot(np.maximum(d["hard_rollouts"], 1), np.median(d["hard_loss"], axis=1), color=muted, lw=1.2, ls="--")
-        ax.text(d["hard_rollouts"][-1], np.median(d["hard_loss"][-1]), " exact", color=muted, va="center", fontsize=9)
+        exact = load_exact()
+        if exact is not None:
+            for k, ls in ((0, "--"), (1, ":")):
+                ax.plot(np.maximum(exact["rollouts"], 1), np.median(exact["loss"][:, k], axis=1),
+                        color=muted, lw=1.2, ls=ls, label=f"exact, {exact['variants'][k]}")
+        else:
+            ax.plot(np.maximum(d["hard_rollouts"], 1), np.median(d["hard_loss"], axis=1), color=muted, lw=1.2, ls="--",
+                    label="exact")
         for k, (m, n) in enumerate(configs):
             if n != name:
                 continue
@@ -159,7 +216,7 @@ def plot(d, configs):
         for spine in ("top", "right"):
             ax.spines[spine].set_visible(False)
     axes[0].set_ylabel(f"median deterministic loss ({STARTS} starts)", color=muted)
-    fig.legend(*axes[0].get_legend_handles_labels(), frameon=False, loc="outside upper right", ncols=3)
+    fig.legend(*axes[0].get_legend_handles_labels(), frameon=False, loc="outside upper right", ncols=5, fontsize=9)
     fig.suptitle("Ball, terminal-state loss: Adam with each gradient estimator",
                  color=muted, fontsize=10, x=0.01, ha="left")
     fig.savefig(bl.RESULTS / "optimize_ball.png", dpi=150)
