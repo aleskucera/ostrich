@@ -116,3 +116,94 @@ def moments(components):
     mean = sum(p * m for _, p, m, _ in components) / P
     cov = sum(p * (S + torch.outer(m - mean, m - mean)) for _, p, m, S in components) / P
     return mean, cov
+
+
+def step_jacobians(sim, means, info, f_ext=None):
+    """d(q1, v1)/d(q0, v0) (P, 6, 6) at the pieces' means, from the adjoint:
+    one batched step_vjp per output row."""
+    P = len(means)
+    q0, v0 = means[:, :3], means[:, 3:]
+    f = torch.zeros(P, 3, dtype=means.dtype) if f_ext is None else f_ext
+    rows = []
+    for i in range(6):
+        g = torch.zeros(P, 6, dtype=means.dtype)
+        g[:, i] = 1.0
+        g_q, g_v, _ = sim.step_vjp(q0, v0, f, info, g[:, :3], g[:, 3:])
+        rows.append(torch.cat([g_q, g_v], dim=1))
+    return torch.stack(rows, dim=1)
+
+
+def propagate_batched(sim, pieces):
+    """As `propagate`, all pieces through one batched step."""
+    if not pieces:
+        return []
+    means = torch.stack([m for _, _, m, _ in pieces])
+    q1, v1, info = sim.step(means[:, :3], means[:, 3:])
+    J = step_jacobians(sim, means, info)
+    out_means = torch.cat([q1, v1], dim=1)
+    return [(label, p, out_means[i], J[i] @ S @ J[i].T) for i, (label, p, _, S) in enumerate(pieces)]
+
+
+def reduce_by_history(components, k_per_history, jitter=1e-12):
+    """Reduce within groups of equal contact history only (the component's
+    label holds its history): components that went through different
+    contact sequences, i.e. different modes, are never merged."""
+    groups = {}
+    for c in components:
+        groups.setdefault(c[0], []).append(c)
+    out = []
+    for history, group in groups.items():
+        out += [(history,) + c[1:] for c in reduce(group, k_per_history, jitter)]
+    return out
+
+
+def reduce(components, k_max, jitter=1e-12):
+    """Merge components [(label, p, mean, cov)] down to k_max by moment matching,
+    each time the pair with the smallest Runnalls cost
+    B = 0.5 [(wi + wj) logdet S_ij - wi logdet S_i - wj logdet S_j].
+    All pair costs are computed in one batch; after a merge only the merged
+    component's costs are recomputed."""
+    if len(components) <= k_max:
+        return [((), p, m, S) for _, p, m, S in components]
+    w = torch.stack([p for _, p, _, _ in components])
+    m = torch.stack([mu for _, _, mu, _ in components])
+    S = torch.stack([cov for _, _, _, cov in components])
+    eye = torch.eye(m.shape[1], dtype=m.dtype) * jitter
+    logdet = lambda C: torch.linalg.slogdet(C + eye)[1]
+
+    def merged(i, j):
+        """Moments of merging components i (index or tensor) with j."""
+        wi, wj = w[i], w[j]
+        ws = wi + wj
+        ms = (wi[..., None] * m[i] + wj[..., None] * m[j]) / ws[..., None]
+        di, dj = m[i] - ms, m[j] - ms
+        Ss = (wi[..., None, None] * (S[i] + di[..., :, None] * di[..., None, :])
+              + wj[..., None, None] * (S[j] + dj[..., :, None] * dj[..., None, :])) / ws[..., None, None]
+        return ws, ms, Ss
+
+    alive = torch.ones(len(w), dtype=torch.bool)
+    ld = logdet(S)
+    I, J = torch.triu_indices(len(w), len(w), offset=1)
+    ws, _, Ss = merged(I, J)
+    cost = torch.full((len(w), len(w)), float("inf"), dtype=m.dtype)
+    cost[I, J] = 0.5 * (ws * logdet(Ss) - w[I] * ld[I] - w[J] * ld[J])
+    n = len(w)
+    while n > k_max:
+        flat = torch.argmin(cost)
+        i, j = divmod(flat.item(), cost.shape[1])
+        wi, mi, Si = merged(torch.tensor(i), torch.tensor(j))
+        w[i], m[i], S[i], ld[i] = wi, mi, Si, logdet(Si)
+        alive[j] = False
+        cost[j, :] = float("inf")
+        cost[:, j] = float("inf")
+        others = torch.nonzero(alive).flatten()
+        others = others[others != i]
+        if len(others):
+            ii = torch.full_like(others, i)
+            wo, _, So = merged(ii, others)
+            c = 0.5 * (wo * logdet(So) - w[i] * ld[i] - w[others] * ld[others])
+            lo, hi = torch.minimum(ii, others), torch.maximum(ii, others)
+            cost[lo, hi] = c
+        n -= 1
+    idx = torch.nonzero(alive).flatten()
+    return [((), w[k], m[k], S[k]) for k in idx]
