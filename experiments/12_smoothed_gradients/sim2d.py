@@ -390,6 +390,38 @@ class Sim2D:
         return vmap(world)(info["z"], q_prev, v_prev, f_ext, active, info["friction_on"], g_q, g_v)
 
 
+class Restarts:
+    """Mixin for Sim2D: a world whose Newton solve has not converged after
+    max_iters is solved again from zero contact forces, then from each
+    candidate carrying an equal share of the weight, with no friction and
+    with sliding friction mu * share of either sign; the result with the
+    smaller residual is kept. Newton can stall in one start and converge from
+    another (wedged contacts, tumbling impacts); only the start differs, the
+    root is the same. Use as class S(Restarts, Sim2D), with a low max_iters."""
+
+    def step(self, q_prev, v_prev, f_ext=None, lam0=None):
+        q, v, info = super().step(q_prev, v_prev, f_ext, lam0)
+        C = self.C
+        share = torch.full((C,), self.body.mass * self.cfg.gravity * self.cfg.dt / C)
+        starts = [None] + [torch.cat([share, sign * self.cfg.mu * share]) for sign in (0.0, -1.0, 1.0)]
+        for start in starts:
+            bad = torch.nonzero(info["residual_world"] > self.cfg.tol)[:, 0]
+            if len(bad) == 0:
+                break
+            l0 = None if start is None else start.expand(len(bad), 2 * C)
+            f = None if f_ext is None else f_ext[bad]
+            q_b, v_b, info_b = super().step(q_prev[bad], v_prev[bad], f, l0)
+            fixed = info_b["residual_world"] < info["residual_world"][bad]
+            sel = bad[fixed]
+            q, v = q.clone(), v.clone()
+            q[sel], v[sel] = q_b[fixed], v_b[fixed]
+            for key in ("lam_n", "lam_t", "active", "z", "friction_on", "residual_world"):
+                info[key] = info[key].clone()
+                info[key][sel] = info_b[key][fixed]
+        info["residual"] = info["residual_world"].max().item()
+        return q, v, info
+
+
 def rollout(sim, q0, v0, forces, warm_start=False):
     """Steps all worlds through forces (T, B, 3). Returns the list of
     (q_prev, v_prev, f_ext, info) per step and the final (q, v). With
