@@ -17,6 +17,10 @@ Estimators (estimators.py; N antithetic pairs, orthogonal directions):
   zeroth_order (L(theta + sigma eps) - L(theta - sigma eps)) eps / (2 sigma)
   alpha_order  Suh et al. 2022, gamma = 2
   ddcg         Onoda, Parmas et al. 2026, c = 0.3
+  method_c     ours (method_c.py, 1D only): jump located by bisection, a
+               polynomial fitted to each side, Stein's formula on the result;
+               loss values only, cost = simulations actually used
+  c_nojump     ablation: one polynomial over all samples, no jump
 Cost in forward-rollout equivalents: a rollout 1, rollout + adjoint
 ADJ_COST (measured: forward + adjoint time over forward time).
 
@@ -36,11 +40,12 @@ import torch
 
 import ball_landscape as bl
 import estimators as est
+import method_c as mc
 
 N_PAIRS = (2, 8, 32, 128, 512)
 REPEATS = 200
 GAMMA = 2.0
-ESTIMATORS = ("hard", "first_order", "zeroth_order", "alpha_order", "ddcg")
+ESTIMATORS = ("hard", "first_order", "zeroth_order", "alpha_order", "ddcg", "method_c", "c_nojump")
 
 
 def _grid2(lo, hi, n):
@@ -109,7 +114,8 @@ def directions(R, N, d, gen):
 
 
 def estimates(grid, theta, sigma, N, gen):
-    """(R, d) estimates of each estimator at theta from N pairs."""
+    """(R, d) estimates of each estimator at theta from N pairs, and the mean
+    simulation count of the variable-cost ones (method C, 1D grids only)."""
     eps = directions(REPEATS, N, grid.d, gen)
     ip = grid.index(theta + sigma * eps.numpy())
     im = grid.index(theta - sigma * eps.numpy())
@@ -117,13 +123,21 @@ def estimates(grid, theta, sigma, N, gen):
     gp, gm = torch.tensor(grid.g[ip]), torch.tensor(grid.g[im])
     hard = torch.tensor(grid.g[grid.index(theta)]).expand(REPEATS, grid.d)
     alpha, _ = est.alpha_order_from_samples(eps, Lp, Lm, gp, gm, sigma, GAMMA)
-    return {
+    out = {
         "hard": hard,
         "first_order": est.first_order_from_samples(gp, gm),
         "zeroth_order": est.zeroth_order_from_samples(eps, Lp, Lm, sigma),
         "alpha_order": alpha,
         "ddcg": est.ddcg_from_samples(eps, Lp, Lm, gp, gm, sigma)[0],
     }
+    sims = {}
+    if grid.d == 1:
+        f = lambda x: grid.L[grid.index(x[:, None])]
+        for name, jumps in (("method_c", True), ("c_nojump", False)):
+            res = [mc.estimate_1d(f, theta[0], sigma, e[:, 0], jumps=jumps) for e in eps.numpy()]
+            out[name] = torch.tensor([[g] for g, _, _ in res])
+            sims[name] = np.mean([n for _, n, _ in res])
+    return out, sims
 
 
 def cost(name, N, adj_cost):
@@ -140,15 +154,21 @@ def bench(scen, gen):
     for N in N_PAIRS:
         err = {k: [] for k in ESTIMATORS}
         cos = {k: [] for k in ESTIMATORS}
+        sims = {k: [] for k in ESTIMATORS}
         for th, g in zip(s["thetas"], true):
-            for k, e in estimates(grid, th, s["sigma"], N, gen).items():
+            ests, used = estimates(grid, th, s["sigma"], N, gen)
+            for k, n in used.items():
+                sims[k].append(n)
+            for k, e in ests.items():
                 e = e.numpy()
                 err[k].append(np.linalg.norm(e - g, axis=1) / scale)
                 cos[k].append(e @ g / np.maximum(np.linalg.norm(e, axis=1) * np.linalg.norm(g), 1e-300))
         for i, k in enumerate(ESTIMATORS):
+            if not err[k]:
+                continue
             e, c = np.concatenate(err[k]), np.concatenate(cos[k])
-            rows.append((i, N, cost(k, N, s["adj_cost"]), np.median(e), np.quantile(e, 0.95),
-                         np.median(c), np.mean(c < 0)))
+            n = np.mean(sims[k]) if sims[k] else cost(k, N, s["adj_cost"])
+            rows.append((i, N, n, np.median(e), np.quantile(e, 0.95), np.median(c), np.mean(c < 0)))
     return np.array(rows), true, scale
 
 
@@ -177,7 +197,7 @@ def plot(out):
 
     ink, muted = "#0b0b0b", "#52514e"
     colors = {"hard": "#8a8f98", "first_order": "#2a78d6", "zeroth_order": "#eb6834", "alpha_order": "#1baf7a",
-              "ddcg": "#7d4cdb"}
+              "ddcg": "#7d4cdb", "method_c": "#0b0b0b", "c_nojump": "#52514e"}
     fig, axes = plt.subplots(2, len(SCENARIOS), figsize=(5 * len(SCENARIOS), 8), constrained_layout=True)
     for j, scen in enumerate(SCENARIOS):
         rows = out[f"{scen}_rows"]
