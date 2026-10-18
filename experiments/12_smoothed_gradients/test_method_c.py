@@ -55,3 +55,52 @@ def test_plane_jump_2d():
         err_zo.append(np.linalg.norm(((y(1) - y(-1))[:, None] * eps).mean(axis=0) / (2 * sigma) - true))
     assert np.median(err_c) < 0.05 * np.linalg.norm(true)
     assert np.median(err_c) < 0.2 * np.median(err_zo)
+
+
+def test_gated_grad_closed_form():
+    """gated_grad equals the smoothed surrogate's gradient by Monte Carlo
+    (sharp and soft gates, separate slopes)."""
+    sigma, d = 0.05, 3
+    rng = np.random.default_rng(2)
+    cl, cr = rng.standard_normal(d + 1), rng.standard_normal(d + 1)
+    for scale in (0.5, 3.0, 200.0):
+        w = np.concatenate([[0.4], scale * rng.standard_normal(d)])
+        e = rng.standard_normal((400_000, d))
+        z = sigma * e
+        p = 1 / (1 + np.exp(-np.clip(w[0] + e @ w[1:], -50, 50)))
+        X = np.hstack([np.ones((len(z), 1)), z])
+        f = (1 - p) * (X @ cl) + p * (X @ cr)
+        mc_grad = (f[:, None] * e).mean(axis=0) / sigma
+        se = np.sqrt(((f[:, None] * e / sigma).var(axis=0)).sum() / len(e))
+        assert np.linalg.norm(mc.gated_grad(cl, cr, w, sigma) - mc_grad) < 4 * se
+
+
+def test_gated_plane_jump():
+    """Planar jump with a slope (as test_plane_jump_2d): the gated fit finds
+    it from the samples alone and is far closer than zeroth-order."""
+    sigma, theta = 0.05, np.zeros(2)
+    a, n = np.array([0.5, -0.3]), np.array([0.6, 0.8])
+    f = lambda x: x @ a + 2.0 * (x @ n > 0.02)
+    true = a + 2.0 * n * math.exp(-0.5 * (0.02 / sigma) ** 2) / (sigma * math.sqrt(2 * math.pi))
+    rng = np.random.default_rng(0)
+    err_g, err_zo = [], []
+    for _ in range(100):
+        eps = rng.standard_normal((32, 2))
+        g, _, info = mc.estimate_gated(f, theta, sigma, eps)
+        assert info["jump"]
+        err_g.append(np.linalg.norm(g - true))
+        y = lambda s: f(theta + s * sigma * eps)
+        err_zo.append(np.linalg.norm(((y(1) - y(-1))[:, None] * eps).mean(axis=0) / (2 * sigma) - true))
+    assert np.median(err_g) < 0.1 * np.linalg.norm(true)
+    assert np.median(err_g) < 0.3 * np.median(err_zo)
+
+
+def test_directional_one_line_is_1d():
+    """Directional smoothing with one direction is the 1D method."""
+    f1 = lambda x: 0.5 * x + 2.0 * (x > 0.03)
+    rng = np.random.default_rng(0)
+    for _ in range(5):
+        e = rng.standard_normal(16)
+        g1, s1, _ = mc.estimate_1d(f1, 0.0, 0.05, e)
+        gd, sd, _ = mc.estimate_directional(lambda X: f1(X[:, 0]), np.zeros(1), 0.05, np.eye(1), e)
+        assert abs(g1 - gd[0]) < 1e-12 and s1 == sd

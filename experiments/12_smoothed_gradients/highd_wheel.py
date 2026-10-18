@@ -7,7 +7,9 @@ for first-order, alpha-order and DDCG come from the adjoint on the same 2N
 samples; method C uses the same samples plus its own bisection simulations.
 
 Test points: torque profiles near the climbing threshold, u0 + a fixed
-random offset per phase (THETA_OFFSET), so the jump lies inside the blur.
+random offset per phase (THETA_OFFSET), u0 per d from a scan of the climb
+fraction in the blur (0.1-0.9; the threshold moves with d), so the climb /
+stall boundary lies inside the blur.
 
   ref:   PYTHONPATH=. python highd_wheel.py ref D K PART NPARTS
   est:   PYTHONPATH=. python highd_wheel.py est D K N R0 R1
@@ -27,7 +29,7 @@ import method_c as mc
 import wheel_ledge as wl
 
 SIGMA = 0.05
-U0 = (0.30, 0.34, 0.38, 0.45)
+U0 = {3: (0.48, 0.50, 0.51, 0.52), 10: (0.45, 0.46, 0.47, 0.48), 30: (0.46, 0.47, 0.48, 0.50)}
 THETA_OFFSET = 0.03
 REF_PAIRS = 4096  # per part
 N_PAIRS = (8, 32, 128)
@@ -36,7 +38,7 @@ OUT = bl.RESULTS / "highd"
 
 def theta(d, k):
     rng = np.random.default_rng(1000 + d)
-    return np.clip(U0[k] + THETA_OFFSET * rng.uniform(-1, 1, (len(U0), d))[k], 0, 1)
+    return np.clip(U0[d][k] + THETA_OFFSET * rng.uniform(-1, 1, (4, d))[k], 0, 1)
 
 
 def loss(sim, x):
@@ -83,10 +85,11 @@ def run_est(d, k, N, r0, r1):
                 out.append(cache[key])
             return np.array(out)
 
-        gc, _, info = mc.estimate_nd(f_c, th, SIGMA, eps)
+        gc, _, info = mc.estimate_nd(f_c, th, SIGMA, eps, refine=4, slopes="loo")
+        ex_c = extra[0]
         gn, _, _ = mc.estimate_nd(f_c, th, SIGMA, eps, jumps=False)
         ests["method_c"], ests["c_nojump"] = gc, gn
-        rows.append({"r": r, "extra": extra[0], "jump": info["jump"] is not None, **ests})
+        rows.append({"r": r, "extra": ex_c, "jump": info["jump"] is not None, **ests})
         print(f"est d={d} k={k} N={N} r={r}: C extra sims {extra[0]}, jump {info['jump'] is not None}", flush=True)
     OUT.mkdir(exist_ok=True)
     names = ("zeroth_order", "alpha_order", "ddcg", "method_c", "c_nojump")
@@ -100,7 +103,7 @@ def merge(d):
     cost = {"zeroth_order": lambda N, ex: 2 * N, "alpha_order": lambda N, ex: 2 * N * adj,
             "ddcg": lambda N, ex: 2 * N * adj, "method_c": lambda N, ex: 2 * N + ex, "c_nojump": lambda N, ex: 2 * N}
     refs, ref_se, out = [], [], {}
-    for k in range(len(U0)):
+    for k in range(len(U0[d])):
         parts = sorted(OUT.glob(f"ref_d{d}_k{k}_p*.npz"))
         s1 = sum(np.load(p)["s1"] for p in parts)
         s2 = sum(np.load(p)["s2"] for p in parts)
@@ -115,7 +118,7 @@ def merge(d):
     for N in N_PAIRS:
         for name in names:
             errs, costs = [], []
-            for k in range(len(U0)):
+            for k in range(len(U0[d])):
                 for p in sorted(OUT.glob(f"est_d{d}_k{k}_N{N}_r*.npz")):
                     r = np.load(p)
                     errs += list(np.linalg.norm(r[name] - refs[k], axis=1) / scale)

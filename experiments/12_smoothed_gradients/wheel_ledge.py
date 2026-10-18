@@ -40,9 +40,11 @@ LEDGE_X, LEDGE_H = 1.4, 0.6 * R
 BUMPS = (0.3, 1.1, 0.04, 0.004)  # start, end, segment length, height amplitude
 
 
-def terrain(seed=0):
-    """Polyline vertices (N, 2) from left to right; solid below."""
-    x0, x1, seg, amp = BUMPS
+def terrain(seed=0, amp=None):
+    """Polyline vertices (N, 2) from left to right; solid below. amp: bump
+    height amplitude (default BUMPS'; 0 gives flat ground)."""
+    x0, x1, seg, amp0 = BUMPS
+    amp = amp0 if amp is None else amp
     rng = np.random.default_rng(seed)
     xs = np.arange(x0, x1 + 1e-9, seg)
     ys = amp * rng.uniform(-1, 1, len(xs))
@@ -84,8 +86,8 @@ class WheelSim(sim2d.Restarts, sim2d.Sim2D):
         return n[idx], s[idx], valid[idx]
 
 
-def make_sim(**cfg):
-    return WheelSim(sim2d.SimConfig(**{"mu": MU, "max_iters": 40, **cfg}))
+def make_sim(amp=None, **cfg):
+    return WheelSim(sim2d.SimConfig(**{"mu": MU, "max_iters": 40, **cfg}), terrain(amp=amp))
 
 
 def torques(u):
