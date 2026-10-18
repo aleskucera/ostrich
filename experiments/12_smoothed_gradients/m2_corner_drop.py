@@ -1,12 +1,14 @@
 """M2: the corner drop propagated as a Gaussian mixture, vs the simulator.
 
 Start: x0 ~ N(theta, SIGMA), the rest of the state certain (tiny covariance).
-Each step every component is split by the wedge's branch tree:
-  contact validity: left face (0 <= s_left <= face length), right face
-  (likewise), apex vertex (between the faces); then impact: the ground's
-  d_free and the d_free of the wedge feature that applies.
-Pieces go through one batched step, linearised at their means with adjoint
-Jacobians. Each component carries its contact history: the set of contact
+Each step every component is split by the wedge's branch tree: which side
+of the apex (both faces' near-end boundaries split jointly, so the result
+does not depend on their order), a face's far end, then impact: the
+ground's d_free and the d_free of the wedge feature that applies.
+Pieces go through one batched step by their cubature points
+(mixture.propagate_unscented): near the apex the step is too sensitive for
+a linearisation at the mean, which extrapolates pieces to unphysical states.
+Each component carries its contact history: the set of contact
 features (apex, left face, right face, ground) it has hit, from its branch
 labels. The mixture is reduced within each history only (Runnalls,
 K_PER_HISTORY each), so different modes are never merged into one
@@ -39,52 +41,69 @@ P_MIN = 1e-6
 
 
 def branch_tree(sim, mirror=False):
-    """label -> next boundary g(s) (< 0 means the first branch), or None.
-    mirror: split the right face's validity first (for a symmetry check)."""
+    """label -> next boundary (a g, a pair of g's split jointly, or None).
+
+    Tree: (1) which side of the apex, both faces' near-end boundaries split
+    jointly: left face / right face / apex region; (2) on a face side, the
+    face's far end; (3) the ground's impact; (4) the impact of the wedge
+    feature that applies. mirror: list the right face first in the joint
+    split (with the joint split the result must not change).
+    tree.events(label) gives the contacts the branch makes this step."""
     f0 = torch.zeros(3, dtype=torch.float64)
     L = sim.face_len
-    s_left = lambda s: (s[:2] - sim.apex) @ sim.dir_left
-    s_right = lambda s: (s[:2] - sim.apex) @ sim.dir_right
-    first, second = (s_right, s_left) if mirror else (s_left, s_right)
-    validity = [
-        lambda s: -first(s),  # < 0: first face's s > 0
-        lambda s: first(s) - L,  # < 0: first face's s < L
-        lambda s: -second(s),
-        lambda s: second(s) - L,
-    ]
+    s_face = {"left": lambda s: (s[:2] - sim.apex) @ sim.dir_left,
+              "right": lambda s: (s[:2] - sim.apex) @ sim.dir_right}
+    index = {"left": 1, "right": 2, "apex": 3}
+    first, second = ("right", "left") if mirror else ("left", "right")
     impact = lambda k: (lambda s: sim.free_gap(s[:3], s[3:], f0)[1][k])
 
-    def feature(label):
-        on_first = label[0] == -1 and label[1] == -1
-        on_second = label[2] == -1 and label[3] == -1
-        apex = label[0] == 1 and label[2] == 1
-        if apex:
-            return 3
-        if on_first or on_second:
-            return (2 if on_first else 1) if mirror else (1 if on_first else 2)
-        return None
+    def side(label):
+        """'left', 'right', 'apex' or None from the joint split's two signs
+        (-1: that face's coordinate s > 0, i.e. the centre is past its near end)."""
+        a, b = label[0] == -1, label[1] == -1
+        if a and not b:
+            return first
+        if b and not a:
+            return second
+        return "apex" if not a and not b else None
 
-    tree_feature = feature
+    def layout(label):
+        """(side, index of the far-end sign or None, index of the ground sign)."""
+        sd = side(label)
+        has_far = sd in ("left", "right")
+        return sd, (2 if has_far else None), (3 if has_far else 2)
+
+    def feature(label):
+        sd, far, _ = layout(label)
+        if sd == "apex":
+            return "apex"
+        if sd in ("left", "right") and label[far] == -1:
+            return sd
+        return None
 
     def tree(label):
-        if len(label) < 4:
-            return validity[len(label)]
-        if len(label) == 4:
-            return impact(0)  # ground
-        if len(label) == 5:
-            k = feature(label)
-            return impact(k) if k is not None else None
+        if len(label) == 0:
+            return (lambda s: -s_face[first](s), lambda s: -s_face[second](s))
+        sd, far, ground = layout(label)
+        if far is not None and len(label) == far:
+            return lambda s, f=s_face[sd]: f(s) - L  # < 0: before the face's far end
+        if len(label) == ground:
+            return impact(0)
+        if len(label) == ground + 1:
+            ft = feature(label)
+            return impact(index[ft]) if ft is not None else None
         return None
 
-    def event(label):
-        """The contact this step's branch makes: 'ground', a wedge feature, or None."""
-        if len(label) >= 5 and label[4] == -1:
-            return "ground"
-        if len(label) >= 6 and label[5] == -1:
-            return {1: "left", 2: "right", 3: "apex"}[tree_feature(label)]
-        return None
+    def events(label):
+        _, _, ground = layout(label)
+        out = []
+        if len(label) > ground and label[ground] == -1:
+            out.append("ground")
+        if len(label) > ground + 1 and label[ground + 1] == -1:
+            out.append(feature(label))
+        return out
 
-    tree.event = event
+    tree.events = events
     return tree
 
 
@@ -98,13 +117,12 @@ def run(sim, theta, steps=cd.T_STEPS, k_per_history=K_PER_HISTORY, mirror=False)
         pieces = []
         for history, p, m, S in comps:
             for lab, q, m2, S2 in mx.partition(m, S, tree, P_MIN):
-                ev = tree.event(lab)
-                new_history = tuple(sorted(set(history) | {ev})) if ev is not None else history
+                new_history = tuple(sorted(set(history) | set(tree.events(lab))))
                 pieces.append((new_history, p * q, m2, S2))
         total = sum(p for _, p, _, _ in pieces)
         pieces = [(h, p / total, m, S) for h, p, m, S in pieces]
         peak = max(peak, len(pieces))
-        comps = mx.reduce_by_history(mx.propagate_batched(sim, pieces), k_per_history)
+        comps = mx.reduce_by_history(mx.propagate_unscented(sim, pieces), k_per_history)
     return comps, peak
 
 

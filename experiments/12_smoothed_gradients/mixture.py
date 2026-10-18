@@ -61,8 +61,9 @@ def partition(mu, Sigma, boundaries, p_min=1e-9):
     its own mean). `boundaries` is either a list of g's applied to every piece,
     or a function label -> g (or None: no further split), so that the next
     boundary can depend on the branch so far (e.g. which face, then whether
-    that face is hit). Returns [(label, p, mean, cov)], label a tuple of
-    signs (-1: g < 0, +1: g >= 0)."""
+    that face is hit). A node may return a pair (g1, g2): both are split at
+    once (split_joint), adding two signs to the label. Returns
+    [(label, p, mean, cov)], label a tuple of signs (-1: g < 0, +1: g >= 0)."""
     nxt_g = boundaries if callable(boundaries) else (lambda label: boundaries[len(label)] if len(label) < len(boundaries) else None)
     done, todo = [], [((), torch.tensor(1.0, dtype=mu.dtype), mu, Sigma)]
     while todo:
@@ -70,6 +71,11 @@ def partition(mu, Sigma, boundaries, p_min=1e-9):
         g = nxt_g(label)
         if g is None:
             done.append((label, p, m, S))
+            continue
+        if isinstance(g, tuple):
+            for signs, (q, m2, S2) in split_joint(m, S, *g).items():
+                if p * q > p_min:
+                    todo.append((label + signs, p * q, m2, S2))
             continue
         for sign, (q, m2, S2) in zip((-1, 1), split(m, S, g)):
             if p * q > p_min:
@@ -85,7 +91,8 @@ def label_samples(s, boundaries):
     for x in s:
         label = ()
         while (g := nxt_g(label)) is not None:
-            label += (-1 if g(x) < 0 else 1,)
+            gs = g if isinstance(g, tuple) else (g,)
+            label += tuple(-1 if gi(x) < 0 else 1 for gi in gs)
         labels.append(label)
     return labels
 
@@ -207,3 +214,85 @@ def reduce(components, k_max, jitter=1e-12):
         n -= 1
     idx = torch.nonzero(alive).flatten()
     return [((), w[k], m[k], S[k]) for k in idx]
+
+
+def _orthant_moments(c1, c2, rho, n=600):
+    """P, E[z], E[z z'] of (z1, z2) ~ N(0, [[1, rho], [rho, 1]]) truncated to
+    z1 < c1, z2 < c2, by quadrature over z1 with z2 | z1 ~ N(rho z1, 1 - rho^2)
+    in closed form (E[Y 1{Y < c}] = m Phi(t) - s phi(t), E[Y^2 1{Y < c}] =
+    (m^2 + s^2) Phi(t) - s (m + c) phi(t), t = (c - m) / s)."""
+    lo = torch.minimum(torch.as_tensor(-10.0, dtype=c1.dtype), c1 - 1.0)
+    x = lo + (c1.clamp(max=10.0) - lo) * torch.linspace(0, 1, n, dtype=c1.dtype)
+    wq = torch.full_like(x, 1.0)
+    wq[0] = wq[-1] = 0.5
+    wq = wq * (x[1] - x[0])  # trapezoid weights
+    s = torch.sqrt((1 - rho**2).clamp(min=1e-12))
+    m = rho * x
+    t = (c2 - m) / s
+    Phi, phi = norm_cdf(t), norm_pdf(t)
+    base = norm_pdf(x) * wq
+    P = (base * Phi).sum()
+    E1 = (base * x * Phi).sum() / P
+    E11 = (base * x**2 * Phi).sum() / P
+    EY = m * Phi - s * phi
+    EYY = (m**2 + s**2) * Phi - s * (m + c2) * phi
+    E2 = (base * EY).sum() / P
+    E22 = (base * EYY).sum() / P
+    E12 = (base * x * EY).sum() / P
+    mean = torch.stack([E1, E2])
+    second = torch.stack([torch.stack([E11, E12]), torch.stack([E12, E22])])
+    return P, mean, second - torch.outer(mean, mean)
+
+
+def split_joint(mu, Sigma, g1, g2):
+    """Split N(mu, Sigma) by two boundaries at once, both linearised at mu.
+    Returns {(s1, s2): (p, mean, cov)} for the four sign regions (-1: g < 0),
+    from the bivariate normal of (g1, g2): no dependence on the order of the
+    boundaries. Falls back to splitting in turn if they are (nearly) parallel."""
+    gs = (g1, g2)
+    g0 = torch.stack([g(mu) for g in gs])
+    A = torch.stack([jacrev(g)(mu) for g in gs], dim=1)  # (n, 2)
+    C = A.T @ Sigma @ A
+    sd = torch.sqrt(torch.diagonal(C))
+    rho = C[0, 1] / (sd[0] * sd[1])
+    if rho.abs() > 1 - 1e-6:
+        out = {}
+        for s1, (p1, m1, S1) in zip((-1, 1), split(mu, Sigma, g1)):
+            for s2, (p2, m2, S2) in zip((-1, 1), split(m1, S1, g2)):
+                out[(s1, s2)] = (p1 * p2, m2, S2)
+        return out
+    K = Sigma @ A @ torch.linalg.inv(C)  # regression of s on (g1, g2) - g0
+    b = -g0 / sd  # g_i < 0  <=>  z_i < b_i, z = (g - g0) / sd standardised
+    out = {}
+    for s1 in (-1, 1):
+        for s2 in (-1, 1):
+            sign = torch.tensor([-s1, -s2], dtype=mu.dtype)  # flip so each region is a lower orthant
+            P, m_z, C_z = _orthant_moments(sign[0] * b[0], sign[1] * b[1], sign[0] * sign[1] * rho)
+            D = torch.diag(sd * sign)  # (g - g0) = D z'
+            m_g = D @ m_z
+            C_g = D @ C_z @ D
+            out[(s1, s2)] = (P, mu + K @ m_g, Sigma - K @ C @ K.T + K @ C_g @ K.T)
+    return out
+
+
+def propagate_unscented(sim, pieces, jitter=1e-14):
+    """As `propagate_batched`, but each piece's output mean and covariance
+    come from its 2n cubature points m +- sqrt(n lambda_i) v_i (principal
+    axes, equal weights 1/2n) pushed through the real step, not from a
+    linearisation. All outputs are simulated states, so a piece cannot be
+    sent to an unphysical region by an extrapolated Jacobian."""
+    if not pieces:
+        return []
+    n = 6
+    S = torch.stack([S for _, _, _, S in pieces])
+    lam, V = torch.linalg.eigh(S)
+    offsets = (V * torch.sqrt(n * lam.clamp(min=0))[:, None, :]).transpose(1, 2)  # (P, n, n), rows are the axes
+    means = torch.stack([m for _, _, m, _ in pieces])
+    pts = torch.cat([means[:, None, :] + offsets, means[:, None, :] - offsets], dim=1)
+    flat = pts.reshape(-1, n)
+    q1, v1, _ = sim.step(flat[:, :3], flat[:, 3:])
+    out = torch.cat([q1, v1], dim=1).reshape(len(pieces), 2 * n, n)
+    m_out = out.mean(dim=1)
+    d = out - m_out[:, None, :]
+    S_out = d.transpose(1, 2) @ d / (2 * n) + jitter * torch.eye(n, dtype=S.dtype)
+    return [(label, p, m_out[i], S_out[i]) for i, (label, p, _, _) in enumerate(pieces)]
