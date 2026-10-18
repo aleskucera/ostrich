@@ -108,7 +108,8 @@ def branch_tree(sim, mirror=False):
 
 
 def run(sim, theta, steps=cd.T_STEPS, k_per_history=K_PER_HISTORY, mirror=False):
-    mu = torch.tensor([theta, cd.Y0, 0.0, 0.0, 0.0, 0.0], dtype=torch.float64)
+    mu = torch.cat([torch.as_tensor(theta, dtype=torch.float64).reshape(1),
+                    torch.tensor([cd.Y0, 0.0, 0.0, 0.0, 0.0], dtype=torch.float64)])  # theta may require grad
     Sigma = torch.diag(torch.tensor([SIGMA**2, 1e-10, 1e-10, 1e-10, 1e-10, 1e-10], dtype=torch.float64))
     comps = [((), torch.tensor(1.0, dtype=torch.float64), mu, Sigma)]
     tree = branch_tree(sim, mirror)

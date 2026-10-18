@@ -189,28 +189,34 @@ def reduce(components, k_max, jitter=1e-12):
         return ws, ms, Ss
 
     alive = torch.ones(len(w), dtype=torch.bool)
-    ld = logdet(S)
-    I, J = torch.triu_indices(len(w), len(w), offset=1)
-    ws, _, Ss = merged(I, J)
-    cost = torch.full((len(w), len(w)), float("inf"), dtype=m.dtype)
-    cost[I, J] = 0.5 * (ws * logdet(Ss) - w[I] * ld[I] - w[J] * ld[J])
+    with torch.no_grad():  # the costs only pick the pair; kept out of the autograd graph
+        ld = logdet(S)
+        I, J = torch.triu_indices(len(w), len(w), offset=1)
+        ws, _, Ss = merged(I, J)
+        cost = torch.full((len(w), len(w)), float("inf"), dtype=m.dtype)
+        cost[I, J] = 0.5 * (ws * logdet(Ss) - w[I] * ld[I] - w[J] * ld[J])
     n = len(w)
     while n > k_max:
         flat = torch.argmin(cost)
         i, j = divmod(flat.item(), cost.shape[1])
         wi, mi, Si = merged(torch.tensor(i), torch.tensor(j))
-        w[i], m[i], S[i], ld[i] = wi, mi, Si, logdet(Si)
+        at = torch.arange(len(w)) == i  # out of place, for autograd
+        w = torch.where(at, wi, w)
+        m = torch.where(at[:, None], mi, m)
+        S = torch.where(at[:, None, None], Si, S)
         alive[j] = False
-        cost[j, :] = float("inf")
-        cost[:, j] = float("inf")
-        others = torch.nonzero(alive).flatten()
-        others = others[others != i]
-        if len(others):
-            ii = torch.full_like(others, i)
-            wo, _, So = merged(ii, others)
-            c = 0.5 * (wo * logdet(So) - w[i] * ld[i] - w[others] * ld[others])
-            lo, hi = torch.minimum(ii, others), torch.maximum(ii, others)
-            cost[lo, hi] = c
+        with torch.no_grad():
+            ld[i] = logdet(Si)
+            cost[j, :] = float("inf")
+            cost[:, j] = float("inf")
+            others = torch.nonzero(alive).flatten()
+            others = others[others != i]
+            if len(others):
+                ii = torch.full_like(others, i)
+                wo, _, So = merged(ii, others)
+                c = 0.5 * (wo * logdet(So) - w[i] * ld[i] - w[others] * ld[others])
+                lo, hi = torch.minimum(ii, others), torch.maximum(ii, others)
+                cost[lo, hi] = c
         n -= 1
     idx = torch.nonzero(alive).flatten()
     return [((), w[k], m[k], S[k]) for k in idx]
@@ -275,22 +281,44 @@ def split_joint(mu, Sigma, g1, g2):
     return out
 
 
+class _Step(torch.autograd.Function):
+    """sim.step as an autograd function: forward by Newton, backward by the
+    implicit-function adjoint (sim.step_vjp), so that mixture moments can be
+    differentiated with respect to the initial state."""
+
+    @staticmethod
+    def forward(ctx, sim, q, v):
+        q1, v1, info = sim.step(q, v)
+        ctx.sim, ctx.info = sim, info
+        ctx.save_for_backward(q, v)
+        return q1, v1
+
+    @staticmethod
+    def backward(ctx, g_q, g_v):
+        q, v = ctx.saved_tensors
+        f = torch.zeros_like(q)
+        g_q0, g_v0, _ = ctx.sim.step_vjp(q, v, f, ctx.info, g_q, g_v)
+        return None, g_q0, g_v0
+
+
 def propagate_unscented(sim, pieces, jitter=1e-14):
     """As `propagate_batched`, but each piece's output mean and covariance
-    come from its 2n cubature points m +- sqrt(n lambda_i) v_i (principal
-    axes, equal weights 1/2n) pushed through the real step, not from a
-    linearisation. All outputs are simulated states, so a piece cannot be
-    sent to an unphysical region by an extrapolated Jacobian."""
+    come from its 2n cubature points m +- sqrt(n) L_i (L_i the columns of
+    the Cholesky factor of its covariance, equal weights 1/2n) pushed
+    through the real step, not from a linearisation. All outputs are
+    simulated states, so a piece cannot be sent to an unphysical region by
+    an extrapolated Jacobian. (Cholesky, not principal axes: the eigenvector
+    gradient is singular for repeated eigenvalues.)"""
     if not pieces:
         return []
     n = 6
     S = torch.stack([S for _, _, _, S in pieces])
-    lam, V = torch.linalg.eigh(S)
-    offsets = (V * torch.sqrt(n * lam.clamp(min=0))[:, None, :]).transpose(1, 2)  # (P, n, n), rows are the axes
+    L = torch.linalg.cholesky(S + jitter * torch.eye(n, dtype=S.dtype))
+    offsets = math.sqrt(n) * L.transpose(1, 2)  # (P, n, n), rows are the offsets
     means = torch.stack([m for _, _, m, _ in pieces])
     pts = torch.cat([means[:, None, :] + offsets, means[:, None, :] - offsets], dim=1)
     flat = pts.reshape(-1, n)
-    q1, v1, _ = sim.step(flat[:, :3], flat[:, 3:])
+    q1, v1 = _Step.apply(sim, flat[:, :3], flat[:, 3:])
     out = torch.cat([q1, v1], dim=1).reshape(len(pieces), 2 * n, n)
     m_out = out.mean(dim=1)
     d = out - m_out[:, None, :]
