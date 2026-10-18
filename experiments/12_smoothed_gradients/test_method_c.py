@@ -104,3 +104,22 @@ def test_directional_one_line_is_1d():
         g1, s1, _ = mc.estimate_1d(f1, 0.0, 0.05, e)
         gd, sd, _ = mc.estimate_directional(lambda X: f1(X[:, 0]), np.zeros(1), 0.05, np.eye(1), e)
         assert abs(g1 - gd[0]) < 1e-12 and s1 == sd
+
+
+def test_gated_subspace_curved():
+    """d = 10, a jump whose boundary curves inside a 2D subspace span(n, v):
+    with that subspace the switch fits the curvature, beating plain gated."""
+    sigma, d = 0.05, 10
+    rng = np.random.default_rng(3)
+    Q = np.linalg.qr(rng.standard_normal((d, d)))[0]
+    n, v, a = Q[:, 0], Q[:, 1], 0.3 * Q[:, 2]
+    f = lambda x: np.atleast_2d(x) @ a + 1.0 * ((np.atleast_2d(x) @ n - 0.01 + 3.0 * (np.atleast_2d(x) @ v) ** 2 / sigma) > 0)
+    e = rng.standard_normal((400_000, d))
+    true = ((f(sigma * e) - f(-sigma * e))[:, None] * e).mean(axis=0) / (2 * sigma)
+    U = np.stack([n, v], axis=1)
+    err_g, err_s = [], []
+    for _ in range(30):
+        eps = rng.standard_normal((40, d))
+        err_g.append(np.linalg.norm(mc.estimate_gated(f, np.zeros(d), sigma, eps)[0] - true))
+        err_s.append(np.linalg.norm(mc.estimate_gated_subspace(f, np.zeros(d), sigma, eps, U)[0] - true))
+    assert np.median(err_s) < 0.7 * np.median(err_g)

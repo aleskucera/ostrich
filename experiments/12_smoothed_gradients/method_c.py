@@ -684,3 +684,60 @@ def estimate_directional(f, theta, sigma, V, eps1d, mode="c", jumps=True):
             pieces[i] = [(-np.inf, bj[k], _fit(xl[ol], yl[ol])[0]), (bj[k], np.inf, _fit(xr[orr], yr[orr])[0])]
     D = np.array([smoothed_grad(p, 0.0, sigma) for p in pieces])
     return D @ V, sims, {"lines_with_jump": len(jl) / len(V)}
+
+
+# --- the switch in a few directions ------------------------------------------
+
+
+def _quad_features(Z):
+    """[Z, upper-triangle products of Z's columns]."""
+    k = Z.shape[1]
+    iu = np.triu_indices(k)
+    return np.hstack([Z, (Z[:, :, None] * Z[:, None, :])[:, iu[0], iu[1]]])
+
+
+def adjoint_subspace(G, k):
+    """Top-k directions (d, k) of the gradient directions G (n, d): the
+    eigenvectors of sum g g^T / |g|^2 (directions only, since adjoint
+    magnitudes near a jump are unreliable)."""
+    Gn = G / np.maximum(np.linalg.norm(G, axis=1, keepdims=True), 1e-300)
+    _, v = np.linalg.eigh(Gn.T @ Gn)
+    return v[:, ::-1][:, :k]
+
+
+def gated_subspace_grad(cl, cr, w, U, sigma, M=20000, seed=0):
+    """Gradient at theta of E[f_hat(theta + sigma eps)] for gated experts
+    whose switch is p = psi(q(U^T eps)), q quadratic with coefficients w
+    (as _quad_features). Monte Carlo over M antithetic pairs of the cheap
+    surrogate (no simulations): E[(1 - p) b_L + p b_R + p (1 - p) (e_R - e_L)
+    grad q / sigma]."""
+    d, k = U.shape
+    e = np.random.default_rng(seed).standard_normal((M, d))
+    e = np.concatenate([e, -e])
+    Zk = e @ U
+    p = 1 / (1 + np.exp(-np.clip(w[0] + _quad_features(Zk) @ w[1:], -50, 50)))
+    iu = np.triu_indices(k)
+    Wq = np.zeros((k, k))
+    Wq[iu] = w[1 + k :]
+    dq = (w[1 : 1 + k] + Zk @ (Wq + Wq.T)) @ U.T
+    X = np.hstack([np.ones((len(e), 1)), sigma * e])
+    dif = X @ cr - X @ cl
+    return ((1 - p)[:, None] * cl[1:] + p[:, None] * cr[1:] + (p * (1 - p) * dif)[:, None] * dq / sigma).mean(axis=0)
+
+
+def estimate_gated_subspace(f, theta, sigma, eps, U, reg=1e-2):
+    """Gated experts (fit_gated on the 2N samples) with the switch refitted
+    in the k directions U (d, k) with quadratic terms, so a curved boundary
+    costs O(k^2) switch parameters instead of O(d^2). U from elsewhere (e.g.
+    adjoint_subspace of gradients at earlier optimizer steps): the estimate
+    uses losses only. No accepted mixture: the slope of one linear fit.
+    Returns (gradient, simulations, info)."""
+    z = np.concatenate([eps, -eps]) * sigma
+    y = f(theta + z)
+    model = fit_gated(z, y, sigma)
+    if model is None:
+        c_all, _ = _lin(np.hstack([np.ones((len(z), 1)), z]), y)
+        return c_all[1:], len(z), {"jump": None}
+    cl, cr, _, r = model
+    w = _logistic(_quad_features((z / sigma) @ U), (r > 0.5).astype(float), reg=reg, iters=50)
+    return gated_subspace_grad(cl, cr, w, U, sigma), len(z), {"jump": True, "switch": w}

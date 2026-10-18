@@ -1,20 +1,26 @@
-"""Optimization in d dimensions: the wheel's torque profile, live simulator.
+"""Optimization in d dimensions on the live simulator.
 
-Adam on u in [0, 1]^d (d torque phases) minimizing the deterministic loss
-(x(T) - X_TARGET)^2, driven by a smoothed-gradient estimator with sigma
-annealed geometrically from SIGMA0 to SIGMA0 / 30 over the budget (as in
-bench_optimize). Starts: the wheel stalls at the ledge (u_start per terrain
-+ a uniform offset per phase), so the optimizer must find the climb.
+Adam on u in [0, 1]^d minimizing the deterministic loss, driven by a
+smoothed-gradient estimator with sigma annealed geometrically from SIGMA0 to
+SIGMA0 * SIGMA_END over the budget (as in bench_optimize).
 
-Estimators (N antithetic pairs per step; cost = simulations actually used):
-  zeroth_order  antithetic Stein average (M2)
-  c_nojump      slope of one linear fit to the 2N samples (ablation)
+Scenarios:
+  wheel  d torque phases (wheel_ledge, terrain bump amplitude AMP); starts
+         stall at the ledge (U_START + a uniform offset per phase)
+  box    d / 2 push phases (box_phases); starts push too weakly to reach
+         the target (BOX_START + offsets), the optimum lies next to tipping
+
+Estimators (cost = simulations actually used):
+  zeroth_order  antithetic Stein mean (M2), N pairs
+  linreg        slope of one linear fit to the 2N samples
   gated         two linear experts with a logistic gate (method_c)
-  method_c      planar jump located by bisection (method_c.estimate_nd)
+  dgs_gh        directional smoothing, Gauss-Hermite with 2K nodes per line
+                (Zhang, Tran, Bao 2020), a random orthonormal basis per step
+  dgs_c         directional smoothing, method C on each line (K pairs)
 
-  PYTHONPATH=. python opt_highd.py run D AMP METHOD N LR_SCALE SEED0 SEED1 TAG
-Writes results/opt_highd/<tag>_<method>_N<N>_lr<c>_s<seed>.npz with the
-iterate's loss against the simulations spent.
+  PYTHONPATH=. python opt_highd.py SCEN D AMP METHOD N LR_SCALE SEED0 SEED1 TAG
+(N is K per line for dgs_*). Writes results/opt_highd/<tag>_<method>_N<N>_
+lr<c>_s<seed>.npz with the iterate's loss against the simulations spent.
 """
 
 import sys
@@ -24,72 +30,77 @@ import torch
 
 import ball_landscape as bl
 import method_c as mc
-import wheel_ledge as wl
 
 SIGMA0 = 0.05
 SIGMA_END = 1 / 30
-BUDGET = 3000
-U_START = {0.0: 0.30, 0.004: 0.38}  # stalls at the ledge for every start offset
+BUDGET = {"wheel": 3000, "box": 6000}
+U_START = {0.0: 0.30, 0.004: 0.38}  # wheel: stalls at the ledge for every start offset
+BOX_START = (0.5, 0.5)  # box: slides short of the target, upright
 START_OFFSET = 0.05
 OUT = bl.RESULTS / "opt_highd"
 
 
-def start(d, amp, seed):
-    return np.clip(U_START[amp] + START_OFFSET * np.random.default_rng([d, seed]).uniform(-1, 1, d), 0, 1)
+def scenario(scen, d, amp):
+    if scen == "wheel":
+        import wheel_ledge as wl
+
+        sim = wl.make_sim(amp=amp)
+        return lambda x: wl.loss(sim, torch.tensor(np.atleast_2d(x)), chunk=512).numpy(), np.full(d, U_START[amp])
+    import box_phases as bp
+    import box_tip as bt
+
+    sim = bt.make_sim()
+    return lambda x: bp.loss(sim, torch.tensor(np.atleast_2d(x)), chunk=512).numpy(), np.tile(BOX_START, d // 2)
 
 
-def run(d, amp, method, N, c, seed):
-    sim = wl.make_sim(amp=amp)
-    f = lambda x: wl.loss(sim, torch.tensor(np.atleast_2d(x)), chunk=512).numpy()
+def gradient(method, f, u, sigma, N, rng):
+    """Estimate and simulations used; repeated points are simulated once."""
+    d = len(u)
+    if method == "dgs_gh":
+        V = np.linalg.qr(rng.standard_normal((d, d)))[0].T
+        g, used, _ = mc.estimate_directional(f, u, sigma, V, np.polynomial.hermite.hermgauss(2 * N), mode="gh")
+        return g, used
+    if method == "dgs_c":
+        V = np.linalg.qr(rng.standard_normal((d, d)))[0].T
+        g, used, _ = mc.estimate_directional(f, u, sigma, V, rng.standard_normal(N), mode="c")
+        return g, used
+    eps = rng.standard_normal((N, d))
+    if method == "zeroth_order":
+        y = f(np.concatenate([u + sigma * eps, u - sigma * eps]))
+        return ((y[:N] - y[N:])[:, None] * eps).mean(axis=0) / (2 * sigma), 2 * N
+    if method == "linreg":
+        g, used, _ = mc.estimate_nd(f, u, sigma, eps, jumps=False)
+        return g, used
+    g, used, _ = mc.estimate_gated(f, u, sigma, eps)
+    return g, used
+
+
+def run(scen, d, amp, method, N, c, seed):
+    f, u0 = scenario(scen, d, amp)
     rng = np.random.default_rng([d, seed, 1])
-    u = start(d, amp, seed)
+    u = np.clip(u0 + START_OFFSET * np.random.default_rng([d, seed]).uniform(-1, 1, d), 0, 1)
     m, v = np.zeros(d), np.zeros(d)
     b1, b2 = 0.9, 0.999
     spent, k = 0, 0
     hist = []
-    while spent < BUDGET:
-        sigma = SIGMA0 * SIGMA_END ** (spent / BUDGET)
-        eps = rng.standard_normal((N, d))
-        if method == "zeroth_order":
-            y = f(np.concatenate([u[None], u + sigma * eps, u - sigma * eps]))
-            L0, yp, ym = y[0], y[1 : N + 1], y[N + 1 :]
-            g = ((yp - ym)[:, None] * eps).mean(axis=0) / (2 * sigma)
-            used = 2 * N
-        else:
-            cache = {}
-
-            def fc(x):
-                x = np.atleast_2d(x)
-                keys = [tuple(np.round(xi, 12)) for xi in x]
-                new = [i for i, kk in enumerate(keys) if kk not in cache]
-                if new:
-                    for i, val in zip(new, f(x[new])):
-                        cache[keys[i]] = val
-                return np.array([cache[kk] for kk in keys])
-
-            L0 = f(u[None])[0]
-            if method == "c_nojump":
-                g, used, _ = mc.estimate_nd(fc, u, sigma, eps, jumps=False)
-            elif method == "gated":
-                g, used, _ = mc.estimate_gated(fc, u, sigma, eps)
-            else:
-                g, used, _ = mc.estimate_nd(fc, u, sigma, eps, refine=4, slopes="loo")
-        hist.append((spent, L0))
+    while spent < BUDGET[scen]:
+        sigma = SIGMA0 * SIGMA_END ** (spent / BUDGET[scen])
+        hist.append((spent, f(u[None])[0]))  # monitoring only, not counted
+        g, used = gradient(method, f, u, sigma, N, rng)
         k += 1
         m = b1 * m + (1 - b1) * g
         v = b2 * v + (1 - b2) * g**2
-        step = c * SIGMA0 * (m / (1 - b1**k)) / (np.sqrt(v / (1 - b2**k)) + 1e-12)
-        u = np.clip(u - step, 0, 1)
+        u = np.clip(u - c * SIGMA0 * (m / (1 - b1**k)) / (np.sqrt(v / (1 - b2**k)) + 1e-12), 0, 1)
         spent += used
     hist.append((spent, f(u[None])[0]))
     return np.array(hist), u
 
 
 if __name__ == "__main__":
-    _, d, amp, method, N, c, s0, s1, tag = sys.argv[1:]
+    scen, d, amp, method, N, c, s0, s1, tag = sys.argv[1:]
     d, amp, N, c, s0, s1 = int(d), float(amp), int(N), float(c), int(s0), int(s1)
     OUT.mkdir(exist_ok=True)
     for seed in range(s0, s1):
-        hist, u = run(d, amp, method, N, c, seed)
+        hist, u = run(scen, d, amp, method, N, c, seed)
         np.savez(OUT / f"{tag}_{method}_N{N}_lr{c}_s{seed}.npz", hist=hist, u=u)
         print(f"{tag} {method} N={N} lr={c} seed {seed}: final loss {hist[-1, 1]:.4f} best {hist[:, 1].min():.4f}", flush=True)

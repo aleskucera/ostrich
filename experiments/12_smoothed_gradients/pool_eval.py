@@ -1,8 +1,10 @@
 """Estimators on a pool of antithetic samples: offline repeats at one point.
 
 A pool holds P antithetic pairs at a test point theta (offsets eps (P, d),
-losses at theta +- sigma eps, adjoint gradients there). Each repeat draws N
-pairs without replacement and applies every estimator to them; the
+losses at theta +- sigma eps, adjoint gradients there), optionally in blocks
+of d orthogonal directions (estimators.directions; then N is a multiple of
+d and repeats draw whole blocks). Each repeat draws N pairs without
+replacement and applies every estimator to them; the
 reference for that repeat is the zeroth-order (antithetic) mean over the
 other P - N pairs, independent of the repeat's samples, so
 E|g_hat - g_ref|^2 = E|g_hat - g|^2 + se_ref^2 and the reported RMSE has
@@ -30,7 +32,7 @@ import torch
 import estimators as est
 import method_c as mc
 
-N_PAIRS = (8, 16, 32, 64, 128)
+N_PAIRS = (8, 16, 32, 64, 128)  # with blocks of d: d x (1, 2, 4, 8, 16)
 REPEATS = 100
 NAMES = ("zeroth_order", "linreg", "gated", "first_order", "alpha_order", "ddcg")
 
@@ -47,14 +49,16 @@ def load(pattern):
         if "g" in z:
             gp.append(z["g"][:n])
             gm.append(z["g"][n:])
-    sigma = float(np.load(fs[0])["sigma"]) if "sigma" in np.load(fs[0]) else 0.05
+    z0 = np.load(fs[0])
+    sigma = float(z0["sigma"]) if "sigma" in z0 else 0.05
+    block = int(z0["block"]) if "block" in z0 else 1
     cat = lambda a: np.concatenate(a) if a else None
-    return cat(eps), cat(Lp), cat(Lm), cat(gp), cat(gm), sigma
+    return cat(eps), cat(Lp), cat(Lm), cat(gp), cat(gm), sigma, block
 
 
 def evaluate(pattern, adj=1.86, seed=0, ref_ext=None):
     """ref_ext: (gradient, standard error) of an independent reference."""
-    eps, Lp, Lm, gp, gm, sigma = load(pattern)
+    eps, Lp, Lm, gp, gm, sigma, block = load(pattern)
     P, d = eps.shape
     terms = (Lp - Lm)[:, None] * eps / (2 * sigma)
     total = terms.sum(axis=0)
@@ -62,12 +66,12 @@ def evaluate(pattern, adj=1.86, seed=0, ref_ext=None):
     names = [n for n in NAMES if gp is not None or n in ("zeroth_order", "linreg", "gated")]
     rng = np.random.default_rng(seed)
     out = {}
-    for N in N_PAIRS:
+    for N in [n * block for n in (1, 2, 4, 8, 16)] if block > 1 else N_PAIRS:
         if N > P // 8:
             break
         sq, rel, scale = {n: [] for n in names}, {n: [] for n in names}, []
         for _ in range(REPEATS):
-            i = rng.choice(P, N, replace=False)
+            i = (rng.choice(P // block, N // block, replace=False)[:, None] * block + np.arange(block)).ravel()
             if ref_ext is None:
                 ref = (total - terms[i].sum(axis=0)) / (P - N)
                 se2 = var_terms / (P - N)
@@ -112,7 +116,7 @@ if __name__ == "__main__":
         print(f"external reference: {len(t_r)} pairs, |g| {np.linalg.norm(ref_ext[0]):.3f}, se {ref_ext[1]:.3f}")
     out, P, d, rse = evaluate(pattern, adj, ref_ext=ref_ext)
     print(f"{pattern}: {P} pairs, d = {d}, reference relative se {rse:.1%} (full pool)")
-    for N in N_PAIRS:
+    for N in sorted({N for _, N in out}):
         row = [(n, *out[(n, N)]) for n in NAMES if (n, N) in out]
         if row:
             print(f"  N={N:3d}  " + "  ".join(f"{n} {med:.3f}/{rmse:.3f}({c:.0f})" for n, c, med, rmse in row))
