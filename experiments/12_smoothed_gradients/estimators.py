@@ -10,6 +10,11 @@
                samples, alpha = var_zo / (var_fo + var_zo) from the sample
                variances, and alpha = 0 when |first - zeroth| exceeds `gamma`
                standard errors of the zeroth-order mean (bias test)
+  ddcg         Onoda, Parmas et al. 2026 (ICLR, arXiv 2604.18161): the same
+               inverse-variance mix, gated by their Eq. 14 test (gradient
+               spread vs a quadratic model's prediction from the spread of L);
+               if it fails, alpha = 0. Here its zeroth-order part is the
+               antithetic estimator above (the paper uses a baseline f(u)).
 
 The *_from_samples functions work on precomputed sample values, so many
 points and repeats can share one batched rollout; the per-point wrappers take
@@ -61,6 +66,26 @@ def alpha_order_from_samples(eps, L_plus, L_minus, g_plus, g_minus, sigma, gamma
     return alpha[..., None] * fo + (1 - alpha[..., None]) * zo, alpha
 
 
+def ddcg_from_samples(eps, L_plus, L_minus, g_plus, g_minus, sigma, c=0.3):
+    """Returns (estimate, alpha). Eq. 14 on all 2N samples x_i: the test
+    v_hat >= 2 (1 - c) Var[L] / sigma^2 - 2 |mean grad|^2 passes for a
+    near-quadratic L; a jump inflates Var[L] without showing in the
+    gradients, so the test fails and alpha = 0 (Eq. 15)."""
+    n = eps.shape[-2]
+    fo_i = 0.5 * (g_plus + g_minus)
+    zo_i = (L_plus - L_minus)[..., None] * eps / (2 * sigma)
+    fo, zo = fo_i.mean(dim=-2), zo_i.mean(dim=-2)
+    var_fo = fo_i.var(dim=-2).sum(dim=-1) / n
+    var_zo = zo_i.var(dim=-2).sum(dim=-1) / n
+    alpha = var_zo / (var_fo + var_zo).clamp(min=1e-300)
+    g = torch.cat([g_plus, g_minus], dim=-2)
+    L = torch.cat([L_plus, L_minus], dim=-1)
+    v_hat = ((g - g.mean(dim=-2, keepdim=True)) ** 2).sum(dim=-1).sum(dim=-1) / (2 * n - 1)
+    smooth = v_hat >= 2 * (1 - c) * L.var(dim=-1) / sigma**2 - 2 * (g.mean(dim=-2) ** 2).sum(dim=-1)
+    alpha = torch.where(smooth, alpha, 0.0)
+    return alpha[..., None] * fo + (1 - alpha[..., None]) * zo, alpha
+
+
 # --- per-point wrappers
 
 
@@ -95,3 +120,8 @@ def zeroth_order(loss, u, sigma, n_pairs, orthogonal=True, generator=None):
 def alpha_order(loss_grad, u, sigma, n_pairs, gamma=2.0, orthogonal=True, generator=None):
     """Returns (estimate, alpha)."""
     return alpha_order_from_samples(*_samples(loss_grad, u, sigma, n_pairs, orthogonal, generator), sigma, gamma)
+
+
+def ddcg(loss_grad, u, sigma, n_pairs, c=0.3, orthogonal=True, generator=None):
+    """Returns (estimate, alpha)."""
+    return ddcg_from_samples(*_samples(loss_grad, u, sigma, n_pairs, orthogonal, generator), sigma, c)

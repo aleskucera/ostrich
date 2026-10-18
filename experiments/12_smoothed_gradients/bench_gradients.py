@@ -16,6 +16,7 @@ Estimators (estimators.py; N antithetic pairs, orthogonal directions):
   first_order  mean of adjoint gradients at theta +- sigma eps
   zeroth_order (L(theta + sigma eps) - L(theta - sigma eps)) eps / (2 sigma)
   alpha_order  Suh et al. 2022, gamma = 2
+  ddcg         Onoda, Parmas et al. 2026, c = 0.3
 Cost in forward-rollout equivalents: a rollout 1, rollout + adjoint
 ADJ_COST (measured: forward + adjoint time over forward time).
 
@@ -39,7 +40,7 @@ import estimators as est
 N_PAIRS = (2, 8, 32, 128, 512)
 REPEATS = 200
 GAMMA = 2.0
-ESTIMATORS = ("hard", "first_order", "zeroth_order", "alpha_order")
+ESTIMATORS = ("hard", "first_order", "zeroth_order", "alpha_order", "ddcg")
 
 
 def _grid2(lo, hi, n):
@@ -121,12 +122,13 @@ def estimates(grid, theta, sigma, N, gen):
         "first_order": est.first_order_from_samples(gp, gm),
         "zeroth_order": est.zeroth_order_from_samples(eps, Lp, Lm, sigma),
         "alpha_order": alpha,
+        "ddcg": est.ddcg_from_samples(eps, Lp, Lm, gp, gm, sigma)[0],
     }
 
 
 def cost(name, N, adj_cost):
     return {"hard": adj_cost, "first_order": 2 * N * adj_cost, "zeroth_order": 2 * N,
-            "alpha_order": 2 * N * adj_cost}[name]
+            "alpha_order": 2 * N * adj_cost, "ddcg": 2 * N * adj_cost}[name]
 
 
 def bench(scen, gen):
@@ -174,7 +176,8 @@ def plot(out):
     import matplotlib.pyplot as plt
 
     ink, muted = "#0b0b0b", "#52514e"
-    colors = {"hard": "#8a8f98", "first_order": "#2a78d6", "zeroth_order": "#eb6834", "alpha_order": "#1baf7a"}
+    colors = {"hard": "#8a8f98", "first_order": "#2a78d6", "zeroth_order": "#eb6834", "alpha_order": "#1baf7a",
+              "ddcg": "#7d4cdb"}
     fig, axes = plt.subplots(2, len(SCENARIOS), figsize=(5 * len(SCENARIOS), 8), constrained_layout=True)
     for j, scen in enumerate(SCENARIOS):
         rows = out[f"{scen}_rows"]

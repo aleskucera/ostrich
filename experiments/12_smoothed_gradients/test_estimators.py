@@ -67,3 +67,21 @@ def test_step_function():
     assert torch.allclose(zo, true, atol=0.1)
     ao = mean_of(lambda g: est.alpha_order(step_grad, u, sigma, 16, gamma=2.0, generator=g)[0])
     assert torch.allclose(ao, true, atol=0.1)
+
+
+def test_ddcg_gate():
+    """DDCG mostly keeps the first-order mix on a quadratic (alpha > 0) and falls
+    back to zeroth-order at a step (alpha = 0), where it is then unbiased."""
+    sigma = 0.1
+    u = torch.tensor([0.3, -0.2], dtype=torch.float64)
+    # The test compares sample variances, so on a quadratic it still fails
+    # now and then (sample Var[L] > 1.4x its mean); check the pass rate.
+    passed = [est.ddcg(quad_grad, u, sigma, 16, generator=torch.Generator().manual_seed(k))[1] > 0 for k in range(200)]
+    assert sum(passed) / len(passed) > 0.7
+    u = torch.tensor([0.05, 0.0], dtype=torch.float64)
+    _, a = est.ddcg(step_grad, u, sigma, 16, generator=torch.Generator().manual_seed(0))
+    assert a == 0
+    true = torch.tensor([math.exp(-0.5 * (u[0] / sigma) ** 2) / (sigma * math.sqrt(2 * math.pi)), 0.0],
+                        dtype=torch.float64)
+    dd = mean_of(lambda g: est.ddcg(step_grad, u, sigma, 16, generator=g)[0])
+    assert torch.allclose(dd, true, atol=0.1)

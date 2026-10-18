@@ -7,15 +7,19 @@ iterate against the compute spent (forward-rollout equivalents, as in
 bench_gradients); smoothing is only the tool. Losses and gradients are read
 from the dense grids (nearest node), so runs are free.
 
-Smoothing methods anneal sigma geometrically from the scenario's sigma to
-SIGMA_END x sigma over the budget (with a fixed sigma they converge to the
-smoothed loss's minimum, not L's); one fixed-sigma zeroth-order run is kept
-as the reference. SIGMA_END keeps the final sigma at >= 2 grid spacings.
+Smoothing methods anneal sigma geometrically from s x sigma (the scenario's
+sigma times a tuned factor s) down to SIGMA_END x sigma over the budget (with
+a fixed sigma they converge to the smoothed loss's minimum, not L's); one
+fixed-sigma zeroth-order run is kept as the reference. SIGMA_END keeps the
+final sigma at >= 2 grid spacings.
 
 Protocol: start points uniform in the scenario's theta box (4 sigma inside the
 grid), iterates projected back into it. Step size (Adam: lr = c sigma; CEM:
-initial spread = c sigma) tuned per method over STEP_SCALES on TUNE_SEEDS
-starts, by the median final loss; reported on separate EVAL_SEEDS starts.
+initial spread = c sigma) and, for smoothing methods, the sigma factor s are
+tuned per method over STEP_SCALES x SIGMA_SCALES on TUNE_SEEDS starts. The
+tuning score is the success rate on all tuning starts plus the success rate
+on the hard ones among them (ties: lower median final loss), so that easy
+starts do not decide the tuning alone. Reported on separate EVAL_SEEDS starts.
 Success: final loss below SUCCESS; also reported for the HARD_STARTS alone,
 the starts in a different mode than the optimum.
 
@@ -32,6 +36,7 @@ import estimators as est
 
 BUDGET = 10000  # forward-rollout equivalents per run
 STEP_SCALES = (0.03, 0.1, 0.3, 1.0, 3.0, 10.0)
+SIGMA_SCALES = (0.5, 1.0, 2.0, 4.0)
 TUNE_SEEDS, EVAL_SEEDS = 50, 200
 SUCCESS = 0.01  # final loss below: x(T) within 0.1 m of its target (box: and upright)
 # starts (u, L(u)) in a different mode than the optimum: the corner drop
@@ -45,7 +50,7 @@ SIGMA_END = {"corner": 1 / 30, "wheel": 1 / 30, "box": 1 / 5}
 # (estimator, pairs N, anneal sigma)
 METHODS = [("hard", 0, False), ("first_order", 4, True), ("first_order", 16, True), ("zeroth_order", 4, True),
            ("zeroth_order", 16, True), ("zeroth_order", 16, False), ("alpha_order", 4, True),
-           ("alpha_order", 16, True), ("cem", CEM_POP, False)]
+           ("alpha_order", 16, True), ("ddcg", 4, True), ("ddcg", 16, True), ("cem", CEM_POP, False)]
 CHECKPOINTS = np.geomspace(10, BUDGET, 25)
 
 
@@ -67,23 +72,27 @@ def gradient(grid, kind, N, theta, sigma, gen):
     gp, gm = torch.tensor(grid.g[ip]), torch.tensor(grid.g[im])
     if kind == "first_order":
         return est.first_order_from_samples(gp, gm)
+    if kind == "ddcg":
+        return est.ddcg_from_samples(eps, Lp, Lm, gp, gm, sigma)[0]
     return est.alpha_order_from_samples(eps, Lp, Lm, gp, gm, sigma, bg.GAMMA)[0]
 
 
-def run_adam(scen, grid, kind, N, anneal, c, starts, gen):
+def run_adam(scen, grid, kind, N, anneal, c, s, starts, gen):
     """Loss of the iterates at the CHECKPOINTS (S, len(CHECKPOINTS))."""
-    sigma0 = sigma = bg.SCENARIOS[scen]["sigma"]
+    base = bg.SCENARIOS[scen]["sigma"]
+    sigma0 = sigma = s * base
+    sigma_end = SIGMA_END[scen] * base
     lo, hi = bounds(scen, grid)
     per_iter = bg.cost(kind, N, bg.SCENARIOS[scen]["adj_cost"])
     theta = torch.tensor(starts, requires_grad=True)
-    opt = torch.optim.Adam([theta], lr=c * sigma)
+    opt = torch.optim.Adam([theta], lr=c * base)
     spent, out, k = 0.0, [], 0
     while k < len(CHECKPOINTS):
         while k < len(CHECKPOINTS) and spent + per_iter > CHECKPOINTS[k]:
             out.append(grid.L[grid.index(theta.detach().numpy())])
             k += 1
         if anneal:
-            sigma = sigma0 * SIGMA_END[scen] ** (spent / BUDGET)
+            sigma = sigma0 * (sigma_end / sigma0) ** (spent / BUDGET)
         theta.grad = gradient(grid, kind, N, theta.detach().numpy(), sigma, gen)
         opt.step()
         with torch.no_grad():
@@ -111,10 +120,10 @@ def run_cem(scen, grid, c, starts, gen):
     return np.stack(out, axis=1)
 
 
-def run(scen, grid, kind, N, anneal, c, starts, gen):
+def run(scen, grid, kind, N, anneal, c, s, starts, gen):
     if kind == "cem":
         return run_cem(scen, grid, c, starts, gen)
-    return run_adam(scen, grid, kind, N, anneal, c, starts, gen)
+    return run_adam(scen, grid, kind, N, anneal, c, s, starts, gen)
 
 
 def main():
@@ -129,21 +138,29 @@ def main():
         tune = rng.uniform(lo, hi, (TUNE_SEEDS, grid.d))
         evals = rng.uniform(lo, hi, (EVAL_SEEDS, grid.d))
         hard = HARD_STARTS[scen](evals, grid.L[grid.index(evals)])
+        tune_hard = HARD_STARTS[scen](tune, grid.L[grid.index(tune)])
         print(f"\n{scen}: {EVAL_SEEDS} starts ({hard.sum()} in another mode), budget {BUDGET}, "
               f"success = final loss < {SUCCESS}")
-        print(f"  {'method':24s} {'step':>5s} {'final loss median [q25, q75]':>34s} {'success':>8s} {'hard starts':>12s}")
-        curves, best_c = [], []
+        print(f"  {'method':24s} {'step':>5s} {'sigma':>5s} {'final loss median [q25, q75]':>34s} {'success':>8s} "
+              f"{'hard starts':>12s}")
+        curves, best_c, best_s = [], [], []
         for (kind, N, anneal), name in zip(METHODS, out["methods"]):
-            score = [np.median(run(scen, grid, kind, N, anneal, c, tune, gen)[:, -1]) for c in STEP_SCALES]
-            c = STEP_SCALES[int(np.argmin(score))]
-            L = run(scen, grid, kind, N, anneal, c, evals, gen)
+            grid_cs = [(c, s) for c in STEP_SCALES for s in (SIGMA_SCALES if kind not in ("hard", "cem") else (1.0,))]
+            score = []
+            for c, s in grid_cs:
+                f = run(scen, grid, kind, N, anneal, c, s, tune, gen)[:, -1]
+                score.append((np.mean(f < SUCCESS) + np.mean(f[tune_hard] < SUCCESS), -np.median(f)))
+            c, s = grid_cs[max(range(len(grid_cs)), key=lambda i: score[i])]
+            L = run(scen, grid, kind, N, anneal, c, s, evals, gen)
             curves.append(L)
             best_c.append(c)
+            best_s.append(s)
             f = L[:, -1]
-            print(f"  {name:24s} {c:5.2f} {np.median(f):12.4f} [{np.quantile(f, 0.25):8.4f}, {np.quantile(f, 0.75):8.4f}]"
+            print(f"  {name:24s} {c:5.2f} {s:5.1f} {np.median(f):12.4f} [{np.quantile(f, 0.25):8.4f}, {np.quantile(f, 0.75):8.4f}]"
                   f" {np.mean(f < SUCCESS):8.0%} {np.mean(f[hard] < SUCCESS):12.0%}")
         out[f"{scen}_curves"] = np.stack(curves)  # (methods, seeds, checkpoints)
         out[f"{scen}_step"] = np.array(best_c)
+        out[f"{scen}_sigma_scale"] = np.array(best_s)
         out[f"{scen}_hard_starts"] = hard
     np.savez(bl.RESULTS / "bench_optimize.npz", **out)
     plot(out)
@@ -157,6 +174,7 @@ def plot(out):
 
     ink, muted = "#0b0b0b", "#52514e"
     colors = {"hard": "#8a8f98", "first_order": "#2a78d6", "zeroth_order": "#eb6834", "alpha_order": "#1baf7a",
+              "ddcg": "#b5398f",
               "cem": "#7d4cdb"}
     fig, axes = plt.subplots(2, len(bg.SCENARIOS), figsize=(5 * len(bg.SCENARIOS), 8), constrained_layout=True)
     for j, scen in enumerate(bg.SCENARIOS):
