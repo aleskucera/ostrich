@@ -150,3 +150,178 @@ def estimate_1d(f, theta, sigma, eps, jumps=True):
     cr, _, _ = _fit(xr, yr)
     g = smoothed_grad([(-np.inf, bj, cl), (bj, np.inf, cr)], theta, sigma)
     return g, sims, {"jump": bj, "delta": float(np.polyval(cr, bj) - np.polyval(cl, bj))}
+
+
+# --- d dimensions: a flat jump surface, a linear piece on each side ---------
+
+
+def _lin(X, y):
+    """Least squares y ~ X; coefficients and RSS."""
+    c, *_ = np.linalg.lstsq(X, y, rcond=None)
+    return c, float(((X @ c - y) ** 2).sum())
+
+
+def _side_model(X, y):
+    """Linear piece if the side has enough points, else a constant. Returns
+    coefficients padded to X's width, RSS and the parameter count."""
+    k = X.shape[1]
+    if len(y) >= k + 2:
+        c, r = _lin(X, y)
+        return c, r, k
+    c = np.zeros(k)
+    c[0] = y.mean()
+    return c, float(((y - c[0]) ** 2).sum()), 1
+
+
+def _prefix_lin(X, y):
+    """Least squares y ~ X on the first j rows, for every j, from cumulative
+    X^T X, X^T y and y^T y. Returns coefficients (n, k) and RSS (n,); NaN
+    where fewer than k + 2 rows (the side then uses a constant)."""
+    n, k = X.shape
+    A = np.cumsum(X[:, :, None] * X[:, None, :], axis=0)
+    B = np.cumsum(X * y[:, None], axis=0)
+    Y2 = np.cumsum(y**2)
+    ok = np.arange(1, n + 1) >= k + 2
+    c = np.full((n, k), np.nan)
+    c[ok] = np.linalg.solve(A[ok] + 1e-12 * np.eye(k), B[ok][..., None])[..., 0]
+    rss = np.full(n, np.nan)
+    rss[ok] = np.maximum(Y2[ok] - (c[ok] * B[ok]).sum(axis=1), 0.0)
+    return c, rss
+
+
+def _split_along(t, X, y):
+    """Best two-piece split of the samples sorted by t (BIC and the KAPPA
+    test at the split, as in 1D). Returns (order, j) or None."""
+    n, k = X.shape
+    order = np.argsort(t)
+    X, y = X[order], y[order]
+    _, rss0 = _lin(X, y)
+    cf, rf = _prefix_lin(X, y)
+    cb, rb = _prefix_lin(X[::-1], y[::-1])
+    csum, c2sum = np.cumsum(y), np.cumsum(y**2)
+    best, best_bic = None, _bic(rss0, n, k)
+    for j in range(2, n - 1):
+        m = n - j
+        if j >= k + 2:
+            cl, rl, kl = cf[j - 1], rf[j - 1], k
+        else:
+            cl = np.zeros(k)
+            cl[0] = csum[j - 1] / j
+            rl, kl = max(c2sum[j - 1] - j * cl[0] ** 2, 0.0), 1
+        if m >= k + 2:
+            cr, rr, kr = cb[m - 1], rb[m - 1], k
+        else:
+            cr = np.zeros(k)
+            cr[0] = (csum[-1] - csum[j - 1]) / m
+            rr, kr = max((c2sum[-1] - c2sum[j - 1]) - m * cr[0] ** 2, 0.0), 1
+        b = _bic(rl + rr, n, kl + kr + 1)
+        if b >= best_bic:
+            continue
+        xs = 0.5 * (X[j - 1] + X[j])
+        spread = math.sqrt((rl + rr) / max(n - kl - kr, 1))
+        if abs(xs @ (cr - cl)) > KAPPA * spread:
+            best, best_bic = j, b
+    return None if best is None else (order, best)
+
+
+def _normal(z, side, reg=1e-2, iters=25):
+    """Unit normal of a linear boundary between the two sides: regularised
+    logistic regression on positions z (n, d), Newton steps."""
+    Z = np.hstack([np.ones((len(z), 1)), z])
+    w = np.zeros(Z.shape[1])
+    for _ in range(iters):
+        p = 1 / (1 + np.exp(-Z @ w))
+        H = Z.T @ (Z * (p * (1 - p))[:, None]) + reg * np.eye(len(w))
+        w -= np.linalg.solve(H, Z.T @ (p - side) + reg * w)
+    n = w[1:]
+    return n / max(np.linalg.norm(n), 1e-300)
+
+
+def estimate_nd(f, theta, sigma, eps, jumps=True):
+    """d-dimensional method C. f(x (m, d)) -> losses; eps (N, d) standard
+    normal directions, antithetic pairs theta +- sigma eps. Returns
+    (gradient (d,), simulations used, info).
+
+    Jump surface modelled as a plane with a linear piece on each side:
+    grad = P_L b_L + P_R b_R + Delta(p0) n phi_sigma(c), where c is the
+    plane's distance from theta along its unit normal n (pointing to the R
+    side), P_L = Phi(c / sigma), b the slopes of the pieces and Delta(p0) the
+    jump at p0 = theta + c n (the Gaussian's mean on the plane; exact for
+    linear pieces). No accepted split: the slope of one linear fit (the
+    ablation, also jumps=False)."""
+    d = len(theta)
+    z = np.concatenate([eps, -eps]) * sigma  # positions relative to theta
+    y = f(theta + z)
+    sims = len(z)
+    X = np.hstack([np.ones((len(z), 1)), z])
+    c_all, _ = _lin(X, y)
+    if not jumps:
+        return c_all[1:], sims, {"jump": None}
+    # first direction: zeroth-order estimate from the same pairs
+    N = len(eps)
+    u = ((y[:N] - y[N:])[:, None] * eps).mean(axis=0)
+    u = u / max(np.linalg.norm(u), 1e-300)
+    found = _split_along(z @ u, X, y)
+    if found is None:
+        return c_all[1:], sims, {"jump": None}
+    order, j = found
+    side = np.zeros(len(z))
+    side[order[j:]] = 1.0
+    n = _normal(z / sigma, side)
+    if (z[side == 1] @ n).mean() < (z[side == 0] @ n).mean():
+        n = -n
+    cl, _, _ = _side_model(X[side == 0], y[side == 0])
+    cr, _, _ = _side_model(X[side == 1], y[side == 1])
+
+    # locate: bisect along up to d segments between opposite-side samples
+    # (closest pairs first, crossing points at least sigma/2 apart); d points
+    # on a flat surface fix it, fewer constrain the logistic normal
+    zl, zr = z[side == 0], z[side == 1]
+    dist = ((zl[:, None] - zr[None]) ** 2).sum(axis=-1)
+    points = []
+    for flat in np.argsort(dist, axis=None):
+        if len(points) == d:
+            break
+        il, ir = np.unravel_index(flat, dist.shape)
+        if any(np.linalg.norm(0.5 * (zl[il] + zr[ir]) - q) < 0.5 * sigma for q in points):
+            continue
+        a, b = zl[il], zr[ir]
+        for _ in range(MAX_STEPS):
+            if np.linalg.norm(b - a) < LOCATE_TOL * sigma:
+                break
+            mid = 0.5 * (a + b)
+            ym = f(theta + mid[None])[0]
+            sims += 1
+            xm = np.concatenate([[1.0], mid])
+            if abs(ym - xm @ cl) <= abs(ym - xm @ cr):
+                a = mid
+            else:
+                b = mid
+        points.append(0.5 * (a + b))
+    P = np.array(points)
+    if len(P) >= 2:  # n orthogonal to the plane's in-plane directions
+        _, sv, Vt = np.linalg.svd(P[1:] - P[0], full_matrices=True)
+        span = Vt[: int((sv > 1e-9 * sigma).sum())]
+        n = n - span.T @ (span @ n)
+        n = n / max(np.linalg.norm(n), 1e-300)
+        if (z[side == 1] @ n).mean() < (z[side == 0] @ n).mean():
+            n = -n
+    c = float((P @ n).mean())
+
+    # sparse side: points beyond the plane along n
+    for s, sgn in ((0, -1.0), (1, 1.0)):
+        if (side == s).sum() < MIN_SIDE:
+            ze = (c + sgn * sigma * np.array(EXTRA))[:, None] * n[None]
+            z = np.vstack([z, ze])
+            y = np.concatenate([y, f(theta + ze)])
+            side = np.concatenate([side, np.full(len(ze), float(s))])
+            sims += len(ze)
+    X = np.hstack([np.ones((len(z), 1)), z])
+    cl, _, _ = _side_model(X[side == 0], y[side == 0])
+    cr, _, _ = _side_model(X[side == 1], y[side == 1])
+    p0 = np.concatenate([[1.0], c * n])
+    delta = float(p0 @ (cr - cl))
+    PL = 0.5 * (1 + math.erf(c / (sigma * math.sqrt(2))))
+    dens = math.exp(-0.5 * (c / sigma) ** 2) / (sigma * math.sqrt(2 * math.pi))
+    g = PL * cl[1:] + (1 - PL) * cr[1:] + delta * n * dens
+    return g, sims, {"jump": c, "normal": n, "delta": delta}

@@ -17,10 +17,11 @@ Estimators (estimators.py; N antithetic pairs, orthogonal directions):
   zeroth_order (L(theta + sigma eps) - L(theta - sigma eps)) eps / (2 sigma)
   alpha_order  Suh et al. 2022, gamma = 2
   ddcg         Onoda, Parmas et al. 2026, c = 0.3
-  method_c     ours (method_c.py, 1D only): jump located by bisection, a
-               polynomial fitted to each side, Stein's formula on the result;
-               loss values only, cost = simulations actually used
-  c_nojump     ablation: one polynomial over all samples, no jump
+  method_c     ours (method_c.py): jump located by bisection, a piece fitted
+               to each side (1D: polynomials and Stein's formula; d > 1: a
+               plane with linear pieces, closed form); loss values only,
+               cost = simulations actually used
+  c_nojump     ablation: one fit over all samples, no jump
 Cost in forward-rollout equivalents: a rollout 1, rollout + adjoint
 ADJ_COST (measured: forward + adjoint time over forward time).
 
@@ -131,12 +132,15 @@ def estimates(grid, theta, sigma, N, gen):
         "ddcg": est.ddcg_from_samples(eps, Lp, Lm, gp, gm, sigma)[0],
     }
     sims = {}
-    if grid.d == 1:
-        f = lambda x: grid.L[grid.index(x[:, None])]
-        for name, jumps in (("method_c", True), ("c_nojump", False)):
+    for name, jumps in (("method_c", True), ("c_nojump", False)):
+        if grid.d == 1:
+            f = lambda x: grid.L[grid.index(x[:, None])]
             res = [mc.estimate_1d(f, theta[0], sigma, e[:, 0], jumps=jumps) for e in eps.numpy()]
-            out[name] = torch.tensor([[g] for g, _, _ in res])
-            sims[name] = np.mean([n for _, n, _ in res])
+        else:
+            f = lambda x: grid.L[grid.index(x)]
+            res = [mc.estimate_nd(f, theta, sigma, e, jumps=jumps) for e in eps.numpy()]
+        out[name] = torch.tensor(np.array([np.atleast_1d(g) for g, _, _ in res]))
+        sims[name] = np.mean([n for _, n, _ in res])
     return out, sims
 
 
