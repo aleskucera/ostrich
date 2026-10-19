@@ -9,6 +9,9 @@ Scenarios:
          stall at the ledge (U_START + a uniform offset per phase)
   box    d / 2 push phases (box_phases); starts push too weakly to reach
          the target (BOX_START + offsets), the optimum lies next to tipping
+  boxf   d push-force phases at the fixed height BOXF_H, target BOXF_TARGET:
+         a constant push reaches it only within ~2 N of tipping (narrower
+         than the blur); starts at BOXF_START + offsets (slides short)
 
 Estimators (cost = simulations actually used):
   zeroth_order  antithetic Stein mean (M2), N pairs
@@ -20,6 +23,8 @@ Estimators (cost = simulations actually used):
   dgs_gh        directional smoothing, Gauss-Hermite with 2K nodes per line
                 (Zhang, Tran, Bao 2020), a random orthonormal basis per step
   dgs_c         directional smoothing, method C on each line (K pairs)
+  margin        two linear experts split by the simulator's tipping margin
+                (margin_probe.energy_margin, e_cross; boxf only)
 
   PYTHONPATH=. python opt_highd.py SCEN D AMP METHOD N LR_SCALE SEED0 SEED1 TAG
 (N is K per line for dgs_*). Isotropic methods draw directions in orthogonal
@@ -38,9 +43,10 @@ import method_c as mc
 
 SIGMA0 = 0.05
 SIGMA_END = 1 / 30
-BUDGET = {"wheel": 3000, "box": 4000}
+BUDGET = {"wheel": 3000, "box": 4000, "boxf": 4000}
 U_START = {0.0: 0.30, 0.004: 0.38}  # wheel: stalls at the ledge for every start offset
 BOX_START = (0.5, 0.5)  # box: slides short of the target, upright
+BOXF_H, BOXF_TARGET, BOXF_START = 0.22, 0.9, 0.6
 START_OFFSET = 0.05
 SUB_K, SUB_PAIRS, SUB_DECAY = 4, 4, 0.9
 ADJ = {"wheel": 1.36, "box": 1.86}
@@ -57,6 +63,21 @@ def scenario(scen, d, amp):
         return lambda x: wl.loss(sim, torch.tensor(np.atleast_2d(x)), chunk=512).numpy(), lg, np.full(d, U_START[amp])
     import box_phases as bp
     import box_tip as bt
+
+    if scen == "boxf":
+        import margin_probe as mp
+
+        sim = bt.make_sim()
+        uh = (BOXF_H - bt.HEIGHT[0]) / (bt.HEIGHT[1] - bt.HEIGHT[0])
+
+        def fm(x):
+            x = np.atleast_2d(x)
+            full = np.full((len(x), 2 * d), uh)
+            full[:, 0::2] = x
+            q, v = mp.trajectories(sim, torch.from_numpy(full))
+            return (q[-1, :, 0] - BOXF_TARGET) ** 2 + bt.W_TILT * q[-1, :, 2] ** 2, mp.energy_margin(q, v)[2]
+
+        return lambda x: fm(x)[0], fm, np.full(d, BOXF_START)
 
     sim = bt.make_sim()
     lg = lambda x: tuple(t.numpy() for t in bp.loss_and_grad(sim, torch.tensor(np.atleast_2d(x)), chunk=512))
@@ -84,6 +105,9 @@ def gradient(method, f, u, sigma, N, rng, gen, state):
         U = np.linalg.eigh(state["C"])[1][:, ::-1][:, :SUB_K]
         g, used, _ = mc.estimate_gated_subspace(f, u, sigma, eps, U)
         return g, used + 2 * SUB_PAIRS * state["adj"]
+    if method == "margin":
+        g, used, _ = mc.estimate_margin(state["lg"], u, sigma, eps)
+        return g, used
     if method == "zeroth_order":
         y = f(np.concatenate([u + sigma * eps, u - sigma * eps]))
         return ((y[:N] - y[N:])[:, None] * eps).mean(axis=0) / (2 * sigma), 2 * N
@@ -98,7 +122,7 @@ def run(scen, d, amp, method, N, c, seed):
     f, lg, u0 = scenario(scen, d, amp)
     rng = np.random.default_rng([d, seed, 1])
     gen = torch.Generator().manual_seed(1000 * d + seed)
-    state = {"lg": lg, "adj": ADJ[scen]}
+    state = {"lg": lg, "adj": ADJ.get(scen)}
     u = np.clip(u0 + START_OFFSET * np.random.default_rng([d, seed]).uniform(-1, 1, d), 0, 1)
     m, v = np.zeros(d), np.zeros(d)
     b1, b2 = 0.9, 0.999

@@ -64,6 +64,16 @@ def trajectories(sim, u, chunk=512):
     return torch.cat(Q, 1).numpy(), torch.cat(V, 1).numpy()
 
 
+def energy_margin(q, v):
+    """Tilt |theta| and energy over the corner barrier per step (T, B), and the
+    margin e_cross: e at the first step with tilt >= CRIT, else max e."""
+    tilt = np.abs(q[:, :, 2])
+    e = 0.5 * I_CORNER * v[:, :, 2] ** 2 + bt.MASS * G * (q[:, :, 1] - R_CORNER)
+    crossed = tilt >= CRIT
+    first = crossed.argmax(0)
+    return tilt, e, np.where(crossed.any(0), e[first, np.arange(q.shape[1])], e.max(0))
+
+
 def features(Z, quad):
     cols = [np.ones(len(Z)), *Z.T]
     if quad:
@@ -91,17 +101,13 @@ def main():
     q, v = trajectories(bt.make_sim(), torch.from_numpy(X))
     L = bt.terminal_cost(torch.from_numpy(q[-1])).numpy()
     tip = np.abs(q[-1, :, 2]) > 1.0
-    tilt = np.abs(q[:, :, 2])
-    e = 0.5 * I_CORNER * v[:, :, 2] ** 2 + bt.MASS * G * (q[:, :, 1] - R_CORNER)
-    crossed = tilt >= CRIT
-    first = np.where(crossed.any(0), crossed.argmax(0), -1)
-    n = np.arange(len(X))
+    tilt, e, ecross = energy_margin(q, v)
     cands = {
         "e_endpush": e[bt.T_PUSH - 1],
         "e_max_all": e.max(0),
         "e_max_after": e[bt.T_PUSH :].max(0),
         "tilt_clip": np.minimum(tilt.max(0), 1.5) - CRIT,
-        "e_cross": np.where(first >= 0, e[first, n], e.max(0)),
+        "e_cross": ecross,
     }
     print(f"d={d} a={a} runs={len(X)} tipped={tip.mean():.3f}")
     for name, m in cands.items():
