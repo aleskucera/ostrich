@@ -14,8 +14,9 @@ N = d pairs in 0..999:
   margin    calibrated candidates o (m - t) (threshold and orientation fitted
             to the labels); among those within AGREE_TOL of the best label
             agreement, the one a linear fit in z explains best (adjusted
-            R^2). Its values are used if that R^2 >= R2_MIN, else the
-            labels (a jumpy margin would mislead the boundary fit)
+            R^2). Its values are used if that R^2 >= R2_MIN and each side
+            has at least MIN_SIDE samples, else the labels (a jumpy margin,
+            or one calibrated on one or two samples, misleads the fit)
   energy    box only: the energy margin e_cross (scene-specific ablation)
 
   PYTHONPATH=. python contact_grad_err.py SCENE FILE_PREFIX   e.g. apex apex_ref
@@ -28,7 +29,7 @@ import numpy as np
 import method_c as mc
 
 SIGMA = 0.05
-AGREE_TOL, R2_MIN = 0.05, 0.9
+AGREE_TOL, R2_MIN, MIN_SIDE = 0.05, 0.9, 3
 
 
 def adj_r2(z, m):
@@ -108,7 +109,7 @@ def main():
                 top_acc = max(a for a, _ in cal.values())
                 zz = np.concatenate([e, -e])
                 name, r2 = max(((k, adj_r2(zz, m)) for k, (a, m) in cal.items() if a >= top_acc - AGREE_TOL), key=lambda t: t[1])
-                if r2 >= R2_MIN:
+                if r2 >= R2_MIN and min(lab.sum(), (~lab).sum()) >= MIN_SIDE:
                     picks[name] = picks.get(name, 0) + 1
                     add("margin", mc.estimate_margin(lambda x: (yy, cal[name][1]), th0, SIGMA, e)[0])
                 else:
