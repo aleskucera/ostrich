@@ -741,3 +741,76 @@ def estimate_gated_subspace(f, theta, sigma, eps, U, reg=1e-2):
     cl, cr, _, r = model
     w = _logistic(_quad_features((z / sigma) @ U), (r > 0.5).astype(float), reg=reg, iters=50)
     return gated_subspace_grad(cl, cr, w, U, sigma), len(z), {"jump": True, "switch": w}
+
+
+# --- margin: the simulator reports a smooth number whose sign is the mode ---
+
+
+def margin_grad(cl, cr, c, r, sigma):
+    """Exact gradient at theta of E[f_hat(theta + sigma eps)] for
+    f_hat(z) = cl . [1, z] + H (cr - cl) . [1, z], H = [c0 + c . z / sigma +
+    r xi > 0], xi ~ N(0, 1) the scatter the flat margin fit leaves. With
+    rho = sqrt(|c|^2 + r^2), s = c0 / rho, D0 = cr0 - cl0, dB = bR - bL:
+      grad = bL + Phi(s) dB + (c / sigma) (phi(s) / rho) (D0 - sigma s (dB . c) / rho)."""
+    c0, cv = c[0], c[1:]
+    rho = max(math.sqrt(cv @ cv + r * r), 1e-12)
+    s = c0 / rho
+    phi = math.exp(-0.5 * s * s) / math.sqrt(2 * math.pi)
+    Phi = 0.5 * math.erfc(-s / math.sqrt(2))
+    bl, dB, D0 = cl[1:], cr[1:] - cl[1:], cr[0] - cl[0]
+    return bl + Phi * dB + (cv / sigma) * (phi / rho) * (D0 - sigma * s * (dB @ cv) / rho)
+
+
+def margin_quad_grad(cl, cr, q, r, sigma, M=20000, seed=0):
+    """As margin_grad with the margin fitted as c0 + c . e + sum_i q_i e_i^2
+    (q = [c0, c, q_diag], e = z / sigma): Stein's formula on M antithetic
+    pairs of the surrogate (no simulations)."""
+    d = len(cl) - 1
+    rng = np.random.default_rng(seed)
+    e = rng.standard_normal((M, d))
+    xi = r * rng.standard_normal(M)
+    sq = (e**2) @ q[1 + d :]
+    lin = e @ q[1 : 1 + d]
+    Hp = (q[0] + lin + sq + xi > 0).astype(float)
+    Hm = (q[0] - lin + sq + xi > 0).astype(float)
+    D0, dB = cr[0] - cl[0], cr[1:] - cl[1:]
+    # E[H(e) (D0 + sigma dB . e) e] / sigma, the pair (e, -e) averaged
+    w = Hp * (D0 + sigma * e @ dB) - Hm * (D0 - sigma * e @ dB)
+    jump = (w[:, None] * e).mean(axis=0) / (2 * sigma)
+    return cl[1:] + jump
+
+
+def estimate_margin(fm, theta, sigma, eps, quad=False, shared=True):
+    """Two linear experts split by the sign of a margin the simulator reports
+    with every loss (fm(x) -> (losses, margins)). The margin is smooth, so its
+    flat fit c0 + c . eps (or diagonal quadratic, quad) is a least-squares
+    regression on real numbers, not a classifier on labels; the scatter r it
+    leaves (curvature seen from the shell at sigma sqrt(d)) enters as extra
+    blur. Experts: one slope plus an offset (shared), or one linear fit per
+    side. Gradient in closed form (margin_grad) or by Stein on the surrogate
+    (quad). One side empty: the slope of one linear fit.
+    Returns (gradient, simulations, info)."""
+    z = np.concatenate([eps, -eps]) * sigma
+    y, m = fm(theta + z)
+    n, d = z.shape
+    X = np.hstack([np.ones((n, 1)), z])
+    side = m > 0
+    if side.sum() < 2 or (~side).sum() < 2:
+        c_all, _ = _lin(X, y)
+        return c_all[1:], n, {"jump": None}
+    if shared:
+        c, _ = _lin(np.hstack([X, side[:, None].astype(float)]), y)
+        cl = c[:-1]
+        cr = cl.copy()
+        cr[0] += c[-1]
+    else:
+        cl, _, _ = _side_model(X[~side], y[~side])
+        cr, _, _ = _side_model(X[side], y[side])
+    e = z / sigma
+    if quad:
+        q, rss = _lin(np.hstack([np.ones((n, 1)), e, e**2]), m)
+        r = math.sqrt(rss / max(n - 2 * d - 1, 1))
+        return margin_quad_grad(cl, cr, q, r, sigma), n, {"jump": True, "margin": q, "r": r}
+    c, rss = _lin(np.hstack([np.ones((n, 1)), e]), m)
+    r = math.sqrt(rss / max(n - d - 1, 1))
+    return margin_grad(cl, cr, c, r, sigma), n, {"jump": True, "margin": c, "r": r}

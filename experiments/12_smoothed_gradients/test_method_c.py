@@ -123,3 +123,43 @@ def test_gated_subspace_curved():
         err_g.append(np.linalg.norm(mc.estimate_gated(f, np.zeros(d), sigma, eps)[0] - true))
         err_s.append(np.linalg.norm(mc.estimate_gated_subspace(f, np.zeros(d), sigma, eps, U)[0] - true))
     assert np.median(err_s) < 0.7 * np.median(err_g)
+
+
+def test_margin_grad_closed_form():
+    """margin_grad and margin_quad_grad (with zero curvature) equal the
+    smoothed surrogate's gradient by Monte Carlo (separate slopes, scatter r)."""
+    sigma, d = 0.05, 3
+    rng = np.random.default_rng(3)
+    cl, cr = rng.standard_normal(d + 1), rng.standard_normal(d + 1)
+    c, r = np.array([0.3, 0.8, -0.5, 0.2]), 0.7
+    e = rng.standard_normal((400_000, d))
+    H = c[0] + e @ c[1:] + r * rng.standard_normal(len(e)) > 0
+    X = np.hstack([np.ones((len(e), 1)), sigma * e])
+    f = X @ cl + H * (X @ (cr - cl))
+    mc_grad = (f[:, None] * e).mean(axis=0) / sigma
+    se = np.sqrt(((f[:, None] * e / sigma).var(axis=0)).sum() / len(e))
+    assert np.linalg.norm(mc.margin_grad(cl, cr, c, r, sigma) - mc_grad) < 4 * se
+    q = np.concatenate([c, np.zeros(d)])
+    assert np.linalg.norm(mc.margin_quad_grad(cl, cr, q, r, sigma, M=200_000) - mc_grad) < 6 * se
+
+
+def test_margin_curved_highd():
+    """Curved jump in d = 16 seen through a smooth margin (the toy of the
+    margin note): with N = 4d the margin estimate is far closer than the
+    gated fit on loss values."""
+    sigma, d, kap = 0.05, 16, 0.15
+    m = lambda x: 0.3 + x[:, 0] / sigma + 0.5 * kap * (((x[:, 1:] / sigma) ** 2).sum(1) - (d - 1))
+    fm = lambda x: (0.5 * x[:, 1] + (m(x) > 0), m(x))
+    rng = np.random.default_rng(1)
+    Q = rng.chisquare(d - 1, 400_000)
+    true = np.zeros(d)
+    true[1] = 0.5
+    true[0] = np.mean(np.exp(-0.5 * (0.3 + 0.5 * kap * (Q - (d - 1))) ** 2)) / (sigma * math.sqrt(2 * math.pi))
+    err = {"margin": [], "quad": [], "gated": []}
+    for _ in range(20):
+        eps = rng.standard_normal((2 * d, d))
+        err["margin"].append(np.linalg.norm(mc.estimate_margin(fm, np.zeros(d), sigma, eps)[0] - true))
+        err["quad"].append(np.linalg.norm(mc.estimate_margin(fm, np.zeros(d), sigma, eps, quad=True)[0] - true))
+        err["gated"].append(np.linalg.norm(mc.estimate_gated(lambda x: fm(x)[0], np.zeros(d), sigma, eps)[0] - true))
+    med = {k: np.median(v) / np.linalg.norm(true) for k, v in err.items()}
+    assert med["margin"] < 0.1 and med["quad"] < 0.2 and med["gated"] > 3 * med["margin"], med
