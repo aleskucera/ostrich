@@ -10,8 +10,9 @@ Scenarios:
   box    d / 2 push phases (box_phases); starts push too weakly to reach
          the target (BOX_START + offsets), the optimum lies next to tipping
   boxf   d push-force phases at the fixed height BOXF_H, target BOXF_TARGET:
-         a constant push reaches it only within ~2 N of tipping (narrower
-         than the blur); starts at BOXF_START + offsets (slides short)
+         beyond what a constant push reaches without tipping (x = 0.947), so
+         the best loss lies at the tipping edge; starts at BOXF_START +
+         offsets (slides short)
 
 Estimators (cost = simulations actually used):
   zeroth_order  antithetic Stein mean (M2), N pairs
@@ -46,7 +47,7 @@ SIGMA_END = 1 / 30
 BUDGET = {"wheel": 3000, "box": 4000, "boxf": 4000}
 U_START = {0.0: 0.30, 0.004: 0.38}  # wheel: stalls at the ledge for every start offset
 BOX_START = (0.5, 0.5)  # box: slides short of the target, upright
-BOXF_H, BOXF_TARGET, BOXF_START = 0.22, 0.9, 0.6
+BOXF_H, BOXF_TARGET, BOXF_START = 0.22, 1.0, 0.6
 START_OFFSET = 0.05
 SUB_K, SUB_PAIRS, SUB_DECAY = 4, 4, 0.9
 ADJ = {"wheel": 1.36, "box": 1.86}
