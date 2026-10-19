@@ -124,7 +124,7 @@ class Sim2D:
 
     # --- per-world functions (vmapped over worlds) -------------------------
 
-    def contact_frame(self, q_prev):
+    def contact_frame(self, q_prev, **geom):
         """Contact candidates at the start of the step, as Ostrich's collision
         detection fixes them: per contact a normal n (C, 2) pointing from the
         static geometry to the body, an anchor point s (C, 2) on the geometry,
@@ -132,15 +132,28 @@ class Sim2D:
         body point against the ground plane y = 0."""
         return NORMAL.expand(self.C, 2), torch.zeros(self.C, 2), torch.ones(self.C, dtype=torch.bool)
 
+    # Moving geometry (scenes that pass step(..., geom=g), g (B, G) per world
+    # and step; static scenes never see it): each hook gets geom=g[world].
+    def surface_velocity(self, q_prev, **geom):
+        """Velocity (C, 2) of the geometry under each contact (kinematic
+        surfaces); enters the gap and the friction slip as a relative motion."""
+        return torch.zeros(self.C, 2)
+
+    def prescribed_normal(self, q_prev, **geom):
+        """Contacts whose normal force is commanded, not solved for (a
+        force-controlled finger pad): mask (C,) and force (C,). Their normal
+        row is lam_n = force while valid, and the force acts along J_n."""
+        return torch.zeros(self.C, dtype=torch.bool), torch.zeros(self.C)
+
     def gap(self, q, frame):
         """Signed distance along each fixed normal: n . (p(q) - s) - thickness."""
         n, s, _ = frame
         p = q[:2] + _rotate(q[2], self.body.points)
         return (n * (p - s)).sum(dim=1) - self.body.thickness
 
-    def jacobians(self, q_prev):
+    def jacobians(self, q_prev, **geom):
         """Normal and tangent Jacobians (C, 3), at the previous pose."""
-        n, _, _ = self.contact_frame(q_prev)
+        n, _, _ = self.contact_frame(q_prev, **geom)
         t = torch.stack([n[:, 1], -n[:, 0]], dim=1)
         lever = _rotate(q_prev[2], self.body.points) - self.body.thickness[:, None] * n
         J_n = torch.cat([n, _cross2(lever, n)[:, None]], dim=1)
@@ -153,41 +166,53 @@ class Sim2D:
     def split(self, z):
         return z[:3], z[3 : 3 + self.C], z[3 + self.C :]
 
-    def free_gap(self, q_prev, v_prev, f_ext):
+    def free_gap(self, q_prev, v_prev, f_ext, **geom):
         """Start-of-step gap, unconstrained-step gap d_free and normal velocity
-        of the unconstrained step v_free = v_prev + h M^-1 (f_ext + gravity)."""
+        of the unconstrained step v_free = v_prev + h M^-1 (f_ext + gravity),
+        relative to the geometry (moving geometry: the frame's anchors are at
+        the end of the step, so the start gap adds back h u_n)."""
         h = self.cfg.dt
         v_free = v_prev + h * (f_ext + self.f_gravity) / self.m_diag
-        J_n, _ = self.jacobians(q_prev)
+        J_n, _ = self.jacobians(q_prev, **geom)
+        frame = self.contact_frame(q_prev, **geom)
         v_n = J_n @ v_free
-        d0 = self.gap(q_prev, self.contact_frame(q_prev))
-        return d0, d0 + h * v_n, v_n
+        d_end = self.gap(q_prev, frame)
+        if not geom:
+            return d_end, d_end + h * v_n, v_n
+        u_n = (frame[0] * self.surface_velocity(q_prev, **geom)).sum(dim=1)
+        return d_end + h * u_n, d_end + h * v_n, v_n - u_n
 
-    def gap_target(self, q_prev, v_prev, f_ext):
+    def gap_target(self, q_prev, v_prev, f_ext, **geom):
         """Restitution target d* = d_k - e h v_n^- for impacting contacts."""
         if self.cfg.restitution == 0.0:
             return torch.zeros(self.C)
-        d0, d_free, v_n_free = self.free_gap(q_prev, v_prev, f_ext)
-        v_n_prev = self.jacobians(q_prev)[0] @ v_prev
+        d0, d_free, v_n_free = self.free_gap(q_prev, v_prev, f_ext, **geom)
+        v_n_prev = self.jacobians(q_prev, **geom)[0] @ v_prev
+        if geom:
+            v_n_prev = v_n_prev - (self.contact_frame(q_prev, **geom)[0] * self.surface_velocity(q_prev, **geom)).sum(dim=1)
         impact = (v_n_free < -self.cfg.restitution_v_thr) & (d_free < 0.0)
         return torch.where(impact, d0 - self.cfg.restitution * self.cfg.dt * v_n_prev, 0.0)
 
-    def residual(self, z, q_prev, v_prev, f_ext, active, friction_on, z_w=None):
+    def residual(self, z, q_prev, v_prev, f_ext, active, friction_on, z_w=None, **geom):
         """Step residual R(z) for unknowns z = (v, lam_n, lam_t). The friction
         weight w is computed from z_w (default z); the adjoint passes a fixed
         z_w to hold w frozen, as Ostrich's adjoint does."""
         h = self.cfg.dt
         v, lam_n, lam_t = self.split(z)
-        w = self.friction_weight(z if z_w is None else z_w, q_prev)
-        J_n, J_t = self.jacobians(q_prev)
+        w = self.friction_weight(z if z_w is None else z_w, q_prev, **geom)
+        J_n, J_t = self.jacobians(q_prev, **geom)
 
         # Normal: scaled FB on (gap at end of step, lambda_n), alpha = 1,
         # beta = h^2 * effective mass, residual divided by h.
-        d = self.gap(integrate(q_prev, v, h), self.contact_frame(q_prev)) - self.gap_target(q_prev, v_prev, f_ext)
+        d = self.gap(integrate(q_prev, v, h), self.contact_frame(q_prev, **geom)) - self.gap_target(q_prev, v_prev, f_ext, **geom)
         beta = h**2 * self.effective_mass(J_n)
         norm = torch.sqrt(d**2 + (beta * lam_n) ** 2 + self.cfg.fb_eps_sq)
         phi = d + beta * lam_n - norm
         dphi_dd = 1.0 - d / norm  # Ostrich applies the normal force along dphi/dd * J_n
+        if geom:
+            pres, lam_p = self.prescribed_normal(q_prev, **geom)
+            dphi_dd = torch.where(pres, 1.0, dphi_dd)
+            phi = torch.where(pres, h * (lam_n - lam_p), phi)
 
         force_n = (torch.where(active, dphi_dd * lam_n, 0.0)[:, None] * J_n).sum(dim=0)
         force_t = (torch.where(friction_on, lam_t, 0.0)[:, None] * J_t).sum(dim=0)
@@ -195,23 +220,30 @@ class Sim2D:
 
         # Rows of undetected contacts / unloaded friction pin their multiplier to 0.
         r_n = torch.where(active, phi / h, lam_n)
-        r_t = torch.where(friction_on, J_t @ v + w * lam_t, lam_t)
+        v_t = J_t @ v
+        if geom:
+            n = self.contact_frame(q_prev, **geom)[0]
+            v_t = v_t - (torch.stack([n[:, 1], -n[:, 0]], dim=1) * self.surface_velocity(q_prev, **geom)).sum(dim=1)
+        r_t = torch.where(friction_on, v_t + w * lam_t, lam_t)
         return torch.cat([r_dyn, r_n, r_t])
 
-    def friction_weight(self, z, q_prev):
+    def friction_weight(self, z, q_prev, **geom):
         """w of compute_friction_model (isotropic branch), from the iterate z."""
-        return self.friction_weight_partials(z, q_prev)[0]
+        return self.friction_weight_partials(z, q_prev, **geom)[0]
 
-    def friction_weight_partials(self, z, q_prev):
+    def friction_weight_partials(self, z, q_prev, **geom):
         """w and its partial derivatives dw/dv_t, dw/dlam_n, dw/dlam_t (each (C,)).
         The derivatives follow torch's conventions (abs'(0) = 0, clamp passes
         the gradient on [0, 1e5]), so they match autodiff of w."""
         h, mu = self.cfg.dt, self.cfg.mu
         v, lam_n, lam_t = self.split(z)
-        _, J_t = self.jacobians(q_prev)
+        _, J_t = self.jacobians(q_prev, **geom)
         r = self.effective_mass(J_t)
 
         v_t = J_t @ v
+        if geom:
+            n = self.contact_frame(q_prev, **geom)[0]
+            v_t = v_t - (torch.stack([n[:, 1], -n[:, 0]], dim=1) * self.surface_velocity(q_prev, **geom)).sum(dim=1)
         d_t_norm = torch.sqrt((v_t * h) ** 2 + self.cfg.friction_slip_eps_sq)
         raw = torch.abs(lam_t * h)
         limit = mu * lam_n * h
@@ -242,20 +274,20 @@ class Sim2D:
         dw_dlam_t = inside * dw_draw * h * torch.sign(lam_t)
         return w, dw_dvt, dw_dlam_n, dw_dlam_t
 
-    def residual_jacobian(self, z, q_prev, v_prev, f_ext, active, friction_on):
+    def residual_jacobian(self, z, q_prev, v_prev, f_ext, active, friction_on, **geom):
         """dR/dz of `residual` (exact: includes dw/dz), written out by hand;
         equal to jacrev(self.residual) and several times cheaper."""
         h, C = self.cfg.dt, self.C
         v, lam_n, lam_t = self.split(z)
-        J_n, J_t = self.jacobians(q_prev)
+        J_n, J_t = self.jacobians(q_prev, **geom)
         a, o = active.to(z.dtype), friction_on.to(z.dtype)
 
         # Gap at the end of the step and its derivative g = dd/dv (C, 3).
         q1 = integrate(q_prev, v, h)
         p = self.body.points
-        frame = self.contact_frame(q_prev)
+        frame = self.contact_frame(q_prev, **geom)
         n = frame[0]
-        d = self.gap(q1, frame) - self.gap_target(q_prev, v_prev, f_ext)
+        d = self.gap(q1, frame) - self.gap_target(q_prev, v_prev, f_ext, **geom)
         dtheta_dw = h / (1.0 + (0.5 * h * v[2]) ** 2)
         c1, s1 = torch.cos(q1[2]), torch.sin(q1[2])
         dp_dtheta = torch.stack([-s1 * p[:, 0] - c1 * p[:, 1], c1 * p[:, 0] - s1 * p[:, 1]], dim=1)
@@ -268,8 +300,13 @@ class Sim2D:
         phi_l = beta * (1.0 - beta * lam_n / norm)
         phi_dd = -((beta * lam_n) ** 2 + self.cfg.fb_eps_sq) / norm**3
         phi_dl = d * beta**2 * lam_n / norm**3
+        if geom:  # commanded normal force: row h (lam_n - force), force along J_n
+            pres = self.prescribed_normal(q_prev, **geom)[0]
+            phi_d, phi_dd, phi_dl = torch.where(pres, 1.0, phi_d), torch.where(pres, 0.0, phi_dd), torch.where(pres, 0.0, phi_dl)
+            g = torch.where(pres[:, None], 0.0, g)
+            phi_l = torch.where(pres, h, phi_l)
 
-        w, dw_dvt, dw_dlam_n, dw_dlam_t = self.friction_weight_partials(z, q_prev)
+        w, dw_dvt, dw_dlam_n, dw_dlam_t = self.friction_weight_partials(z, q_prev, **geom)
 
         # Blocks assembled with cat (in-place writes are not allowed under vmap).
         # Dynamics rows: M (v - v_prev) - h (f + g) - h sum(phi_d lam_n J_n + lam_t J_t)
@@ -295,12 +332,16 @@ class Sim2D:
 
     # --- batched step -----------------------------------------------------
 
-    def step(self, q_prev, v_prev, f_ext=None, lam0=None):
+    def step(self, q_prev, v_prev, f_ext=None, lam0=None, geom=None):
         """One step for all worlds. q_prev, v_prev, f_ext: (B, 3).
 
         lam0 (B, 2C): initial contact forces for Newton (warm start, e.g. the
         previous step's info["z"][:, 3:]); default zero. It changes only the
         path to the root, not the root.
+
+        geom (B, G): per-world state of moving geometry for this step, handed
+        to the hooks contact_frame / surface_velocity / prescribed_normal as
+        geom=geom[world] (forward only: step_vjp ignores it).
 
         Returns q, v (B, 3) and an info dict with lam_n, lam_t (B, C), the
         number of Newton iterations and the final residual max-norm.
@@ -310,11 +351,19 @@ class Sim2D:
         if f_ext is None:
             f_ext = torch.zeros(B, 3)
 
-        d0, d_free, _ = vmap(self.free_gap)(q_prev, v_prev, f_ext)
-        valid = vmap(lambda q: self.contact_frame(q)[2])(q_prev)
-        active = (torch.minimum(d0, d_free) < cfg.margin) & valid
-        residual = vmap(self.residual)
-        jacobian = vmap(self.residual_jacobian)
+        if geom is None:
+            d0, d_free, _ = vmap(self.free_gap)(q_prev, v_prev, f_ext)
+            valid = vmap(lambda q: self.contact_frame(q)[2])(q_prev)
+            active = (torch.minimum(d0, d_free) < cfg.margin) & valid
+            residual = vmap(self.residual)
+            jacobian = vmap(self.residual_jacobian)
+        else:
+            d0, d_free, _ = vmap(lambda q, v, f, g: self.free_gap(q, v, f, geom=g))(q_prev, v_prev, f_ext, geom)
+            valid = vmap(lambda q, g: self.contact_frame(q, geom=g)[2])(q_prev, geom)
+            pres = vmap(lambda q, g: self.prescribed_normal(q, geom=g)[0])(q_prev, geom)
+            active = ((torch.minimum(d0, d_free) < cfg.margin) | pres) & valid
+            residual = lambda *a, _r=vmap(lambda z, q, v, f, ac, o, g: self.residual(z, q, v, f, ac, o, None, geom=g)): _r(*a, geom)
+            jacobian = lambda *a, _j=vmap(lambda z, q, v, f, ac, o, g: self.residual_jacobian(z, q, v, f, ac, o, geom=g)): _j(*a, geom)
 
         z = torch.cat([v_prev, torch.zeros(B, 2 * C) if lam0 is None else lam0], dim=1)
         for it in range(cfg.max_iters + 1):
@@ -399,8 +448,8 @@ class Restarts:
     another (wedged contacts, tumbling impacts); only the start differs, the
     root is the same. Use as class S(Restarts, Sim2D), with a low max_iters."""
 
-    def step(self, q_prev, v_prev, f_ext=None, lam0=None):
-        q, v, info = super().step(q_prev, v_prev, f_ext, lam0)
+    def step(self, q_prev, v_prev, f_ext=None, lam0=None, geom=None):
+        q, v, info = super().step(q_prev, v_prev, f_ext, lam0, geom)
         C = self.C
         share = torch.full((C,), self.body.mass * self.cfg.gravity * self.cfg.dt / C)
         starts = [None] + [torch.cat([share, sign * self.cfg.mu * share]) for sign in (0.0, -1.0, 1.0)]
@@ -410,7 +459,7 @@ class Restarts:
                 break
             l0 = None if start is None else start.expand(len(bad), 2 * C)
             f = None if f_ext is None else f_ext[bad]
-            q_b, v_b, info_b = super().step(q_prev[bad], v_prev[bad], f, l0)
+            q_b, v_b, info_b = super().step(q_prev[bad], v_prev[bad], f, l0, None if geom is None else geom[bad])
             fixed = info_b["residual_world"] < info["residual_world"][bad]
             sel = bad[fixed]
             q, v = q.clone(), v.clone()
