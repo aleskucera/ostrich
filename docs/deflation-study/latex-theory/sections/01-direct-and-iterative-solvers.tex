@@ -97,6 +97,30 @@ enough. Their cost is (number of iterations) $\times$ (cost of one
 iteration), and the number of iterations depends on the spectrum of $\mathbf{A}$. Reducing it is the purpose of preconditioning
 (Section~\ref{sec:preconditioning}).
 
+Krylov methods differ in the condition that picks $\mathbf{x}_k$ from the
+Krylov space (Table~\ref{tab:krylov-families}). \emph{Orthogonal residual}
+methods require $\mathbf{r}_k \perp \mathcal{K}_k$. This is the Galerkin
+condition, and for SPD $\mathbf{A}$ it is equivalent to minimizing the
+$\mathbf{A}$-norm of the error. \emph{Minimal residual} methods minimize
+$\|\mathbf{r}_k\|_2$ over the Krylov space, which is equivalent to the
+Petrov--Galerkin condition $\mathbf{r}_k \perp \mathbf{A}\mathcal{K}_k$
+\citep{saad2003iterative}.
+
+\begin{table}[h]
+  \centering
+  \begin{tabular}{@{}llll@{}}
+    \toprule
+    Family & Condition on $\mathbf{x}_k$ & Symmetric $\mathbf{A}$ & Nonsymmetric $\mathbf{A}$ \\
+    \midrule
+    Orthogonal residual & $\mathbf{r}_k \perp \mathcal{K}_k$ & CG \citep{hestenes1952methods} & FOM \citep{saad2003iterative} \\
+    Minimal residual & $\min \|\mathbf{r}_k\|_2$ over $\mathcal{K}_k$ & MINRES \citep{paige1975solution}, & GMRES \citep{saad1986gmres}, \\
+     & & CR \citep{stiefel1955relaxationsmethoden} & GCR \citep{eisenstat1983variational} \\
+    \bottomrule
+  \end{tabular}
+  \caption{The two families of Krylov methods.}
+  \label{tab:krylov-families}
+\end{table}
+
 \paragraph{Conjugate gradient (CG).}
 For SPD $\mathbf{A}$, CG \citep{hestenes1952methods,wiki:cg} chooses the $\mathbf{x}_k$ that
 minimizes the $\mathbf{A}$-norm of the error, $\|\mathbf{x} - \mathbf{x}_k\|_{\mathbf{A}}$, over the

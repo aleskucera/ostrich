@@ -16,7 +16,7 @@ General rules for all steps:
 - Write results to a new doc, docs/deflation-study/deflation_ab.md. Work happens in this repo on branch deflation-ab (the study started in the NeurKItt checkout, where ostrich is a submodule).
 
 Step 0 — Prerequisite: regenerate the dataset. DONE 2026-10-12 (ostrich fbc3efe, newton 102e812).
-- data/baselines/ is gitignored. Regenerate both scenes (from the repo root, with `uv run --no-sync` or `.venv/bin/python`; never plain `uv sync` / `uv run`, which reverts torch to cu128 and breaks it on the GPU):
+- data/baselines/ is gitignored. Regenerate both scenes (from the repo root, with `uv run --no-sync` or `.venv/bin/python`; on a machine with a low-compute-capability GPU like sm_61, never plain `uv sync` / `uv run`, which reverts torch to cu128 and breaks it on the GPU; other machines, e.g. one with a GTX 1650 (sm_75), work fine with the default versions from pyproject.toml):
     python test_scripts/dump_linear_systems.py --scene obstacle --out data/baselines/helhest_systems.npz
     python test_scripts/dump_linear_systems.py --scene surface  --out data/baselines/helhest_surface_systems.npz
   (`helhest_surface_systems.npz` is the script's default name and the name generalization_report.py expects.)

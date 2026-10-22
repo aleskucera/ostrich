@@ -1,2 +1,29 @@
 \section{How to Choose the Source of the Small $\mathbf{Z}$ Matrix}
 \label{sec:choosing-z}
+
+% TEMPORARY: summary of the Z sources tried so far (docs/deflation-study/deflation_ab.md).
+% To be replaced by the actual section text.
+\begin{table}[h]
+  \centering
+  \small
+  \begin{tabular}{@{}p{2.4cm}p{5.6cm}p{6.6cm}@{}}
+    \toprule
+    Family & $\mathbf{Z}$ source & Result (deflation median, obstacle / surface; Jacobi 19 / 29) \\
+    \midrule
+    Exact spectral & bottom-$k$ eigvecs of Jacobi-scaled $\mathbf{A}$ & $k=16$: 11 / 10 (ceiling only) \\
+     & cross-step (exact bottom-16 of step $N-1$) & 11 / 20; breaks in float32 \\
+     & recycle-exact (bottom-16 of previous solve) & 11 / 10 (reference only) \\
+    Krylov recycling & harmonic Ritz, $m = 16/24/32$ & $m=16$ fails (20 / 15); $m=32$: 12 / 11, but $m$ exceeds the 16-iteration cap \\
+     & GCRO-DR accumulated & 14 / 11; building $\mathbf{Z}$ too expensive \\
+    Structural & joint/control unit vectors ($k=18$) & \textbf{7 / 12}, free to build \\
+     & joint/control + $k_c$ contact rows & AMG strength $\approx$ leverage oracle \\
+    Analytic & $\operatorname{null}(\mathbf{J}^\top)$ & 12 / 19, but $k/n$ = 0.59 / 0.82 \\
+     & enriched ($\operatorname{null}(\mathbf{J}^\top)$ $\|$ joint/control) & 4 / 6, but $k/n \approx 0.9$ (a direct solve) \\
+    Hybrid & joint/control $\|$ exact bottom-$k_c$ of the condensed contact problem & not written up yet \\
+    Diagnostic & random, $k=16$ & 27.5 (mean) on obstacle, worse than Jacobi \\
+     & exact subspace rotated by $\theta$ & obstacle not monotone in $\theta$ \\
+    \bottomrule
+  \end{tabular}
+  \caption{Temporary summary of the $\mathbf{Z}$ sources tested so far.}
+  \label{tab:z-sources-tried}
+\end{table}

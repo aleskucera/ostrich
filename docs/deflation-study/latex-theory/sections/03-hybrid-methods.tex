@@ -159,3 +159,239 @@ residual stays orthogonal to $\mathbf{Z}$ and CG never spends iterations on
 those directions. The price is the projection itself: one application of
 $\tilde{\mathbf{P}}$, $\mathcal{O}(nk + k^2)$, in every iteration, on top of the
 one-off setup.
+
+\subsection{Deflated Preconditioned Conjugate Residual}
+\label{sec:dpcr}
+
+The solver used in our experiments combines the deflation projector of
+Section~\ref{sec:deflated-cg} with PCR (Algorithm~\ref{alg:pcr}) as the
+inner Krylov method. We call it deflated PCR (DPCR). Unlike DPCG, DPCR is
+not a named method in the literature. It joins two established parts: the
+Galerkin projector of deflated CG, and a minimal-residual inner solver
+(Table~\ref{tab:krylov-families}). The established deflated
+minimal-residual methods use a different projector; we compare the two
+below. Nothing in this section depends on how $\mathbf{Z}$ is obtained.
+Possible sources of $\mathbf{Z}$ are the subject of
+Section~\ref{sec:choosing-z}.
+
+\paragraph{The method.}
+$\mathbf{E}$, $\mathbf{Q}$ and $\tilde{\mathbf{P}}$ are defined as in
+\eqref{eq:deflation-setup}. PCR solves the deflated system
+\eqref{eq:deflated-system}, $\tilde{\mathbf{P}}\mathbf{A}\hat{\mathbf{x}} =
+\tilde{\mathbf{P}}\mathbf{b}$, and the solution is assembled by
+\eqref{eq:deflated-solution}, $\mathbf{x} = \mathbf{Q}\mathbf{b} +
+\tilde{\mathbf{P}}^\top\hat{\mathbf{x}}$. The preconditioner $\mathbf{P}$ is
+the one used for $\mathbf{A}$ itself, in our case the Jacobi preconditioner
+$\operatorname{diag}(\mathbf{A})$, not $\operatorname{diag}(\tilde{\mathbf{P}}\mathbf{A})$.
+Using $\mathbf{A}\tilde{\mathbf{P}}^\top = \tilde{\mathbf{P}}\mathbf{A}$ from
+\eqref{eq:deflation-identities},
+\begin{equation}
+  \mathbf{b} - \mathbf{A}\mathbf{x}
+  = \mathbf{b} - \mathbf{A}\mathbf{Q}\mathbf{b} - \mathbf{A}\tilde{\mathbf{P}}^\top\hat{\mathbf{x}}
+  = \tilde{\mathbf{P}}\mathbf{b} - \tilde{\mathbf{P}}\mathbf{A}\hat{\mathbf{x}}
+  = \hat{\mathbf{r}} ,
+  \label{eq:dpcr-residual}
+\end{equation}
+so the residual that PCR tracks is the true residual of the assembled
+solution. The stopping test of Algorithm~\ref{alg:pcr} therefore applies
+unchanged. Its target $\mathrm{tol}\,\|\mathbf{b}\|_2$ must stay relative to
+the original right-hand side, not to $\|\tilde{\mathbf{P}}\mathbf{b}\|_2$, so
+that PCR and DPCR stop at the same true residual.
+
+\paragraph{DPCR cannot break down.}
+PCR assumes an SPD operator, but $\tilde{\mathbf{P}}\mathbf{A}$ is only
+positive semidefinite. Its null space is exactly
+$\operatorname{span}(\mathbf{Z})$: $\tilde{\mathbf{P}}\mathbf{A}\mathbf{d} = \mathbf{0}$
+means $\mathbf{A}\tilde{\mathbf{P}}^\top\mathbf{d} = \mathbf{0}$, hence
+$\tilde{\mathbf{P}}^\top\mathbf{d} = \mathbf{0}$ and
+$\mathbf{d} = \mathbf{Q}\mathbf{A}\mathbf{d} \in \operatorname{span}(\mathbf{Z})$.
+Since $\tilde{\mathbf{P}}\mathbf{A}$ is symmetric, its range is
+$\operatorname{span}(\mathbf{Z})^\perp$. PCR with preconditioner $\mathbf{P}$
+is CR applied to the symmetrically preconditioned system
+\begin{equation}
+  \begin{aligned}
+    \mathbf{S}\mathbf{y} &= \mathbf{P}^{-1/2}\tilde{\mathbf{P}}\mathbf{b}, \\
+    \mathbf{S} &= \mathbf{P}^{-1/2}\tilde{\mathbf{P}}\mathbf{A}\mathbf{P}^{-1/2}, \\
+    \hat{\mathbf{x}} &= \mathbf{P}^{-1/2}\mathbf{y} .
+  \end{aligned}
+\end{equation}
+$\mathbf{S}$ is symmetric positive semidefinite with range
+$\mathbf{P}^{-1/2}\operatorname{span}(\mathbf{Z})^\perp$. The right-hand side
+lies in this range, because $\mathbf{Z}^\top\tilde{\mathbf{P}} = \mathbf{0}$.
+The Krylov space therefore never leaves the range, and on the range
+$\mathbf{S}$ is SPD. In exact arithmetic DPCR is CR on an SPD system of
+dimension $n-k$. It does not break down: until the residual is exactly zero,
+the denominators $\mathbf{y}^\top\mathbf{v}$ and $\rho$ of
+Algorithm~\ref{alg:pcr} stay positive, as they do for PCR on an SPD
+matrix. The safeguards that set $\gamma$ or $\beta$ to $0$ are therefore not
+needed in exact arithmetic. They are still kept for finite precision, where
+rounding can leave a small component of $\hat{\mathbf{r}}$ along
+$\mathbf{Z}$ and make a denominator vanish or turn negative.
+
+\paragraph{What DPCR minimizes.}
+PCR chooses $\hat{\mathbf{x}}_i$ in
+$\mathcal{K}_i = \mathcal{K}_i(\mathbf{P}^{-1}\tilde{\mathbf{P}}\mathbf{A},\, \mathbf{P}^{-1}\tilde{\mathbf{P}}\mathbf{b})$
+to minimize $\|\hat{\mathbf{r}}_i\|_{\mathbf{P}^{-1}}$. By
+\eqref{eq:dpcr-residual}, the assembled iterate
+$\mathbf{x}_i = \mathbf{Q}\mathbf{b} + \tilde{\mathbf{P}}^\top\hat{\mathbf{x}}_i$
+minimizes the true residual $\|\mathbf{b} - \mathbf{A}\mathbf{x}\|_{\mathbf{P}^{-1}}$
+over the affine set $\mathbf{Q}\mathbf{b} + \tilde{\mathbf{P}}^\top\mathcal{K}_i$.
+This set has a simple description. Take any
+$\mathbf{x} = \mathbf{Z}\mathbf{c} + \mathbf{w}$ with $\mathbf{w} \in \mathcal{K}_i$
+and impose the Galerkin condition $\mathbf{Z}^\top(\mathbf{b} - \mathbf{A}\mathbf{x}) = \mathbf{0}$.
+Then $\mathbf{c} = \mathbf{E}^{-1}\mathbf{Z}^\top(\mathbf{b} - \mathbf{A}\mathbf{w})$,
+so $\mathbf{x} = \mathbf{Q}\mathbf{b} + (\mathbf{I} - \mathbf{Q}\mathbf{A})\mathbf{w}
+= \mathbf{Q}\mathbf{b} + \tilde{\mathbf{P}}^\top\mathbf{w}$. Hence
+\begin{equation}
+  \mathbf{x}_i = \operatorname*{arg\,min}
+  \left\{ \|\mathbf{b} - \mathbf{A}\mathbf{x}\|_{\mathbf{P}^{-1}} \;:\;
+  \mathbf{x} \in \operatorname{span}(\mathbf{Z}) + \mathcal{K}_i,\;
+  \mathbf{Z}^\top(\mathbf{b} - \mathbf{A}\mathbf{x}) = \mathbf{0} \right\} .
+  \label{eq:dpcr-minimization}
+\end{equation}
+DPCR thus searches the augmented space $\operatorname{span}(\mathbf{Z}) + \mathcal{K}_i$.
+The component in $\operatorname{span}(\mathbf{Z})$ is fixed by a Galerkin
+condition and the rest by residual minimization, so DPCR uses one condition
+from each row of Table~\ref{tab:krylov-families}.
+
+\paragraph{Relation to deflated MINRES.}
+\citet{gaul2013framework} treat deflated CG, MINRES and GMRES in one
+framework. Their deflated minimal-residual methods replace
+$\tilde{\mathbf{P}}$ by
+\begin{equation}
+  \mathbf{P}_{\mathbf{A}} = \mathbf{I} - \mathbf{A}\mathbf{Z}\left((\mathbf{A}\mathbf{Z})^\top\mathbf{A}\mathbf{Z}\right)^{-1}(\mathbf{A}\mathbf{Z})^\top ,
+\end{equation}
+the orthogonal projector onto $\operatorname{range}(\mathbf{A}\mathbf{Z})^\perp$.
+With $\mathbf{P}_{\mathbf{A}}$ the residual is minimized over the augmented
+space without the Galerkin constraint in \eqref{eq:dpcr-minimization}; the
+residual is then orthogonal to $\mathbf{A}\mathbf{Z}$ instead of
+$\mathbf{Z}$. If $\operatorname{span}(\mathbf{Z})$ is an invariant subspace
+of $\mathbf{A}$, i.e.\ $\mathbf{A}\mathbf{Z} = \mathbf{Z}\boldsymbol{\Lambda}$
+for some $k \times k$ matrix $\boldsymbol{\Lambda}$, both projectors reduce
+to the orthogonal projector $\mathbf{I} - \mathbf{Z}(\mathbf{Z}^\top\mathbf{Z})^{-1}\mathbf{Z}^\top$.
+They differ only when $\mathbf{Z}$ is approximate. We use
+$\tilde{\mathbf{P}}$ for two reasons:
+\begin{itemize}
+  \item The spectral bound below holds for every full-rank $\mathbf{Z}$.
+  \item The coarse matrix is better conditioned. For orthonormal $\mathbf{Z}$
+    the eigenvalues of $\mathbf{E} = \mathbf{Z}^\top\mathbf{A}\mathbf{Z}$ lie in
+    $[\lambda_1(\mathbf{A}), \lambda_n(\mathbf{A})]$, so
+    $\kappa(\mathbf{E}) \le \kappa(\mathbf{A})$. $\mathbf{P}_{\mathbf{A}}$
+    needs $(\mathbf{A}\mathbf{Z})^\top\mathbf{A}\mathbf{Z} = \mathbf{Z}^\top\mathbf{A}^2\mathbf{Z}$,
+    whose condition number can reach $\kappa(\mathbf{A})^2$. This matters in
+    single precision, which the engine uses.
+\end{itemize}
+
+\paragraph{Spectrum.}
+The interlacing argument of Section~\ref{sec:deflated-cg} extends to the
+preconditioned operator. Let $\boldsymbol{\Pi}$ be the orthogonal projector
+onto $\operatorname{range}(\mathbf{A}^{1/2}\mathbf{Z})$, so that
+$\tilde{\mathbf{P}}\mathbf{A} = \mathbf{A}^{1/2}(\mathbf{I} - \boldsymbol{\Pi})\mathbf{A}^{1/2}$,
+and let $\mathbf{X} = (\mathbf{I} - \boldsymbol{\Pi})\mathbf{A}^{1/2}\mathbf{P}^{-1/2}$.
+Then $\mathbf{S} = \mathbf{X}^\top\mathbf{X}$, which has the same nonzero
+eigenvalues as
+$\mathbf{X}\mathbf{X}^\top = (\mathbf{I} - \boldsymbol{\Pi})\,\mathbf{A}^{1/2}\mathbf{P}^{-1}\mathbf{A}^{1/2}\,(\mathbf{I} - \boldsymbol{\Pi})$.
+This is a compression of $\mathbf{A}^{1/2}\mathbf{P}^{-1}\mathbf{A}^{1/2}$,
+which is similar to $\mathbf{P}^{-1}\mathbf{A}$, to an $(n-k)$-dimensional
+subspace. Cauchy interlacing gives, for the nonzero eigenvalues
+$\mu_1 \le \dots \le \mu_{n-k}$ of $\mathbf{P}^{-1}\tilde{\mathbf{P}}\mathbf{A}$,
+\begin{equation}
+  \lambda_j(\mathbf{P}^{-1}\mathbf{A}) \le \mu_j \le \lambda_{j+k}(\mathbf{P}^{-1}\mathbf{A}),
+  \qquad j = 1, \dots, n-k .
+  \label{eq:dpcr-interlacing}
+\end{equation}
+So for any full-rank $\mathbf{Z}$, deflation keeps the spectrum inside the
+interval of the preconditioned spectrum without deflation and cannot create
+new outliers. If $\operatorname{span}(\mathbf{Z})$ is spanned by eigenvectors
+of $\mathbf{P}^{-1}\mathbf{A}$ for its $k$ smallest eigenvalues, then
+$\mu_j = \lambda_{j+k}(\mathbf{P}^{-1}\mathbf{A})$, and the effective
+condition number is $\lambda_n(\mathbf{P}^{-1}\mathbf{A})/\lambda_{k+1}(\mathbf{P}^{-1}\mathbf{A})$.
+These eigenvectors are those of the preconditioned operator, not of
+$\mathbf{A}$. With the usual Chebyshev argument, the residual of CR obeys a
+bound of the same form as \eqref{eq:cg-bound}, with $\kappa$ replaced by
+$\mu_{n-k}/\mu_1$.
+
+Figure~\ref{fig:dpcr-interlacing} illustrates \eqref{eq:dpcr-interlacing}
+on a synthetic SPD matrix with four soft outlier modes and a diagonal
+scaling that spans three orders of magnitude, with Jacobi preconditioning
+and $k = 4$. The exact $\mathbf{Z}$ moves every eigenvalue to the upper
+edge of the band, which removes the four outliers and lowers
+$\kappa_{\mathrm{eff}}$ from $2.8 \cdot 10^4$ to $9$. A random $\mathbf{Z}$
+also stays inside the band, but close to its lower edge: the outliers
+remain and $\kappa_{\mathrm{eff}} = 2.3 \cdot 10^4$. Deflation with a poor
+$\mathbf{Z}$ is therefore safe for the spectrum, but it gains almost nothing.
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\textwidth]{latex-theory/figures/dpcr_interlacing.pdf}
+  \caption{Interlacing \eqref{eq:dpcr-interlacing} on a synthetic SPD
+    matrix ($n = 40$, $k = 4$, $\mathbf{P} = \operatorname{diag}(\mathbf{A})$).
+    Nonzero eigenvalues $\mu_j$ of the deflated operator
+    $\mathbf{P}^{-1}\tilde{\mathbf{P}}\mathbf{A}$ for an exact and a random
+    $\mathbf{Z}$, against the spectrum of $\mathbf{P}^{-1}\mathbf{A}$. Every
+    $\mu_j$ lies in the band $[\lambda_j, \lambda_{j+k}]$. Generated by
+    \texttt{test\_scripts/deflation\_theory\_figs.py}.}
+  \label{fig:dpcr-interlacing}
+\end{figure}
+
+The bound controls the condition number, not the iteration count. The
+right-hand side seen by PCR is $\tilde{\mathbf{P}}\mathbf{b}$, not
+$\mathbf{b}$. Because $\tilde{\mathbf{P}}$ is an oblique projector,
+$\|\tilde{\mathbf{P}}\mathbf{b}\|_2$ can exceed $\|\mathbf{b}\|_2$, and its
+components along the remaining eigenvectors can be distributed less
+favourably than those of $\mathbf{b}$. A $\mathbf{Z}$ that improves
+$\kappa_{\mathrm{eff}}$ can therefore still increase the iteration count
+(Section~\ref{sec:choosing-z}).
+
+\paragraph{Algorithm.}
+Algorithm~\ref{alg:dpcr} is Algorithm~\ref{alg:pcr} with every product by
+$\mathbf{A}$ replaced by a product by $\tilde{\mathbf{P}}\mathbf{A}$, plus
+the setup and the final assembly. Since $\mathbf{A}$ is symmetric,
+$\mathbf{Z}^\top\mathbf{A}\mathbf{d} = (\mathbf{A}\mathbf{Z})^\top\mathbf{d}$,
+so the deflated product can be evaluated as
+\begin{equation}
+  \tilde{\mathbf{P}}\mathbf{A}\mathbf{d}
+  = \mathbf{A}\mathbf{d} - (\mathbf{A}\mathbf{Z})\,\mathbf{E}^{-1}\left((\mathbf{A}\mathbf{Z})^\top\mathbf{d}\right) .
+  \label{eq:dpcr-product}
+\end{equation}
+The projection coefficients depend only on $\mathbf{d}$, the input of the
+product with $\mathbf{A}$, so the projection can be fused into the
+matrix--vector product. $\mathbf{Z}$ only needs full rank, but
+orthonormalizing it first keeps $\mathbf{E}$ well conditioned in finite
+precision. Orthonormalization does not change $\operatorname{span}(\mathbf{Z})$,
+and therefore does not change the method.
+
+\begin{algorithm}[h]
+  \caption{Deflated preconditioned conjugate residual (DPCR)}
+  \label{alg:dpcr}
+  \begin{algorithmic}[1]
+    \Require SPD $\mathbf{A}$, right-hand side $\mathbf{b}$, SPD preconditioner $\mathbf{P}$ of $\mathbf{A}$, full-rank $\mathbf{Z} \in \mathbb{R}^{n \times k}$, tolerances $\mathrm{tol}, \mathrm{atol}$, budget $k_{\max}$
+    \State $\mathbf{A}\mathbf{Z} \gets$ $k$ products with $\mathbf{A}$, \quad $\mathbf{E} \gets \mathbf{Z}^\top(\mathbf{A}\mathbf{Z})$, Cholesky-factor $\mathbf{E}$ \Comment{setup}
+    \State $\hat{\mathbf{x}} \gets \mathbf{0}$, \quad $\mathbf{r} \gets \mathbf{b} - (\mathbf{A}\mathbf{Z})\,\mathbf{E}^{-1}(\mathbf{Z}^\top\mathbf{b})$ \Comment{$= \tilde{\mathbf{P}}\mathbf{b}$}
+    \State $\mathbf{z} \gets \mathbf{P}^{-1}\mathbf{r}$, \quad $\mathbf{t} \gets \tilde{\mathbf{P}}\mathbf{A}\mathbf{z}$ \Comment{by \eqref{eq:dpcr-product}}
+    \State $\mathbf{p} \gets \mathbf{z}$, \quad $\mathbf{v} \gets \mathbf{t}$ \Comment{$\mathbf{v} = \tilde{\mathbf{P}}\mathbf{A}\mathbf{p}$}
+    \State $\rho \gets \mathbf{z}^\top \mathbf{t}$, \quad $i \gets 0$
+    \Repeat
+      \State $\mathbf{y} \gets \mathbf{P}^{-1}\mathbf{v}$
+      \State $\gamma \gets \rho / (\mathbf{y}^\top \mathbf{v})$ \textbf{if} $\mathbf{y}^\top \mathbf{v} > 0$ \textbf{else} $0$
+      \State $\hat{\mathbf{x}} \gets \hat{\mathbf{x}} + \gamma \mathbf{p}$, \quad $\mathbf{r} \gets \mathbf{r} - \gamma \mathbf{v}$
+      \State $\mathbf{z} \gets \mathbf{z} - \gamma \mathbf{y}$
+      \State $\mathbf{t} \gets \tilde{\mathbf{P}}\mathbf{A}\mathbf{z}$ \Comment{by \eqref{eq:dpcr-product}}
+      \State $\rho_{\text{new}} \gets \mathbf{z}^\top \mathbf{t}$
+      \State $\beta \gets \rho_{\text{new}} / \rho$ \textbf{if} $\rho > 0$ \textbf{else} $0$
+      \State $\mathbf{p} \gets \mathbf{z} + \beta \mathbf{p}$, \quad $\mathbf{v} \gets \mathbf{t} + \beta \mathbf{v}$
+      \State $\rho \gets \rho_{\text{new}}$, \quad $i \gets i + 1$
+    \Until{$\|\mathbf{r}\|_2 \le \max(\mathrm{atol},\, \mathrm{tol}\,\|\mathbf{b}\|_2)$ \textbf{or} $i = k_{\max}$} \Comment{$\|\mathbf{b}\|_2$, not $\|\tilde{\mathbf{P}}\mathbf{b}\|_2$}
+    \State \Return $\mathbf{x} = \hat{\mathbf{x}} + \mathbf{Z}\,\mathbf{E}^{-1}\left(\mathbf{Z}^\top\mathbf{b} - (\mathbf{A}\mathbf{Z})^\top\hat{\mathbf{x}}\right)$ \Comment{$= \mathbf{Q}\mathbf{b} + \tilde{\mathbf{P}}^\top\hat{\mathbf{x}}$}
+  \end{algorithmic}
+\end{algorithm}
+
+\paragraph{Cost.}
+The setup costs $k$ products with $\mathbf{A}$ for $\mathbf{A}\mathbf{Z}$,
+$\mathcal{O}(nk^2)$ for $\mathbf{E}$ and $\mathcal{O}(k^3)$ for its Cholesky
+factor. Each iteration adds one evaluation of \eqref{eq:dpcr-product},
+$\mathcal{O}(nk + k^2)$, to the product with $\mathbf{A}$ and the
+application of $\mathbf{P}^{-1}$. PCR needs only one product with
+$\mathbf{A}$ per iteration, thanks to the recurrence for $\mathbf{v}$, so it
+also needs only one projection per iteration, the same as DPCG. The initial
+projection and the final assembly each cost another $\mathcal{O}(nk + k^2)$.
