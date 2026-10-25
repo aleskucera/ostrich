@@ -251,3 +251,4 @@ experiments/7_engine_comparison/engines/tmp/
 
 # claude in VS code
 .claude/
+docs/deflation-study/latex-theory/figures/*.pdf
