@@ -1,29 +1,163 @@
 \section{How to Choose the Source of the Small $\mathbf{Z}$ Matrix}
 \label{sec:choosing-z}
 
-% TEMPORARY: summary of the Z sources tried so far (docs/deflation-study/deflation_ab.md).
+The matrix $\mathbf{Z} \in \mathbb{R}^{n \times k}$ is the only free input of
+DPCR (Section~\ref{sec:dpcr}): the projector $\tilde{\mathbf{P}}$, the cost
+of each iteration and the iteration count all follow from it. Any full-rank
+$\mathbf{Z}$ is admissible, because \eqref{eq:dpcr-interlacing} keeps the
+deflated spectrum inside that of $\mathbf{P}^{-1}\mathbf{A}$, so we are free
+to choose $\mathbf{Z}$ by how cheap it is to build and apply, not only by
+how well it deflates. The ideal choice is the span of the eigenvectors of
+$\mathbf{P}^{-1}\mathbf{A}$ for its $k$ smallest eigenvalues, which reduces
+the effective condition number to
+$\lambda_n(\mathbf{P}^{-1}\mathbf{A})/\lambda_{k+1}(\mathbf{P}^{-1}\mathbf{A})$,
+but computing them costs more than the solve itself. Because the iteration
+count also depends on the right-hand side, only the soft modes that
+$\tilde{\mathbf{P}}\mathbf{b}$ actually excites need to be captured.
+Practical sources therefore approximate this ideal from information that is
+available before the solve: earlier solves in the sequence, the Krylov
+vectors they produced, or the structure of $\mathbf{A}$.
+Table~\ref{tab:z-sources-tried} lists the sources we have tested.
+
+% TEMPORARY: summary of the Z sources tried so far. Numbers re-measured
+% 2026-10-25 on data regenerated on a GTX 1650 (test_scripts/deflation_ab.py,
+% deflation.py, deflation_hybrid.py, deflation_rowsel.py; float64, tol 1e-5).
 % To be replaced by the actual section text.
 \begin{table}[h]
   \centering
   \small
   \begin{tabular}{@{}p{2.4cm}p{5.6cm}p{6.6cm}@{}}
     \toprule
-    Family & $\mathbf{Z}$ source & Result (deflation median, obstacle / surface; Jacobi 19 / 29) \\
+    Family & $\mathbf{Z}$ source & Result (deflation median, obstacle / surface; Jacobi 19 / 19) \\
     \midrule
-    Exact spectral & bottom-$k$ eigvecs of Jacobi-scaled $\mathbf{A}$ & $k=16$: 11 / 10 (ceiling only) \\
-     & cross-step (exact bottom-16 of step $N-1$) & 11 / 20; breaks in float32 \\
-     & recycle-exact (bottom-16 of previous solve) & 11 / 10 (reference only) \\
-    Krylov recycling & harmonic Ritz, $m = 16/24/32$ & $m=16$ fails (20 / 15); $m=32$: 12 / 11, but $m$ exceeds the 16-iteration cap \\
-     & GCRO-DR accumulated & 14 / 11; building $\mathbf{Z}$ too expensive \\
-    Structural & joint/control unit vectors ($k=18$) & \textbf{7 / 12}, free to build \\
-     & joint/control + $k_c$ contact rows & AMG strength $\approx$ leverage oracle \\
-    Analytic & $\operatorname{null}(\mathbf{J}^\top)$ & 12 / 19, but $k/n$ = 0.59 / 0.82 \\
+    Exact spectral & bottom-$k$ eigvecs of Jacobi-scaled $\mathbf{A}$ & $k=16$: 11 / 9 (ceiling only) \\
+     & cross-step (exact bottom-16 of step $N-1$) & 11 / 14; broke in float32 (step 2) \\
+     & recycle-exact (bottom-16 of previous solve) & 11 / 9 (reference only) \\
+    Krylov recycling & harmonic Ritz, $m = 16/24/32$ & 20 / 11, 16 / 12, 11 / 10; $m=16$ loses on obstacle, $m \ge 24$ exceeds the 16-iteration cap \\
+     & GCRO-DR accumulated & 14 / 10; building $\mathbf{Z}$ too expensive \\
+    Structural & joint/control unit vectors ($k=18$) & \textbf{7 / 9}, free to build \\
+     & joint/control + 8 contact rows by AMG strength ($k=26$) & \textbf{5 / 4}; matches the leverage oracle, random rows 6 / 8 \\
+    Analytic & $\operatorname{null}(\mathbf{J}^\top)$ & 12 / 17, but $k/n$ = 0.59 / 0.82 \\
      & enriched ($\operatorname{null}(\mathbf{J}^\top)$ $\|$ joint/control) & 4 / 6, but $k/n \approx 0.9$ (a direct solve) \\
-    Hybrid & joint/control $\|$ exact bottom-$k_c$ of the condensed contact problem & not written up yet \\
-    Diagnostic & random, $k=16$ & 27.5 (mean) on obstacle, worse than Jacobi \\
+    Hybrid & joint/control $\|$ exact bottom-$k_c$ of the condensed contact problem & $k_c = 8$: 7 / 5; $k_c = 12$: 5 / 2 (needs an eigensolve) \\
+    Diagnostic & random, $k=16$ & 27.2 (mean, all systems) on obstacle vs Jacobi 19.8 \\
      & exact subspace rotated by $\theta$ & obstacle not monotone in $\theta$ \\
     \bottomrule
   \end{tabular}
   \caption{Temporary summary of the $\mathbf{Z}$ sources tested so far.}
   \label{tab:z-sources-tried}
 \end{table}
+
+% NOTE: the figure and table use data regenerated 2026-10-25 on a GTX 1650.
+% Obstacle reproduces deflation_ab.md; surface differs from it (Jacobi median 19 vs 29).
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\textwidth]{latex-theory/figures/deflation_z_sources.pdf}
+  \caption{Median PCR iterations on the held-out systems with deflation
+    (DPCR) for real sources of $\mathbf{Z}$, against Jacobi PCR without
+    deflation, which the ostrich solver uses today. The first four sources
+    approximate the bottom-16 eigenvectors ($k = 16$). Joint/control uses
+    unit vectors on the 18 joint and control rows, i.e.\ an exact solve of
+    the joint block ($k = 18$). The last bar also eliminates the 8 contact
+    rows with the largest AMG strength of connection
+    $\max_{j \ne r} |a_{rj}| / \sqrt{a_{rr} a_{jj}}$ ($k = 26$), which needs
+    only the entries of $\mathbf{A}$.
+    Generated by \texttt{figure\_scripts/deflation\_z\_sources.py}.}
+  \label{fig:deflation-z-sources}
+\end{figure}
+
+\subsection{Joint and Control Rows: An Exact Block Solve}
+\label{sec:z-joint-control}
+
+In the Helhest scenes, $18$ rows of $\mathbf{A}$ belong to the joints ($15$)
+and to the wheel controls ($3$). They are active in every system and sit at
+fixed positions in the row ordering. Taking $\mathbf{Z}$ as the unit vectors
+on these rows therefore costs nothing to build, and $k = 18$ is constant.
+$\mathbf{A}\mathbf{Z}$ is just the corresponding columns of $\mathbf{A}$, and
+$\mathbf{E} = \mathbf{Z}^\top\mathbf{A}\mathbf{Z} = \mathbf{A}_{JJ}$ is the
+joint block.
+
+With this $\mathbf{Z}$, deflation becomes block elimination. Order the joint
+rows $J$ first and the contact rows $C$ second. Then
+$\tilde{\mathbf{P}} = \mathbf{I} - \mathbf{A}\mathbf{Z}\mathbf{E}^{-1}\mathbf{Z}^\top$
+gives
+\begin{equation}
+  \tilde{\mathbf{P}}\mathbf{A} =
+  \begin{bmatrix} \mathbf{0} & \mathbf{0} \\ \mathbf{0} & \mathbf{S} \end{bmatrix},
+  \qquad
+  \mathbf{S} = \mathbf{A}_{CC} - \mathbf{A}_{CJ}\mathbf{A}_{JJ}^{-1}\mathbf{A}_{JC} .
+\end{equation}
+The joint block is solved exactly, and PCR iterates only on the Schur
+complement $\mathbf{S}$ of the contact rows. In mechanics this is known as
+static condensation.
+
+The joint rows are a good target for an exact solve for three reasons:
+\begin{itemize}
+  \item \textbf{Jacobi cannot handle them.} Jacobi treats every row on its
+    own and ignores the off-diagonal coupling. Joint rows are stiff
+    (compliance $c = 0.011$, controls $0.22$) and strongly coupled to each
+    other, because several rows of one joint act on the same pair of
+    bodies. In the Jacobi-scaled matrix, the largest off-diagonal entry of a
+    joint row is typically $0.54$ (obstacle) and $0.30$ (surface). For a
+    typical contact row it is close to $0$.
+  \item \textbf{The block itself is easy.} The Jacobi-scaled
+    $\mathbf{A}_{JJ}$ has condition number about $2.5$. Its $18 \times 18$
+    Cholesky factorization is cheap and stable, even in single precision.
+  \item \textbf{On surface, the soft modes live there.} The joint rows are
+    $14\%$ of the rows but carry $51\%$ of the weight of the bottom-16
+    eigenvectors of the scaled $\mathbf{A}$. Eliminating them lowers the
+    condition number from about $20$ to about $4$. On obstacle the soft modes
+    are not concentrated on the joint rows, and the condition number only
+    drops from $10^6$ to $3 \cdot 10^5$. The iteration count nevertheless
+    drops from $19$ to $7$ (Figure~\ref{fig:deflation-z-sources}), a
+    reminder that the condition number alone does not set the iteration
+    count (Section~\ref{sec:dpcr}).
+\end{itemize}
+The exact elimination is what matters, not merely using $\mathbf{A}_{JJ}$.
+Block-Jacobi with the exact $\mathbf{A}_{JJ}^{-1}$, i.e.\ the same block used
+as a preconditioner instead of being eliminated, needs about twice as many
+iterations on obstacle ($14$).
+
+\subsection{Choosing Further Rows by Strength of Connection}
+\label{sec:z-strength}
+
+The joint block removes the coupling that Jacobi misses among the joint
+rows. Some contact rows are strongly coupled too, and the same idea extends
+to them: eliminate a few more rows exactly. The question is which ones,
+without computing any eigenvectors.
+
+The answer comes from looking at the matrix after Jacobi scaling,
+$\mathbf{A}_s = \mathbf{P}^{-1/2}\mathbf{A}\mathbf{P}^{-1/2}$, where
+$\mathbf{P} = \operatorname{diag}(\mathbf{A})$ is the Jacobi preconditioner. It has a unit diagonal and
+off-diagonal entries
+\begin{equation}
+  s_{rj} = \frac{|a_{rj}|}{\sqrt{a_{rr}\,a_{jj}}} \in [0, 1),
+  \label{eq:strength}
+\end{equation}
+where $s_{rj} < 1$ because $\mathbf{A}$ is SPD. Jacobi would be exact if every
+$s_{rj}$ were zero. Now consider two rows $r$ and $j$ alone. Their scaled
+$2 \times 2$ block $\begin{bmatrix} 1 & s_{rj} \\ s_{rj} & 1 \end{bmatrix}$
+has eigenvalues $1 \pm s_{rj}$. If $s_{rj}$ is close to $1$, the two rows
+are almost parallel, and $1 - s_{rj}$ is a soft mode that Jacobi cannot
+remove. This is exactly the example of Section~\ref{sec:deflated-cg}, where
+$s = 0.99/1.01 \approx 0.98$ gives the scaled eigenvalues $1.98$ and $0.02$.
+Eliminating both rows exactly removes this mode. Eliminating only one of them
+is not enough: the other row stays in the Schur complement with diagonal
+$a_{rr}(1 - s_{rj}^2)$, and since DPCR keeps the preconditioner
+$\mathbf{P} = \operatorname{diag}(\mathbf{A})$, it still sees the small
+eigenvalue $1 - s_{rj}^2 \approx 2(1 - s_{rj})$.
+
+The quantity \eqref{eq:strength} is the \emph{strength of connection} used
+by algebraic multigrid to decide which unknowns are strongly coupled; this
+symmetric, scaled form is the one used in smoothed aggregation
+\citep{vanek1996algebraic}. Our rule scores each contact row by its strongest
+connection to any other row, joint rows included,
+\begin{equation}
+  \sigma_r = \max_{j \ne r} s_{rj},
+\end{equation}
+and adds unit vectors on the $k_c$ contact rows with the largest $\sigma_r$
+to the joint and control rows. With $k_c = 8$ this gives $k = 26$. Both
+rows of a strongly coupled pair have the same score, so the rule tends to
+pick them together, as the $2 \times 2$ argument requires. The
+rule needs only the diagonal and the off-diagonal entries of $\mathbf{A}$,
+i.e.\ one pass over the matrix, with no solves and no eigenvectors.
