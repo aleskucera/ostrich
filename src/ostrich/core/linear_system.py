@@ -236,6 +236,7 @@ def compute_linear_system(
             data.joint_target_vel,
             model.joint_target_ke,
             model.joint_target_kd,
+            model.joint_effort_limit,
             data.dt,
         ],
         outputs=[
