@@ -19,7 +19,7 @@ The block (1 kg) is held while 2 mu F covers its weight plus the lift's
 acceleration, i.e. F above about 10 N; squeezing less drops it (a loss jump
 of about (Z_TARGET - HZ)^2 / Z_SCALE^2 = 9). Dimensions follow a Franka
 Hand: 2 x 2 cm fingertip pads, 68 mm opening, 0 to 40 N squeeze. The squeeze cost pulls the optimum to
-that edge, as in experiments/12_smoothed_gradients/grasp.py.
+that edge, as in experiments/12_smoothed_gradients/grasp.py of the axion repository.
 
 Modes:
     python -m examples.grasp.grasp_lift view --squeeze 0.5 --lift 0.35 --vis gl
