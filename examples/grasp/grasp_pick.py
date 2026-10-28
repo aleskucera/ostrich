@@ -190,7 +190,7 @@ class GraspPick(OstrichDifferentiableSimulator):
             parent_xform=wp.transform_identity(), child_xform=wp.transform_identity(),
             target_ke=SLIDE_KE, target_kd=0.0, label="slide_y_j", custom_attributes={"joint_dof_mode": [JointMode.TARGET_VELOCITY]}))
         base = b.add_link(xform=wp.transform(wp.vec3(X_START, 0.0, z0), wp.quat_identity()), label="base", mass=BASE_MASS)
-        b.add_shape_box(base, hx=0.06, hy=0.08, hz=0.01, xform=wp.transform(wp.vec3(0.0, 0.0, 0.06), wp.quat_identity()), cfg=no_col)
+        b.add_shape_box(base, hx=0.06, hy=0.08, hz=0.01, xform=wp.transform(wp.vec3(0.0, 0.0, 0.08), wp.quat_identity()), cfg=no_col)  # visual only, clear of the block top
         joints.append(b.add_joint_prismatic(
             parent=sy, child=base, axis=wp.vec3(0.0, 0.0, 1.0),
             parent_xform=wp.transform_identity(), child_xform=wp.transform_identity(),
@@ -229,12 +229,7 @@ class GraspPick(OstrichDifferentiableSimulator):
 
     def nominal_u(self, P=None):
         """Commands that centre the pads on each block: (W, d)."""
-        P = self.instances if P is None else np.asarray(P)
-        # phase 0: approach with the pads open and still; phase 1: close (20 N), no lift; then squeeze and lift
-        u = np.tile([0.0, 0.0, 0.0, 0.0, 0.5, 0.0] + [0.5, 0.4] * (self.k - 2), (self.W, 1)).astype(np.float64)
-        u[:, 0] = ((-X_START + P[:, 0]) - X_TRAVEL[0]) / (X_TRAVEL[1] - X_TRAVEL[0])
-        u[:, 1] = (P[:, 1] / Y_TRAVEL + 1) / 2
-        return np.clip(u, 0, 1)
+        return nominal_commands(self.instances if P is None else P, self.k)
 
     def apply(self, U):
         U = np.asarray(U, dtype=np.float64)
@@ -319,6 +314,16 @@ class GraspPick(OstrichDifferentiableSimulator):
 
 
 OUTCOMES = ("held", "held_shifted", "dropped", "pushed", "toppled")
+
+
+def nominal_commands(P, k):
+    """Commands that centre the pads on blocks at poses P (n, 3), physical units: (n, 2k + 2)."""
+    P = np.asarray(P)
+    # phase 0: approach with the pads open and still; phase 1: close (20 N), no lift; then squeeze and lift
+    u = np.tile([0.0, 0.0, 0.0, 0.0, 0.5, 0.0] + [0.5, 0.4] * (k - 2), (len(P), 1)).astype(np.float64)
+    u[:, 0] = ((-X_START + P[:, 0]) - X_TRAVEL[0]) / (X_TRAVEL[1] - X_TRAVEL[0])
+    u[:, 1] = (P[:, 1] / Y_TRAVEL + 1) / 2
+    return np.clip(u, 0, 1)
 
 
 def make_sim(num_worlds, phases, duration=1.6, dt=5e-3, vis="null"):
