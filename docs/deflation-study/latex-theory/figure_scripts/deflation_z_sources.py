@@ -2,12 +2,12 @@
 
 Median PCR iterations on the held-out split (last 20% of systems) against the
 Jacobi PCR median, which is what the ostrich solver does today. Sources:
-  * the k = 16 spectral sources from test_scripts/deflation_ab.py (z_sources);
+  * the k = 16 spectral sources from test_scripts/deflation/deflation_ab.py (z_sources);
   * joint/control: unit vectors on the 18 joint/control rows, i.e. an exact
     solve of the joint block + PCR on the Schur complement of the contact rows;
   * joint/control + K_C contact rows, also eliminated as unit vectors, picked
     by the classical AMG strength of connection max_{j≠r} |a_rj| / √(a_rr a_jj)
-    (test_scripts/deflation_rowsel.py, rule "strength A (all j)"). Needs only
+    (test_scripts/deflation/deflation_rowsel.py, rule "strength A (all j)"). Needs only
     the entries of A, no eigensolve.
 
 Needs data/baselines/helhest_systems.npz and helhest_surface_systems.npz
@@ -30,9 +30,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 from _common import save_fig
 
-from test_scripts.deflation import DT, SCENES, deflated_pcr
-from test_scripts.deflation_ab import z_sources
-from test_scripts.deflation_rowsel import sources as rowsel_sources
+from test_scripts.deflation.deflation import DT, SCENES, deflated_pcr
+from test_scripts.deflation.deflation_ab import z_sources
+from test_scripts.deflation.deflation_rowsel import sources as rowsel_sources
 from test_scripts.precond_lab import jacobi_apply, load_systems, pcr
 from test_scripts.recycle_probe import pct
 
@@ -68,7 +68,7 @@ def main():
             ax.annotate(f"{v:g}", (xi, v), xytext=(0, 2), textcoords="offset points",
                         ha="center", fontsize=7, color=INK)
         ax.axhline(jac, color=INK, ls=":", lw=1, label="Jacobi median (current ostrich)")
-        ax.set_title(label)
+        ax.set_title({"obstacle": "obstacle scene", "surface": "terrain scene"}[label])
         ax.set_xticks(x, SOURCES.values(), fontsize=7, rotation=35, ha="right", rotation_mode="anchor")
         for s in ("top", "right"):
             ax.spines[s].set_visible(False)

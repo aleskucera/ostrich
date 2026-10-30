@@ -22,7 +22,7 @@ k_c is capped at n_C // 2 so it stays a deflation, not a direct solve.
     a free, perfect network.
 
 Run:
-    python test_scripts/deflation_hybrid.py
+    python test_scripts/deflation/deflation_hybrid.py
 """
 
 from __future__ import annotations
@@ -35,8 +35,8 @@ from ostrich.optim import PCRSolver
 from test_scripts.precond_lab import jacobi_apply, load_systems
 from test_scripts.recycle_probe import NC, pct
 from test_scripts.ideal_target_stability import bad_subspace
-from test_scripts.deflation import DT, SCENES, deflated_pcr
-from test_scripts.deflation_cost import DEV, SETTINGS, Deflation, engine_objects, time_graph
+from test_scripts.deflation.deflation import DT, SCENES, deflated_pcr
+from test_scripts.deflation.deflation_cost import DEV, SETTINGS, Deflation, engine_objects, time_graph
 
 N_JC = 18
 KCS = (4, 8, 12, 20)

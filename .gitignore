@@ -211,7 +211,8 @@ examples/comparison_scalability/*/results/
 # Top-level scratch run outputs
 /results/
 # Scratch & debug scripts
-/test_scripts/
+/test_scripts/*
+!/test_scripts/deflation/
 # Thesis PDFs + review notes
 /thesis/
 # Friction-gradient toy exploration

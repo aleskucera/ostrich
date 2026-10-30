@@ -3,7 +3,7 @@
 Median PCR iterations on the held-out split against the principal angle θ between
 span(Z) and the exact bottom-16 eigenvectors of the Jacobi-scaled A, for random
 and spectral (neighbouring-eigenvector) errors, on both Helhest scenes. The
-experiment itself is test_scripts/deflation_robustness.py (run_scene); this
+experiment itself is test_scripts/deflation/deflation_robustness.py (run_scene); this
 script only re-plots it. The real Z sources are in deflation_z_sources.py.
 
 Needs data/baselines/helhest_systems.npz and helhest_surface_systems.npz
@@ -27,8 +27,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from _common import save_fig
 
-from test_scripts.deflation import SCENES
-from test_scripts.deflation_robustness import ANGLES, run_scene
+from test_scripts.deflation.deflation import SCENES
+from test_scripts.deflation.deflation_robustness import ANGLES, run_scene
 from test_scripts.recycle_probe import pct
 
 RED, BLUE, INK, MUTED, GRID = "#e34948", "#2a78d6", "#2b2b29", "#8a8980", "#e4e3dd"

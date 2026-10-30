@@ -15,7 +15,7 @@ differs slightly from the 14.4 quoted in PLAN.md). Sources that need a
 previous solve still use the full sequence before the split.
 
 Run:
-    python test_scripts/deflation_ab.py
+    python test_scripts/deflation/deflation_ab.py
 """
 
 from __future__ import annotations
@@ -29,7 +29,7 @@ from test_scripts.recycle_probe import embed, pct, restrict, two_level
 from test_scripts.recycle_approx import approx_subspace, harmonic_ritz, krylov_residual_basis
 from test_scripts.coarse_null_probe import null_jt_basis
 from test_scripts.coarse_enriched_probe import orthonormal
-from test_scripts.deflation import DT, SCENES, deflated_pcr
+from test_scripts.deflation.deflation import DT, SCENES, deflated_pcr
 
 K = 16
 GCRODR_M = 16

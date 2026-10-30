@@ -31,7 +31,7 @@ Step 0 — Prerequisite: regenerate the dataset. DONE 2026-10-12 (ostrich fbc3ef
 
 Step 1 — Offline, iteration counts only: implement Galerkin-deflated PCR and A/B it against the additive form on the same Z.
 
-1a. DONE 2026-10-12 (ostrich cd6852a). Implement `deflated_pcr(A, b, Z, M_apply)` in a new file, test_scripts/deflation.py. The simplest correct version reuses the existing `pcr` from precond_lab.py:
+1a. DONE 2026-10-12 (ostrich cd6852a). Implement `deflated_pcr(A, b, Z, M_apply)` in a new file, test_scripts/deflation/deflation.py. The simplest correct version reuses the existing `pcr` from precond_lab.py:
 - Orthonormalize Z (QR) and drop near-dependent columns using rank-revealing QR or the SVD. Harvested Ritz bases can be nearly dependent.
 - Compute AZ, E = Zᵀ(AZ), and the Cholesky factor of E.
 - Build the dense PA = A − AZ E⁻¹ (AZ)ᵀ and the deflated right-hand side Pb = b − AZ E⁻¹ Zᵀb. The systems are small, so dense is fine offline.
@@ -47,7 +47,7 @@ Step 1 — Offline, iteration counts only: implement Galerkin-deflated PCR and A
 - Z random → expected median iterations ≤ Jacobi, up to noise. RESULT: obstacle is clearly worse (27.5 vs 19.9; additive 32.8), surface is equal (39.4 vs 39.5). This is NOT a bug. The theory bounds κ_eff, not the iteration count: projecting out random directions moves RHS energy into the soft modes (obstacle ~7×, surface unchanged). Interlacing holds, and rounding, cluster splitting and a larger initial residual were ruled out. So "theory forbids clearly worse" was too strong. Deflation is still better than additive with the same bad Z.
 - x matches a dense solve to within tolerance. Also check it against the engine solution stored in the npz, but only on obstacle: surface x_engine is often unconverged (see step 0).
 
-1c. DONE 2026-10-13 (test_scripts/deflation_ab.py; full tables in docs/deflation-study/deflation_ab.md). The A/B table. For each Z source, run additive (`two_level`) and deflation with the SAME Z, on both scenes. Report median and p90 iterations, and wins vs Jacobi (count).
+1c. DONE 2026-10-13 (test_scripts/deflation/deflation_ab.py; full tables in docs/deflation-study/deflation_ab.md). The A/B table. For each Z source, run additive (`two_level`) and deflation with the SAME Z, on both scenes. Report median and p90 iterations, and wins vs Jacobi (count).
 - Exact current subspace, bad_subspace on the system itself, k ∈ {4, 8, 16, 32}. This is the ceiling.
 (Additive numbers below were re-measured 2026-10-12 on the obstacle held-out split, Jacobi bar 18.4.)
 - Exact subspace from step N−1, reused for all of step N (logic of cross_step_stability.py). Additive gives 18.4 → 14.4 (+22%; doc had 18.5 → 11.9). For reference: the exact bottom-16 of the previous SOLVE (recycle_validate.py "recycle-always") gives 18.4 → 11.9.
@@ -55,7 +55,7 @@ Step 1 — Offline, iteration counts only: implement Galerkin-deflated PCR and A
 - Accumulated recycling across the sequence (logic of recycle_gcrodr.py). Additive gives 18.6 (−1%).
 - Analytic null(Jᵀ) (`null_jt_basis` in coarse_null_probe.py). Additive gives 15.0 (+18%). Note that dim null(Jᵀ) is p50 31 (10–43) with n 31–67, so Z is large; that matters for step 2. The completion Z = [null(Jᵀ) ‖ joint/control block] is NOT untested, as the doc says: coarse_enriched_probe.py tested it additively, and it gave 16.4 (+11%), worse than null-only. Joint-only gave 14.7. Run all three with deflation.
 
-1d. DONE 2026-10-13 (test_scripts/deflation_robustness.py, docs/deflation-study/deflation_robustness.png; details in docs/deflation-study/deflation_ab.md). Robustness curve. Take Z = exact current subspace, k = 16, and perturb it with controlled noise to sweep the principal angle to the true subspace from 0° to about 60°. Plot iterations vs angle for additive vs deflation. This shows how accurate any Z source (or a future network) must be.
+1d. DONE 2026-10-13 (test_scripts/deflation/deflation_robustness.py, docs/deflation-study/deflation_robustness.png; details in docs/deflation-study/deflation_ab.md). Robustness curve. Take Z = exact current subspace, k = 16, and perturb it with controlled noise to sweep the principal angle to the true subspace from 0° to about 60°. Plot iterations vs angle for additive vs deflation. This shows how accurate any Z source (or a future network) must be.
 
 Decision gate for Step 1 → Step 2:
 - A CHEAP Z source qualifies if, with deflation, it cuts median iterations by ≥ ~20% vs Jacobi on BOTH scenes and does not lose to Jacobi in p90. Cheap means no per-step eigensolve: harvested Ritz, accumulated recycling, or analytic.
@@ -74,7 +74,7 @@ Decision gate for Step 1 → Step 2:
   - Obstacle (gap ~7e-6) is non-monotone. A uniform random error of 1° already loses to Jacobi, while 90° beats 10–60°. Partially capturing the ultra-soft, RHS-free modes is the worst case: the leftover eigenvalue is ≈ λ/sin²θ, and ‖Pb‖ grows. The working sources (GCRO-DR, harmonic m=32) ignore modes 1–4 and capture modes ~12–16.
   - So a single principal angle is NOT a valid accuracy spec, and for step 3 a uniform projection loss is the wrong target (see the doc).
 
-Step 2 — Estimate wall time before touching the engine. DONE 2026-10-13 (test_scripts/deflation_cost.py; details in docs/deflation-study/deflation_ab.md).
+Step 2 — Estimate wall time before touching the engine. DONE 2026-10-13 (test_scripts/deflation/deflation_cost.py; details in docs/deflation-study/deflation_ab.md).
 - RESULT: no Z source gives a clearly positive net gain on both scenes, so no engine change is proposed.
   - Engine facts: the dump config caps PCR at 16, and Jacobi hits the cap on ~90% of held-out solves (residual p90 8e-4 / 2e-2). All worlds iterate until the slowest converges, so the batch cost follows the MAX iteration count.
   - Cross-step breaks in float32 (surface) and was dropped. Block-Jacobi on the joint block is no substitute for joint/control deflation.
@@ -82,7 +82,7 @@ Step 2 — Estimate wall time before touching the engine. DONE 2026-10-13 (test_
   - GCRO-DR / any dense Z (incl. a network): at the default config even zero overhead gives 0% in batch. At tol 1e-3 the ceiling is −25% to −41%, eaten by the dense projection and the Z update.
   - Open lever: accuracy. Joint/control deflation converges (6e-6 / 2e-4) where Jacobi stops unconverged at the cap. Whether that cuts Newton iterations needs an in-engine run (a src/ change; not done).
 
-Step 2c — Direct-solve baseline. DONE 2026-10-13 (test_scripts/deflation_direct.py; tables in docs/deflation-study/deflation_ab.md, "Direct-solve baseline").
+Step 2c — Direct-solve baseline. DONE 2026-10-13 (test_scripts/deflation/deflation_direct.py; tables in docs/deflation-study/deflation_ab.md, "Direct-solve baseline").
 - Question: since the systems are small (n ≤ 170), is iterating worth it at all?
 - Body-space solve: A = G M⁻¹ Gᵀ + C, where G has only 6·N_b = 24 columns (Helhest has 4 bodies), and every row has c > 0. So by Woodbury, (M + Gᵀ C⁻¹ G) v = Gᵀ C⁻¹ b and x = C⁻¹(b − G v). That is a 24×24 Cholesky per world, independent of the number of active contacts. The ultra-soft modes (null(Gᵀ), held only by c) are handled exactly.
 - RESULT, float32 GPU, assembly included, ms per solve at W = 1 / 64 / 1024:
@@ -104,7 +104,7 @@ Step 2c — Direct-solve baseline. DONE 2026-10-13 (test_scripts/deflation_direc
   - measure time per step and the Newton iteration count;
   - reuse the same factor for the adjoint (eq. 18; A is symmetric).
 
-Step 2d — Adjoint accuracy, offline. DONE 2026-10-13 (test_scripts/adjoint_accuracy.py; tables in docs/deflation-study/deflation_ab.md, "Adjoint accuracy").
+Step 2d — Adjoint accuracy, offline. DONE 2026-10-13 (test_scripts/deflation/adjoint_accuracy.py; tables in docs/deflation-study/deflation_ab.md, "Adjoint accuracy").
 - Engine backward step (base_engine.step_backward): d = M⁻¹f, then A w = J d by PCR (forward tol/cap, x0 = 0), then w_u = d − M⁻¹Jᵀw. With the defaults, A is the forward operator.
 - Offline stand-in: the last NR system per step, 25 steps per scene × 8 loss gradients (random on all bodies / chassis only), compared against a float64 exact solve.
 - RESULT, relative error of w_u (the gradient carried to the previous step), float32:

@@ -28,7 +28,7 @@ per iteration, a final correction, and the cost of producing Z.
     implementation can.
 
 Run:
-    python test_scripts/deflation_cost.py
+    python test_scripts/deflation/deflation_cost.py
 """
 
 from __future__ import annotations
@@ -51,8 +51,8 @@ from ostrich.optim.system_operator import (SystemLinearData, SystemOperator,
                                            kernel_invM_Jt_matvec_direct)
 from test_scripts.precond_lab import jacobi_apply, load_systems
 from test_scripts.recycle_probe import NC, embed, pct
-from test_scripts.deflation import DT, SCENES, deflated_pcr
-from test_scripts.deflation_ab import z_sources
+from test_scripts.deflation.deflation import DT, SCENES, deflated_pcr
+from test_scripts.deflation.deflation_ab import z_sources
 
 DEV = "cuda:0"
 REG = 1e-6

@@ -20,7 +20,7 @@ contrast); x vs dense solve (and vs x_engine on obstacle only — surface
 x_engine is often unconverged at the engine's 16-iter cap).
 
 Run:
-    python test_scripts/deflation.py
+    python test_scripts/deflation/deflation.py
 """
 
 from __future__ import annotations

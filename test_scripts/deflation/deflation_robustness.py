@@ -25,7 +25,7 @@ Held-out split (last 20% of systems), both scenes.
 Writes docs/deflation-study/deflation_robustness.png.
 
 Run:
-    python test_scripts/deflation_robustness.py
+    python test_scripts/deflation/deflation_robustness.py
 """
 
 from __future__ import annotations
@@ -40,8 +40,8 @@ import torch
 
 from test_scripts.precond_lab import jacobi_apply, load_systems, pcr
 from test_scripts.recycle_probe import pct, two_level
-from test_scripts.deflation import DT, SCENES, deflated_pcr
-from test_scripts.deflation_ab import z_sources
+from test_scripts.deflation.deflation import DT, SCENES, deflated_pcr
+from test_scripts.deflation.deflation_ab import z_sources
 
 K = 16
 ANGLES = (0, 0.1, 0.3, 1, 3, 10, 20, 30, 45, 60, 90)
@@ -49,7 +49,7 @@ SEEDS = (0, 1, 2)
 K16_SOURCES = ("cross-step (N-1)", "recycle-exact (prev)", "harmonic m=16",
                "harmonic m=24", "harmonic m=32", "gcrodr accumulated")
 MODES = (1, 2, 4, 8, 12, 16)
-OUT = pathlib.Path(__file__).resolve().parent.parent / "docs/deflation-study/deflation_robustness.png"
+OUT = pathlib.Path(__file__).resolve().parents[2] / "docs/deflation-study/deflation_robustness.png"
 
 
 def scaled_eig(A):

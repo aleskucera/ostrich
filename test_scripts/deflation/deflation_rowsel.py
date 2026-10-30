@@ -20,7 +20,7 @@ at W = 1 from the dense Warp deflation kernels (gpu_costs of
 deflation_hybrid.py — an upper bound, unit-vector Z is really a gather).
 
 Run:
-    python -m test_scripts.deflation_rowsel
+    python -m test_scripts.deflation.deflation_rowsel
 """
 
 from __future__ import annotations
@@ -31,9 +31,9 @@ import warp as wp
 
 from test_scripts.precond_lab import load_systems
 from test_scripts.recycle_probe import pct
-from test_scripts.deflation import DT, SCENES
-from test_scripts.deflation_cost import SETTINGS
-from test_scripts.deflation_hybrid import N_JC, gpu_costs, run_iters
+from test_scripts.deflation.deflation import DT, SCENES
+from test_scripts.deflation.deflation_cost import SETTINGS
+from test_scripts.deflation.deflation_hybrid import N_JC, gpu_costs, run_iters
 
 KCS = (4, 8, 12)
 N_LEV = 16

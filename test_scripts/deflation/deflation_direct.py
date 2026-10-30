@@ -25,7 +25,7 @@ Two direct solvers:
     + 8 strength rows (k=26, dense deflation kernels = upper bound).
 
 Run:
-    python -m test_scripts.deflation_direct
+    python -m test_scripts.deflation.deflation_direct
 """
 
 from __future__ import annotations
@@ -39,10 +39,10 @@ import warp as wp
 from ostrich.optim import PCRSolver
 from test_scripts.precond_lab import load_systems
 from test_scripts.recycle_probe import NC, pct
-from test_scripts.deflation import DT, SCENES
-from test_scripts.deflation_cost import DEV, REG, SETTINGS, Deflation, batch_iters, engine_objects, time_graph
-from test_scripts.deflation_hybrid import run_iters
-from test_scripts import deflation_rowsel
+from test_scripts.deflation.deflation import DT, SCENES
+from test_scripts.deflation.deflation_cost import DEV, REG, SETTINGS, Deflation, batch_iters, engine_objects, time_graph
+from test_scripts.deflation.deflation_hybrid import run_iters
+from test_scripts.deflation import deflation_rowsel
 
 WORLDS = (1, 64, 1024)
 torch.backends.cuda.preferred_linalg_library("cusolver")   # MAGMA batched potrs is not graph-capturable

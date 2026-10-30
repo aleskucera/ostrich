@@ -30,7 +30,7 @@ and the cosine between computed and exact w_u. Single step only: over a
 horizon these errors compound through the chain of step Jacobians.
 
 Run:
-    python -m test_scripts.adjoint_accuracy
+    python -m test_scripts.deflation.adjoint_accuracy
 """
 
 from __future__ import annotations
@@ -40,8 +40,8 @@ import torch
 
 from test_scripts.precond_lab import _block_minv, jacobi_apply, load_systems
 from test_scripts.recycle_probe import pct
-from test_scripts.deflation import DT, SCENES, deflated_pcr
-from test_scripts.deflation_cost import SETTINGS
+from test_scripts.deflation.deflation import DT, SCENES, deflated_pcr
+from test_scripts.deflation.deflation_cost import SETTINGS
 
 N_DRAWS = 8
 
