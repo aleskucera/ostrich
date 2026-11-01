@@ -92,3 +92,101 @@ methods) or §4 (next to the joint/control Z source).
 - Lacoursière, SPOOK / split solver report:
   https://webapps.cs.umu.se/uminf/reports/2011/009/part1.pdf
 - Peiret et al. 2019: https://doi.org/10.1145/3355621
+
+## Idea: body-space / constraint-space hybrid for better adjoint gradients
+
+Discussed 2026-11-02. **Untested idea, not a finding yet.** Nothing below
+has been measured, except the §5.3 numbers it builds on.
+
+**Motivation.** The ostrich adjoint (`base_engine.step_backward`) computes
+d = M̃⁻¹f, solves A w = J d with capped PCR and forms w_u = d − M̃⁻¹Jᵀw.
+The subtraction amplifies the relative error of w by about the stiffness
+ratio of the stiff rows (1/(mc) in the scalar example of §5.3), regardless
+of which solver produced w. A full body-space solve removes the subtraction
+(§5.3: 0% of draws > 10% error, vs ~40% for PCR on obstacle). However, it
+needs c_i > 0 for every row, and a dense K costs (6N_b)³ once body–body
+contacts fill it in. The hybrid moves only the rows that cause the
+cancellation into body space.
+
+**Construction.** Split the active rows into stiff rows S and soft rows F.
+- Eliminate λ_S in body space. This gives a stiffened mass matrix
+  M̂ = M̃ + J_Sᵀ C_S⁻¹ J_S (6N_b × 6N_b, SPD).
+- Eliminate Δu. This gives a soft-row system A_F = J_F M̂⁻¹ J_Fᵀ + C_F
+  (n_F × n_F), solved with PCR (matrix-free, one M̂ solve per product) or
+  Cholesky.
+- By Woodbury, A_F = A_FF − A_FS A_SS⁻¹ A_SF. This is **exactly the Schur
+  complement that joint/control deflation (unit-vector Z) iterates on.** In
+  the forward solve the hybrid and DPCR are the same Krylov method on the
+  same matrix. They differ only in how A_SS⁻¹ is applied: DPCR uses a
+  Cholesky factor of E = A_SS (n_S × n_S), the hybrid uses one of M̂
+  (6N_b × 6N_b). The difference that matters is the adjoint formula.
+- Hybrid adjoint: d̂ = M̂⁻¹f, A_F w_F = J_F d̂, w_u = d̂ − M̂⁻¹J_Fᵀ w_F,
+  w_S = C_S⁻¹ J_S w_u. Multiplied out, w_u = K⁻¹f, so it is exact in exact
+  arithmetic.
+
+**Split rule.** Use the per-row stiffness ratio
+ρ_i = (J_i M̃⁻¹ J_iᵀ) / c_i: the inertia part over the compliance part of
+diag(A), both already computed during assembly. Rows with ρ_i ≫ 1 go to
+body space; the rest stay in constraint space. Structure matters too.
+Joints form a tree, and ground contacts touch only one body, so both keep
+M̂ tree-sparse, which allows an O(N_b) factorization without fill-in
+(Baraff-style). Body–body contacts close loops, so they are the natural
+constraint-space rows. In Helhest every row is of the first kind, and the
+hybrid reduces to full body space. Its regime is manipulation, piles and
+self-contact.
+
+**Hypothesized effect on gradient quality.**
+- An error in w_F reaches the gradient as δw_u = −M̂⁻¹J_Fᵀ δw_F, so
+  (relative error of w_u) ≈ ρ̂ × (relative error of w_F), with
+  ρ̂_i = J_i M̂⁻¹ J_iᵀ / c_i ≤ ρ_i.
+- Two effects: (1) the stiff rows leave the subtraction, because their
+  forces come from a multiplication w_S = C_S⁻¹J_S w_u; (2) the soft rows
+  become safer, because M̂ is "heavier" in the directions the stiff rows
+  hold. In the scalar example with one stiff and one soft row on the same
+  body, ρ̂_F ≈ c_S/c_F, which is below 1 if the split is right.
+- With ρ̂ ≲ 1, the gradient error ≈ the PCR error, without amplification.
+  Removing the stiff rows also conditions A_F well: joint/control DPCR
+  needed 7–9 iterations, under the cap of 16. So PCR should converge to
+  its tolerance, and **PCR vs Cholesky on A_F should make little
+  difference.** Today both factors are bad at once: large ρ and capped
+  PCR.
+- With both parts direct, the hybrid is just K⁻¹f in another order: its
+  gradient ≈ "body-space native". Then it is about cost and feasibility,
+  not about better gradients than full body space.
+
+**Solver choice per part.**
+- M̂: always Cholesky. It is applied inside every PCR iteration, so an
+  inexact inner solve would make the operator vary between iterations and
+  require a flexible Krylov method. The adjoint reuses the factor.
+- A_F: Cholesky if n_F is small, especially if it holds rows with large ρ̂
+  that must stay there. PCR if n_F is large (piles, dense grasps).
+
+**Open problems / limits.**
+- Rows with c = 0 (truly rigid) cannot enter body space and have ρ = ∞.
+  The hybrid does not fix them. One possible direction: project w_u onto
+  the null space of the rigid rows instead of subtracting (not worked out).
+- Relevant to Kučera's `exp/smoothed-gradients` branch (ca21b64). It
+  lowers the adjoint's contact compliance to 1e-6, and says 0 is "exact".
+  This raises ρ of the normal rows, so it probably worsens today's
+  cancellation and pushes those rows towards c = 0.
+- Prior art for the split itself: minimal coordinates with a Delassus
+  matrix for contacts (Featherstone-style engines, Carpentier et al.) is
+  the rigid limit of this split; AGX (direct joints, iterative contacts);
+  Peiret et al. 2019 (substructuring); Baraff 1996 (linear-time Lagrange
+  multipliers for trees). Not found in the literature: choosing the split
+  by ρ_i to remove the adjoint cancellation, in maximal coordinates with
+  compliant constraints.
+
+**Cheapest test (offline).** Extend `test_scripts/deflation/adjoint_accuracy.py`
+with the hybrid adjoint: put the joint/control rows (or the rows with ρ_i
+above a threshold) into M̂, solve A_F in float32 with capped PCR and with
+Cholesky, and add both as rows of the §5.3 table. Prediction: errors close
+to "body-space native", and nearly equal for PCR and Cholesky on A_F. If
+PCR and Cholesky differ a lot, ρ̂ is not small and the split threshold
+needs tuning. A stronger test is to rescale the masses and compliances of
+the recorded systems (mass ratio × stiffness ratio grid) and look for
+regimes where full body space, the hybrid and constraint space each win.
+
+**Possible use:** the core of a paper on "choosing the linear solver in
+differentiable contact simulation", with the hybrid as the middle regime
+that targets gradient quality (deflation only targets solve speed).

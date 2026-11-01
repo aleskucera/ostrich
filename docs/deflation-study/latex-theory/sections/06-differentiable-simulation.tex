@@ -1,0 +1,368 @@
+\section{Differentiable Simulation}
+\label{sec:diffsim}
+
+A physics simulator is usually treated as a black box: we give it an
+initial state and a sequence of control inputs, and it tells us what
+happens. A \emph{differentiable} simulator also tells us how the outcome
+would change if we changed the inputs a little. Formally, it returns the
+derivative of the outcome with respect to the inputs. This chapter
+introduces the idea: what such a derivative is, why it is useful, how it is
+computed, and why it is harder to get right than it first looks, especially
+when objects touch each other.
+
+\subsection{What Is a Differentiable Simulator?}
+\label{sec:diffsim-what}
+
+\paragraph{A simulator as a function.}
+A simulator advances a state $\mathbf{s}_k$ (positions and velocities of
+all bodies) by one time step of length $h$:
+\begin{equation}
+  \mathbf{s}_{k+1} = \mathbf{f}(\mathbf{s}_k, \mathbf{a}_k, \boldsymbol{\theta}),
+  \qquad k = 0, \dots, T-1 .
+  \label{eq:diffsim-step}
+\end{equation}
+Here $\mathbf{a}_k$ are the control inputs at step $k$, for example motor
+torques or target wheel velocities, and $\boldsymbol{\theta}$ are the
+parameters of the model, for example masses, friction coefficients or the
+lengths of the links of a robot. Running $T$ steps from an initial state
+$\mathbf{s}_0$ gives a trajectory $\mathbf{s}_1, \dots, \mathbf{s}_T$.
+
+What we care about is usually summarized in one number, the \emph{loss}
+\begin{equation}
+  L = \sum_{k=1}^{T} \ell_k(\mathbf{s}_k, \mathbf{a}_{k-1}) ,
+  \label{eq:diffsim-loss}
+\end{equation}
+for example the distance between the final position of a robot and a
+goal, plus a penalty on the control effort. Because every state depends on
+the inputs, $L$ is a function of the initial state, the controls and the
+parameters. A differentiable simulator computes, in addition to $L$, its
+gradient
+\begin{equation}
+  \nabla L = \left(
+    \frac{\partial L}{\partial \mathbf{s}_0},\;
+    \frac{\partial L}{\partial \mathbf{a}_0}, \dots,
+    \frac{\partial L}{\partial \mathbf{a}_{T-1}},\;
+    \frac{\partial L}{\partial \boldsymbol{\theta}}
+  \right) .
+\end{equation}
+The gradient points in the direction in which the loss increases fastest.
+Stepping against it lowers the loss, which is the basic step of every
+gradient-based optimizer.
+
+\paragraph{What it is used for.}
+With the gradient available, many problems in robotics and graphics become
+optimization problems that standard gradient methods can solve
+\citep{newbury2024review}:
+\begin{itemize}
+  \item \textbf{Trajectory optimization.} Find the controls
+    $\mathbf{a}_0, \dots, \mathbf{a}_{T-1}$ that make a robot reach a
+    goal, throw a ball into a basket or walk without falling. The unknowns
+    are the controls.
+  \item \textbf{System identification.} Find the parameters
+    $\boldsymbol{\theta}$ (a mass, a friction coefficient) for which the
+    simulated trajectory matches a recorded real one. The loss is the
+    distance between the two trajectories.
+  \item \textbf{Policy learning.} Train a neural network that maps the
+    state to the controls, $\mathbf{a}_k = \boldsymbol{\pi}_{\mathbf{w}}(\mathbf{s}_k)$.
+    The gradient of the loss with respect to the network weights
+    $\mathbf{w}$ flows backwards through the simulator into the network,
+    in the same way as through any other layer.
+  \item \textbf{Design optimization.} Change the shape or the dimensions
+    of a mechanism so that it performs a task better.
+\end{itemize}
+
+\subsection{Computing the Gradient}
+\label{sec:diffsim-gradient}
+
+There are three basic ways to compute $\nabla L$. Table~\ref{tab:diffsim-methods}
+compares them at the end of this section.
+
+\paragraph{Finite differences.}
+The simplest way is to perturb one input $p_i$ by a small $\varepsilon$
+and simulate again:
+\begin{equation}
+  \frac{\partial L}{\partial p_i}
+  \approx \frac{L(\mathbf{p} + \varepsilon \mathbf{e}_i) - L(\mathbf{p} - \varepsilon \mathbf{e}_i)}{2\varepsilon} .
+  \label{eq:diffsim-fd}
+\end{equation}
+This \emph{central difference} needs two simulations per input, so the full
+gradient of $P$ inputs costs $2P$ simulations. Its accuracy is limited from
+two sides. A large $\varepsilon$ gives a truncation error of order
+$\varepsilon^2$, because the formula assumes $L$ is a parabola near
+$\mathbf{p}$. A small $\varepsilon$ makes the two values of $L$ nearly
+equal, and their difference loses the significant digits of the rounding
+error $\delta$ of $L$, an error of order $\delta/\varepsilon$. The best
+$\varepsilon$ balances the two, and in single precision the result rarely
+has more than three or four correct digits
+\citep{griewank2008evaluating}. Finite differences are therefore too
+expensive and too inaccurate for optimization with many unknowns, but they
+are the standard way to \emph{check} a gradient computed by other means
+(Section~\ref{sec:diffsim-quality}).
+
+\paragraph{Automatic differentiation.}
+A simulator is a long sequence of elementary operations (additions,
+multiplications, square roots, \dots), each of which has a known
+derivative. \emph{Automatic differentiation} (AD) applies the chain rule to
+this sequence mechanically and gives derivatives that are exact up to
+rounding \citep{griewank2008evaluating,baydin2018automatic}. It comes in
+two modes.
+\begin{itemize}
+  \item \textbf{Forward mode} carries, next to every intermediate value,
+    its derivative with respect to \emph{one} chosen input. One pass gives
+    the derivative of all outputs with respect to that input, so the full
+    gradient of $P$ inputs needs $P$ passes, as with finite differences,
+    but without their error.
+  \item \textbf{Reverse mode} first runs the computation forward and
+    records it (the \emph{tape}). It then goes through the record
+    backwards and propagates the derivative of \emph{one} output, the loss,
+    to all intermediate values and finally to all inputs. One backward
+    pass gives the whole gradient, at a cost of a small multiple of the
+    forward computation, independently of $P$. Backpropagation in neural
+    networks is reverse-mode AD.
+\end{itemize}
+Since a loss is one number and the inputs are many, reverse mode is the
+natural choice for simulation. Its price is memory: the backward pass needs
+the intermediate values of the forward pass, so the whole trajectory must
+be stored. For long trajectories, \emph{checkpointing} stores only some of
+the states and recomputes the rest during the backward pass, trading
+computation for memory \citep{griewank2008evaluating}. Several simulation
+frameworks provide reverse-mode AD for their kernels, for example
+DiffTaichi \citep{hu2020difftaichi}, Brax \citep{freeman2021brax} and
+NVIDIA Warp.
+
+\paragraph{Backpropagation through time.}
+Applied to the trajectory \eqref{eq:diffsim-step}, reverse mode becomes a
+backward recursion over the time steps. Let
+$\bar{\mathbf{s}}_k = \partial L / \partial \mathbf{s}_k$ denote the
+\emph{adjoint} of the state, i.e.\ the sensitivity of the loss to the state
+at step $k$, including the influence of $\mathbf{s}_k$ on all later
+states. Starting from $\bar{\mathbf{s}}_T = \partial \ell_T / \partial \mathbf{s}_T$,
+the chain rule gives
+\begin{equation}
+  \bar{\mathbf{s}}_k
+  = \frac{\partial \ell_k}{\partial \mathbf{s}_k}
+  + \left(\frac{\partial \mathbf{f}}{\partial \mathbf{s}_k}\right)^{\!\top} \bar{\mathbf{s}}_{k+1},
+  \qquad
+  \frac{\partial L}{\partial \mathbf{a}_k}
+  = \frac{\partial \ell_{k+1}}{\partial \mathbf{a}_k}
+  + \left(\frac{\partial \mathbf{f}}{\partial \mathbf{a}_k}\right)^{\!\top} \bar{\mathbf{s}}_{k+1},
+  \label{eq:diffsim-bptt}
+\end{equation}
+for $k = T-1, \dots, 0$, and the parameter gradient
+$\partial L/\partial \boldsymbol{\theta}$ is the sum of
+$(\partial \mathbf{f}/\partial \boldsymbol{\theta})^\top \bar{\mathbf{s}}_{k+1}$
+over all steps. Each backward step multiplies the adjoint by the
+transposed \emph{step Jacobian} $\partial \mathbf{f}/\partial \mathbf{s}_k$.
+The matrix itself is never formed: what is needed is only its product with
+a vector, which is what reverse-mode AD of one time step provides.
+
+\paragraph{Implicit time stepping and the implicit function theorem.}
+Many simulators, especially those for stiff systems and contact, do not
+compute $\mathbf{s}_{k+1}$ by an explicit formula. They define it
+\emph{implicitly}, as the solution of a system of nonlinear equations
+\begin{equation}
+  \mathbf{R}(\mathbf{s}_{k+1}, \mathbf{s}_k, \mathbf{a}_k, \boldsymbol{\theta}) = \mathbf{0},
+  \label{eq:diffsim-residual}
+\end{equation}
+which they solve by an iterative method, typically Newton's method.
+Implicit integrators are popular because they stay stable with large time
+steps. Differentiating through the Newton iterations with AD is possible
+but wasteful, since the iterations are only the road to the solution, and
+the derivative of the road is not what we want.
+
+The \emph{implicit function theorem} gives the derivative of the solution
+directly. If $\mathbf{R} = \mathbf{0}$ holds at the solution and we change
+$\mathbf{s}_k$ by a small $\mathrm{d}\mathbf{s}_k$, then $\mathbf{s}_{k+1}$
+must change by a $\mathrm{d}\mathbf{s}_{k+1}$ that keeps $\mathbf{R}$ at
+zero to first order:
+\begin{equation*}
+  \frac{\partial \mathbf{R}}{\partial \mathbf{s}_{k+1}}\,\mathrm{d}\mathbf{s}_{k+1}
+  + \frac{\partial \mathbf{R}}{\partial \mathbf{s}_k}\,\mathrm{d}\mathbf{s}_k = \mathbf{0}
+  \quad\Longrightarrow\quad
+  \frac{\partial \mathbf{s}_{k+1}}{\partial \mathbf{s}_k}
+  = -\left(\frac{\partial \mathbf{R}}{\partial \mathbf{s}_{k+1}}\right)^{\!-1}
+     \frac{\partial \mathbf{R}}{\partial \mathbf{s}_k} ,
+\end{equation*}
+provided that $\partial \mathbf{R}/\partial \mathbf{s}_{k+1}$, the matrix
+of the last Newton iteration, is invertible. Inserting the transpose of
+this Jacobian into \eqref{eq:diffsim-bptt} gives the \emph{adjoint method}:
+each backward step first solves one linear system with the transposed
+Newton matrix and then multiplies by $\partial \mathbf{R}/\partial \mathbf{s}_k$,
+\begin{equation}
+  \left(\frac{\partial \mathbf{R}}{\partial \mathbf{s}_{k+1}}\right)^{\!\top} \boldsymbol{\mu}_{k+1}
+  = \bar{\mathbf{s}}_{k+1},
+  \qquad
+  \bar{\mathbf{s}}_k
+  = \frac{\partial \ell_k}{\partial \mathbf{s}_k}
+  - \left(\frac{\partial \mathbf{R}}{\partial \mathbf{s}_k}\right)^{\!\top} \boldsymbol{\mu}_{k+1} .
+  \label{eq:diffsim-adjoint}
+\end{equation}
+The gradients with respect to $\mathbf{a}_k$ and $\boldsymbol{\theta}$
+follow in the same way, with $\partial \mathbf{R}/\partial \mathbf{a}_k$
+and $\partial \mathbf{R}/\partial \boldsymbol{\theta}$ in place of
+$\partial \mathbf{R}/\partial \mathbf{s}_k$, and they reuse the same
+$\boldsymbol{\mu}_{k+1}$. The backward step therefore costs one linear
+solve, no matter how many Newton iterations the forward step needed, and
+it needs to store only the converged states. The same idea underlies the
+adjoint-state method in engineering and geophysics \citep{plessix2006review},
+neural ordinary differential equations \citep{chen2018neural} and
+optimization layers in neural networks \citep{amos2017optnet}. Its
+assumptions also mark its limits. The theorem describes the
+\emph{exact} solution of \eqref{eq:diffsim-residual}, so if Newton's
+method stopped early, or the linear solve in \eqref{eq:diffsim-adjoint}
+is inexact, the computed gradient is only an approximation.
+
+\begin{table}[h]
+  \centering
+  \small
+  \begin{tabular}{@{}p{3.2cm}p{3.4cm}p{3.0cm}p{4.6cm}@{}}
+    \toprule
+    Method & Cost of $\nabla L$ & Memory & Accuracy \\
+    \midrule
+    Finite differences & $2P$ simulations & one trajectory & a few digits; step-size dependent \\
+    Forward-mode AD & $P$ passes & one trajectory & exact up to rounding \\
+    Reverse-mode AD & $\approx 1$ backward pass & whole trajectory and tape & exact up to rounding \\
+    Implicit adjoint & one linear solve per step & converged states & exact if forward and adjoint solves are exact \\
+    \bottomrule
+  \end{tabular}
+  \caption{Ways to compute the gradient of a scalar loss with respect to
+    $P$ inputs. ``Exact'' refers to the derivative of the computation that
+    was actually performed, which is not the same as the derivative of the
+    physics (Section~\ref{sec:diffsim-contact}).}
+  \label{tab:diffsim-methods}
+\end{table}
+
+\subsection{Why Contact Is Hard}
+\label{sec:diffsim-contact}
+
+So far we assumed that $\mathbf{f}$ is a smooth function. Free flight,
+springs and joints satisfy this. Contact does not, and contact is what
+robots use to walk, drive and grasp.
+
+\paragraph{Contact makes the dynamics non-smooth.}
+Drop a ball from height $y_0$ onto the floor and record its height after a
+fixed time. While the ball is in the air, the final height depends
+smoothly on $y_0$. Raise $y_0$ slightly, and the moment of impact moves
+past the end of the simulation, so the ball suddenly ends up much higher
+than the neighbouring trajectories that did bounce. The final height has a
+\emph{kink} (its derivative jumps) or even a \emph{jump} as a function of
+$y_0$. Contact introduces such features in three ways:
+\begin{itemize}
+  \item \textbf{Making or breaking contact.} A non-penetration constraint
+    is active only when the bodies touch. Whether it is active changes
+    abruptly.
+  \item \textbf{Impacts.} A collision changes the velocity in an instant.
+    Small changes of the initial state can change the order or the number
+    of impacts.
+  \item \textbf{Stick and slip.} Coulomb friction holds a body in place
+    until the tangential force reaches $\mu$ times the normal force, and
+    then lets it slide. The switch between sticking and sliding is again
+    abrupt.
+\end{itemize}
+
+\paragraph{What the gradient sees.}
+A derivative describes the function in an infinitesimal neighbourhood. At
+a kink or a jump it either does not exist or, where it exists, it tells
+nothing about what lies a small step away. Two failures are typical.
+First, \emph{flat regions}: a box resting on a table under static friction
+does not move when we push it slightly, so the derivative of its final
+position with respect to the push is exactly zero, and gradient descent
+never learns that a harder push would move it. Second, \emph{misleading
+directions}: near a jump the gradient describes only one side of it, and a
+step in its direction can increase the loss. A gradient that is correct
+in the mathematical sense can still be useless for optimization, and
+\citet{suh2022differentiable} show examples where it makes the optimizer
+worse than a method that only samples the loss at random inputs. \citet{zhong2022differentiable} compare
+four common contact models and find that their gradients are not always
+correct, even in simple scenes.
+
+\paragraph{Approaches.}
+Differentiable simulators handle contact in roughly three ways.
+\begin{itemize}
+  \item \textbf{Analytic gradients of a hard contact model.} The contact
+    forces are the solution of a complementarity problem or of a convex
+    optimization problem, and the gradient follows from differentiating
+    its optimality conditions, an application of the implicit function
+    theorem above \citep{belbuteperes2018endtoend,werling2021fast,howell2022dojo}.
+    The gradients are exact for the model, including the kinks.
+  \item \textbf{Smoothing the model.} Compliant contact replaces the hard
+    constraint by a stiff spring, and soft or relaxed versions of the
+    complementarity conditions round off the kinks \citep{geilinger2020add}.
+    The gradients become informative around the contact event, at the
+    price of a less accurate physical model, and the stiffness controls
+    the trade-off.
+  \item \textbf{Smoothing the gradient.} Instead of changing the model,
+    one averages gradients or function values over randomly perturbed
+    inputs. The average is the gradient of a smoothed loss, which has no
+    kinks. It is more expensive and noisier, but it can step over the
+    flat regions \citep{suh2022differentiable}.
+\end{itemize}
+In all three cases the gradient is the gradient of \emph{some} smooth
+problem close to the real one. Which one is best depends on the task, and
+it is an active research topic.
+
+\subsection{Gradient Quality}
+\label{sec:diffsim-quality}
+
+Even when the model is smooth, the computed gradient can be wrong in ways
+that are not obvious from the code. It is useful to separate three
+sources of error.
+
+\paragraph{The wrong derivative.}
+The backward pass must differentiate exactly the computation the forward
+pass performed. Any mismatch, for example a forward step that uses one
+value of a parameter while the backward step linearizes around another,
+gives a gradient that is self-consistent but belongs to a different
+problem. Such bugs do not cause crashes or warnings; they only make the
+optimization worse.
+
+\paragraph{Inexact solves.}
+Implicit simulators stop Newton's method and the linear solver at a
+tolerance, and so the implicit function theorem is applied at a point
+that is not exactly a solution, and the linear system of
+\eqref{eq:diffsim-adjoint} is solved only approximately. How much error
+this introduces depends on the conditioning of the matrices involved, and
+also on how the solution of the linear system is turned into the
+gradient: a formula that subtracts two nearly equal quantities amplifies
+a small relative error of the solution into a large error of the
+gradient. Studies in computational fluid dynamics have found that
+truncated adjoint solves can produce gradients that point in a wrong
+direction \citep{akbarzadeh2020consistency}.
+
+\paragraph{Long horizons and chaos.}
+By \eqref{eq:diffsim-bptt}, the adjoint of the initial state is a product
+of $T$ transposed step Jacobians applied to the final adjoint. If these
+Jacobians tend to stretch vectors, the gradient grows exponentially with
+$T$ (\emph{exploding gradients}); if they tend to shrink them, the
+gradient vanishes. This is the same problem as in recurrent neural
+networks. In chaotic systems, where nearby trajectories diverge
+exponentially, the exact gradient of a long rollout is huge and its
+direction carries little information about the loss at a finite distance
+\citep{metz2021gradients}. Practical remedies are short horizons,
+splitting the trajectory into shorter segments that are optimized
+together (multiple shooting), and normalizing or clipping the gradient.
+
+\paragraph{Checking a gradient.}
+The standard test compares the computed gradient with finite differences
+\eqref{eq:diffsim-fd}. Instead of all $P$ components, one usually checks a
+few random directions $\mathbf{d}$: the directional derivative
+$\nabla L^\top \mathbf{d}$ should agree with
+$\left(L(\mathbf{p} + \varepsilon\mathbf{d}) - L(\mathbf{p} - \varepsilon\mathbf{d})\right)/(2\varepsilon)$.
+Agreement is reported as a relative error, and for whole gradients as the
+\emph{cosine} between the computed and the reference gradient: a cosine
+near $1$ means the direction is right, which is what a gradient-based
+optimizer needs most. Because finite differences are themselves
+inaccurate, such checks are best done in double precision and with a few
+values of $\varepsilon$.
+
+\paragraph{Summary.}
+A differentiable simulator turns a simulation into a function whose
+gradient can be computed at roughly the cost of one more simulation, by
+reverse-mode differentiation and, for implicit time stepping, by one
+linear solve per step with the adjoint method. This makes optimization
+over many unknowns feasible. The gradient is, however, only as good as the
+model it differentiates and the numerics that compute it: contact makes
+the true dynamics non-smooth, inexact solves and unstable formulas
+introduce numerical errors, and long horizons amplify both. Using a
+differentiable simulator well therefore means not only computing the
+gradient, but also knowing how far it can be trusted.

@@ -1,2 +1,290 @@
 \section{Body-Space Direct Solving Utilizing the Woodbury Matrix Identity}
 \label{sec:body-space}
+
+\subsection{Constraint Space and Body Space}
+\label{sec:body-space-idea}
+
+The system \eqref{eq:ostrich-system} is one of two ways to write the
+linear system of a Newton iteration. Both come from a block system in two
+unknowns, the velocity update $\Delta\mathbf{u}$ of the bodies and the
+constraint force update $\Delta\boldsymbol{\lambda}$:
+\begin{equation}
+  \begin{bmatrix}
+    \tilde{\mathbf{M}} & -\mathbf{J}^\top \\
+    \mathbf{J} & \mathbf{C}
+  \end{bmatrix}
+  \begin{bmatrix} \Delta\mathbf{u} \\ \Delta\boldsymbol{\lambda} \end{bmatrix}
+  = -\begin{bmatrix} \mathbf{r}_u \\ \mathbf{r}_\lambda \end{bmatrix} ,
+  \label{eq:kkt}
+\end{equation}
+where $\mathbf{r}_u = \mathbf{r}_{\text{dyn}}/h$ and
+$\mathbf{r}_\lambda = \mathbf{r}_{\text{con}}/h$, so that eliminating
+$\Delta\mathbf{u}$ gives exactly \eqref{eq:ostrich-system}. Ostrich uses
+maximal coordinates: every rigid body has $6$ velocity degrees of freedom,
+so $\Delta\mathbf{u} \in \mathbb{R}^{6N_b}$ for $N_b$ bodies. The
+generalized mass matrix $\tilde{\mathbf{M}}$ is block diagonal, with one
+$6 \times 6$ block (mass and inertia) per body. The Jacobian
+$\mathbf{J} \in \mathbb{R}^{n \times 6N_b}$ has one row per constraint, and
+each row acts on at most two bodies. The compliance $\mathbf{C} =
+\operatorname{diag}(c_1, \dots, c_n)$ is diagonal.
+
+The block system can be reduced to either unknown:
+\begin{itemize}
+  \item \textbf{Constraint space} (ostrich today). The first block row gives
+    $\Delta\mathbf{u} = \tilde{\mathbf{M}}^{-1}(\mathbf{J}^\top\Delta\boldsymbol{\lambda} - \mathbf{r}_u)$,
+    which is cheap because $\tilde{\mathbf{M}}$ is inverted block by block.
+    Substituting it into the second row gives \eqref{eq:ostrich-system}. The
+    unknowns are the constraint forces $\Delta\boldsymbol{\lambda}$, and the
+    system has dimension $n$.
+  \item \textbf{Body space}. The second block row gives
+    $\Delta\boldsymbol{\lambda} = -\mathbf{C}^{-1}(\mathbf{r}_\lambda + \mathbf{J}\Delta\mathbf{u})$,
+    which is cheap because $\mathbf{C}$ is diagonal. Substituting it into the
+    first row gives
+    \begin{equation}
+      \underbrace{\left(\tilde{\mathbf{M}} + \mathbf{J}^\top\mathbf{C}^{-1}\mathbf{J}\right)}_{\mathbf{K}}
+      \Delta\mathbf{u}
+      = -\mathbf{r}_u - \mathbf{J}^\top\mathbf{C}^{-1}\mathbf{r}_\lambda .
+      \label{eq:body-system}
+    \end{equation}
+    The unknowns are the body velocities $\Delta\mathbf{u}$, and the system
+    has dimension $6N_b$. The forces then follow from the formula for
+    $\Delta\boldsymbol{\lambda}$ above.
+\end{itemize}
+Both reductions are Schur complements of \eqref{eq:kkt} and give the same
+solution. What changes is the dimension, from $n$ to $6N_b$. For Helhest,
+$N_b = 4$, so the body-space system is always $24 \times 24$, while
+$n = 31$ to $67$ in the obstacle scene and $50$ to $170$ in the terrain
+scene (Section~\ref{sec:choosing-z}). The body-space dimension depends only
+on the number of bodies. It does not grow with the number of active
+contacts, each of which adds three rows (one normal, two friction) to the
+constraint-space system.
+
+\paragraph{Prerequisite: $c_i > 0$.}
+The body-space form needs $\mathbf{C}^{-1}$, i.e.\ $c_i > 0$ for every
+active row. A perfectly rigid constraint ($c_i = 0$) has no body-space
+form. In ostrich every row is compliant. In the recorded Helhest systems the
+compliance is $0.011$ for joint rows, $0.22$ for control rows, $0.11$ to
+$0.95$ for contact normals and $10^{-6}$ to $3 \cdot 10^{6}$ for friction
+rows, and the system operator adds a regularization of $10^{-6}$ to every
+diagonal entry. Very small $c_i$ are still a numerical concern: they put
+weights $1/c_i$ of order $10^{6}$ into $\mathbf{K}$, which limits the
+accuracy of a single-precision solve.
+
+\paragraph{A direct solver in body space.}
+$\mathbf{K}$ is SPD, because $\tilde{\mathbf{M}}$ is SPD and
+$\mathbf{J}^\top\mathbf{C}^{-1}\mathbf{J}$ is positive semidefinite. A
+Cholesky factorization \eqref{eq:cholesky} therefore applies, without
+pivoting. Its cost is about $\tfrac{1}{3}(6N_b)^3$ operations
+(Table~\ref{tab:direct-cost}): about $4.6 \cdot 10^3$ for Helhest, against
+about $1.6 \cdot 10^6$ for a dense Cholesky factorization of $\mathbf{A}$
+at $n = 170$. Assembling $\mathbf{K}$ is cheap too. Each row adds
+$c_i^{-1}\mathbf{j}_i^\top\mathbf{j}_i$, where $\mathbf{j}_i$ is the $i$-th
+row of $\mathbf{J}$, and this term touches at most two body blocks, so the
+assembly costs $\mathcal{O}(n)$. The small, fixed size is what makes an
+exact solve affordable in every Newton iteration. The soft modes that slow
+down PCR are no obstacle here. In the directions of
+$\operatorname{null}(\mathbf{J}^\top)$, where
+$\mathbf{A}\mathbf{x} = \mathbf{C}\mathbf{x}$
+(Section~\ref{sec:choosing-z}), the body-space form handles the forces
+exactly through the division by $c_i$. In our offline measurements, this
+$24 \times 24$ solve is $3.9$ to $5.6$ times faster than the best PCR
+variant for a single simulation, and $1.7$ to $2.0$ times faster for $1024$
+parallel simulations.
+
+The argument relies on $6N_b$ being small. With many bodies, a dense
+factorization of $\mathbf{K}$ grows like $(6N_b)^3$. $\mathbf{K}$ is sparse
+(the block of bodies $i$ and $j$ is nonzero only if a constraint row couples
+them), but for large connected piles of bodies PCR is expected to win again.
+
+\subsection{Relation to the Woodbury Identity}
+\label{sec:woodbury}
+
+The ostrich system matrix
+$\mathbf{A} = \mathbf{J}\tilde{\mathbf{M}}^{-1}\mathbf{J}^\top + \mathbf{C}$
+is a diagonal matrix $\mathbf{C}$ plus the term
+$\mathbf{J}\tilde{\mathbf{M}}^{-1}\mathbf{J}^\top$ of rank at most $6N_b$,
+and the Woodbury identity turns its inverse into a single
+$6N_b \times 6N_b$ Cholesky solve ($24 \times 24$ for Helhest) plus a
+row-by-row division by $c_i$. This replaces PCR on up to $170$ rows with an
+exact direct solve that runs several times faster in our measurements,
+while the solver still takes $\mathbf{A}$ and $\mathbf{b}$ and returns
+$\Delta\boldsymbol{\lambda}$ as before.
+
+The engine is built around the constraint-space system
+$\mathbf{A}\mathbf{x} = \mathbf{b}$. The Woodbury matrix identity
+\citep{woodbury1950inverting,golub2013matrix} gives the body-space solve
+directly for this system, without going back to \eqref{eq:kkt}. For
+invertible $\mathbf{B}$ and $\mathbf{D}$, it states
+\begin{equation}
+  \left(\mathbf{B} + \mathbf{U}\mathbf{D}\mathbf{V}\right)^{-1}
+  = \mathbf{B}^{-1} - \mathbf{B}^{-1}\mathbf{U}
+    \left(\mathbf{D}^{-1} + \mathbf{V}\mathbf{B}^{-1}\mathbf{U}\right)^{-1}
+    \mathbf{V}\mathbf{B}^{-1} ,
+\end{equation}
+whenever the inner matrix is invertible. It inverts an easy matrix plus a
+low-rank term, and needs only an inverse of the size of the low-rank term.
+With $\mathbf{B} = \mathbf{C}$, $\mathbf{U} = \mathbf{J}$,
+$\mathbf{D} = \tilde{\mathbf{M}}^{-1}$ and $\mathbf{V} = \mathbf{J}^\top$,
+the left-hand side is $\mathbf{A}^{-1}$:
+\begin{equation}
+  \mathbf{A}^{-1}
+  = \left(\mathbf{C} + \mathbf{J}\tilde{\mathbf{M}}^{-1}\mathbf{J}^\top\right)^{-1}
+  = \mathbf{C}^{-1} - \mathbf{C}^{-1}\mathbf{J}\,\mathbf{K}^{-1}\mathbf{J}^\top\mathbf{C}^{-1} .
+  \label{eq:woodbury-A}
+\end{equation}
+$\mathbf{A}$ is a diagonal matrix plus a term of rank at most $6N_b$, and
+the only inverse left on the right is the body-space matrix $\mathbf{K}$ of
+\eqref{eq:body-system}. Applied to $\mathbf{b}$, \eqref{eq:woodbury-A}
+becomes two steps:
+\begin{equation}
+  \mathbf{K}\mathbf{v} = \mathbf{J}^\top\mathbf{C}^{-1}\mathbf{b},
+  \qquad
+  \mathbf{x} = \mathbf{C}^{-1}\left(\mathbf{b} - \mathbf{J}\mathbf{v}\right) .
+  \label{eq:woodbury-solve}
+\end{equation}
+The first step is one Cholesky solve with $\mathbf{K}$. The second is a
+row-by-row division.
+
+This is the body-space reduction of Section~\ref{sec:body-space-idea},
+written for the right-hand side $\mathbf{b}$ of \eqref{eq:ostrich-system}.
+The auxiliary vector is $\mathbf{v} = \tilde{\mathbf{M}}^{-1}\mathbf{J}^\top\mathbf{x}$,
+the velocity change caused by the constraint forces. Indeed,
+$\mathbf{K}\tilde{\mathbf{M}}^{-1}\mathbf{J}^\top\mathbf{x}
+= \mathbf{J}^\top\mathbf{C}^{-1}(\mathbf{C} + \mathbf{J}\tilde{\mathbf{M}}^{-1}\mathbf{J}^\top)\mathbf{x}
+= \mathbf{J}^\top\mathbf{C}^{-1}\mathbf{b}$.
+Hence $\mathbf{x} = \Delta\boldsymbol{\lambda}$ and
+$\Delta\mathbf{u} = \mathbf{v} - \tilde{\mathbf{M}}^{-1}\mathbf{r}_u$.
+The eliminating-$\Delta\boldsymbol{\lambda}$ view is the physics form; the
+Woodbury identity is the linear-algebra form of the same computation. The
+Woodbury form keeps the interface of the existing solver: it takes
+$\mathbf{A}$ and $\mathbf{b}$ as given and returns $\mathbf{x}$, so it can
+replace PCR without changing the rest of the Newton iteration. Because the
+adjoint solve uses the same $\mathbf{A}$ (Section~\ref{sec:solvers}), it can
+reuse the same Cholesky factor of $\mathbf{K}$.
+
+\subsection{Better Gradients for Differentiable Simulation}
+\label{sec:body-space-adjoint}
+
+\paragraph{Differentiable simulation.}
+A differentiable simulator returns not only a trajectory but also the
+gradient of a scalar loss $L$ on that trajectory with respect to the
+initial state, the controls or the model parameters. Trajectory
+optimization, system identification and policy learning all use this
+gradient. In ostrich a time step is defined implicitly, by a residual
+$\mathbf{R}(\mathbf{s}^+, \mathbf{s}^-) = \mathbf{0}$ that Newton's method
+solves for the new state $\mathbf{s}^+$. The gradient through one step
+follows from the implicit function theorem. Computing it for a scalar loss
+takes one linear solve with the transposed Newton matrix, the
+\emph{adjoint solve}, whose solution is the \emph{adjoint vector}. Going
+backwards through the time steps, each step turns the gradient with respect
+to its own state into the gradient with respect to the previous state. Like
+the forward step, the adjoint solve reduces to a system with the same
+matrix $\mathbf{A}$ \citep[eq.~(18)]{kucera2026ostrich}.
+
+\paragraph{The adjoint step in ostrich today.}
+Let $\mathbf{f}$ be the gradient of the loss with respect to the new body
+velocities (including the contribution through the poses). The engine
+computes the gradient $\mathbf{w}_u$ handed to the previous step in three
+steps:
+\begin{equation}
+  \mathbf{d} = \tilde{\mathbf{M}}^{-1}\mathbf{f}, \qquad
+  \mathbf{A}\mathbf{w} = \mathbf{J}\mathbf{d} \;\;\text{(PCR)}, \qquad
+  \mathbf{w}_u = \mathbf{d} - \tilde{\mathbf{M}}^{-1}\mathbf{J}^\top\mathbf{w} .
+  \label{eq:adjoint-pcr}
+\end{equation}
+Here $\mathbf{d}$ is the response of the bodies without constraints, and
+$\mathbf{w}$ is the constraint part of the adjoint, solved by PCR with the
+same tolerance and iteration cap as the forward solve. The last step is
+fragile. When a body is held firmly by stiff joints or sticking contacts,
+the constraints absorb almost all of $\mathbf{f}$. Then $\mathbf{w}_u$ is
+small, but it is computed as the difference of two large, nearly equal
+vectors, so a relative error in $\mathbf{w}$ is amplified (catastrophic
+cancellation). For one body of mass $m$ and one constraint row with
+$J = 1$ and compliance $c$, a relative error $\varepsilon$ in $w$ gives
+the relative error $\varepsilon/(mc)$ in $w_u$. The amplification is the
+ratio of the constraint stiffness $1/c$ to the inertia $m$. A more accurate
+solve for $\mathbf{w}$ reduces $\varepsilon$, but the amplification stays.
+
+\paragraph{The adjoint step in body space.}
+Writing \eqref{eq:adjoint-pcr} as one formula gives
+\begin{equation*}
+  \mathbf{w}_u = \left(\tilde{\mathbf{M}}^{-1} - \tilde{\mathbf{M}}^{-1}\mathbf{J}^\top\mathbf{A}^{-1}\mathbf{J}\tilde{\mathbf{M}}^{-1}\right)\mathbf{f} .
+\end{equation*}
+The bracket is the right-hand side of the Woodbury identity with
+$\mathbf{B} = \tilde{\mathbf{M}}$, $\mathbf{U} = \mathbf{J}^\top$,
+$\mathbf{D} = \mathbf{C}^{-1}$ and $\mathbf{V} = \mathbf{J}$, i.e.\ the
+identity of Section~\ref{sec:woodbury} used in the other direction, with
+$\tilde{\mathbf{M}}$ as the easy matrix. Hence
+\begin{equation}
+  \mathbf{K}\mathbf{w}_u = \mathbf{f}, \qquad
+  \mathbf{w} = \mathbf{C}^{-1}\mathbf{J}\mathbf{w}_u ,
+  \label{eq:adjoint-body}
+\end{equation}
+where the second formula follows from
+$\mathbf{C}\mathbf{w} = \mathbf{J}\mathbf{d} - \mathbf{J}\tilde{\mathbf{M}}^{-1}\mathbf{J}^\top\mathbf{w} = \mathbf{J}\mathbf{w}_u$.
+Nothing is subtracted: a firmly held body contributes a large stiffness to
+$\mathbf{K}$, so $\mathbf{K}^{-1}\mathbf{f}$ comes out small directly. The
+adjoint step also costs almost nothing. The forward solve has already
+computed the Cholesky factor of $\mathbf{K}$, so \eqref{eq:adjoint-body}
+needs only two triangular solves, $\mathcal{O}((6N_b)^2)$ operations.
+
+\paragraph{Comparison.}
+We measured the error of a single adjoint step offline. For every
+recorded time step we take the matrix of its last Newton iteration
+($25$ steps per scene) and $8$ random loss gradients $\mathbf{f}$ on all
+bodies. All solvers run in single precision and are compared against a
+dense solve in double precision. Table~\ref{tab:adjoint-accuracy} shows
+the relative error of $\mathbf{w}_u$.
+
+% Data: step 2d of the deflation study (docs/deflation-study/deflation_ab.md,
+% "Adjoint accuracy"; test_scripts/deflation/adjoint_accuracy.py), measured
+% 2026-10-13 on the dataset of that date, before the regeneration used in
+% Section 4. Random loss gradients only; the chassis-only loss gives the same
+% picture.
+\begin{table}[h]
+  \centering
+  \small
+  \begin{tabular}{@{}lcccccc@{}}
+    \toprule
+    & \multicolumn{3}{c}{obstacle scene} & \multicolumn{3}{c}{terrain scene} \\
+    \cmidrule(lr){2-4} \cmidrule(l){5-7}
+    Adjoint solver & p50 & p90 & $>10\%$ & p50 & p90 & $>10\%$ \\
+    \midrule
+    PCR Jacobi, tol $10^{-5}$, cap $16$ & $5 \cdot 10^{-2}$ & $0.57$ & $42\%$ & $4 \cdot 10^{-2}$ & $0.16$ & $22\%$ \\
+    PCR Jacobi, tol $10^{-3}$, cap $26$ & $4 \cdot 10^{-2}$ & $0.46$ & $39\%$ & $8 \cdot 10^{-3}$ & $6 \cdot 10^{-2}$ & $3\%$ \\
+    PCR joint/control, tol $10^{-5}$, cap $16$ & $6 \cdot 10^{-3}$ & $0.15$ & $14\%$ & $1 \cdot 10^{-4}$ & $8 \cdot 10^{-3}$ & $0.5\%$ \\
+    Body-space $\mathbf{w}$, then \eqref{eq:adjoint-pcr} & $0.14$ & $2.1$ & $51\%$ & $1 \cdot 10^{-3}$ & $0.28$ & $18\%$ \\
+    Body space, \eqref{eq:adjoint-body} & $\mathbf{2 \cdot 10^{-4}}$ & $\mathbf{2 \cdot 10^{-3}}$ & $\mathbf{0\%}$ & $\mathbf{3 \cdot 10^{-6}}$ & $\mathbf{4 \cdot 10^{-4}}$ & $\mathbf{0\%}$ \\
+    \bottomrule
+  \end{tabular}
+  \caption{Relative error of the gradient $\mathbf{w}_u$ after one adjoint
+    step, single precision, $25$ time steps $\times$ $8$ random loss
+    gradients per scene: median (p50), 90th percentile (p90) and share of
+    draws with more than $10\%$ error. The first two rows are the ostrich
+    solver at the default and the scene configuration.}
+  \label{tab:adjoint-accuracy}
+\end{table}
+
+With PCR, as ostrich uses it today, the gradient of one step is often
+substantially wrong. In the obstacle scene about $40\%$ of the draws have
+more than $10\%$ error, and the worst cosine between the computed and the
+exact $\mathbf{w}_u$ is $0.61$ to $0.72$. The terrain scene is milder.
+Joint/control deflation (Section~\ref{sec:z-joint-control}) helps, but
+does not remove the large errors. The fourth row isolates the cause. It
+solves for $\mathbf{w}$ accurately in body space (relative error about
+$3 \cdot 10^{-3}$) but keeps the subtraction of \eqref{eq:adjoint-pcr}, and
+it is the worst row: in the worst case the gradient even points the wrong
+way (cosine $-0.51$). The formula, not the solver, limits the accuracy. The
+body-space adjoint \eqref{eq:adjoint-body} has at most $0.5\%$ error on
+every draw and a worst cosine of $1.0000$. Together with
+Section~\ref{sec:body-space-idea}, the same Cholesky factor of $\mathbf{K}$
+thus gives a faster forward solve and an essentially exact adjoint step at
+almost no extra cost.
+
+These are errors of a single step, measured offline on the matrix of the
+last Newton iteration, which approximates the converged state. Over a
+trajectory the errors propagate through all earlier steps, which probably
+increases the difference, but this has not been measured. The decisive
+tests, a finite-difference check of the gradient and a trajectory
+optimization with both adjoints, require implementing the body-space solve
+in the engine.
