@@ -12,8 +12,10 @@
 #   make compares timestamps: a figure is rebuilt only if its script or
 #   figure_scripts/_common.py is newer than the PDF. The PDFs are gitignored,
 #   so on a fresh clone `make figures` builds all of them.
-#   `uv run` uses the project's pinned environment (uv.lock), so it needs no
-#   manual venv activation.
+#   `uv run --no-sync` uses the existing .venv as-is (no manual activation
+#   needed) and never re-syncs it to uv.lock, which on sm_61 GPUs would swap
+#   torch to a build that breaks there. On a fresh clone run `uv sync` once
+#   first (see docs/deflation-study/PLAN.md step 0).
 #
 # ADDING A FIGURE:
 #   1. Write figure_scripts/NAME.py ending in `save_fig(fig, __file__)`
@@ -33,7 +35,7 @@ FIGURES := $(patsubst figure_scripts/%.py,figures/%.pdf,$(SCRIPTS))
 figures: $(FIGURES)
 
 figures/%.pdf: figure_scripts/%.py figure_scripts/_common.py
-	uv run python $<
+	uv run --no-sync python $<
 
 clean-figures:
 	rm -f $(FIGURES)
