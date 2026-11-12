@@ -1,0 +1,199 @@
+\section{Paper Ideas}
+\label{sec:paper-ideas}
+
+Two possible publications have come out of the study so far. Both are
+thin in their current form. This section states each idea, the evidence
+we have, and what is still missing.
+
+\subsection{Structure-Aware Deflation for Constraint-Space Solvers}
+\label{sec:idea-deflation}
+
+\paragraph{Idea.}
+Simulators that work in constraint space solve
+$\mathbf{A}\boldsymbol{\lambda} = \mathbf{b}$ either iteratively (PCR, CG,
+PGS) or directly (Cholesky of $\mathbf{A}$, or of the body-space matrix
+$\mathbf{K}$). Deflated PCR (Section~\ref{sec:dpcr}) sits between the two:
+a small block is solved exactly and the rest iteratively. The paper would
+present DPCR with a $\mathbf{Z}$ that needs no eigenvectors: the
+joint/control block (Section~\ref{sec:z-joint-control}) plus $k_c$
+contact rows chosen by the AMG strength-of-connection rule
+(Section~\ref{sec:z-strength}). The claim is that this hybrid is faster,
+or more accurate for the same time budget, than both pure iterative and
+pure direct solving on some class of robotics scenes.
+
+\paragraph{Evidence so far.}
+On Helhest, the median PCR iteration count drops from $19$ (Jacobi) to
+$7$ and $9$ with the joint/control block, and to $5$ and $4$ with $8$
+additional strength rows, in the obstacle and terrain scenes
+(Figure~\ref{fig:deflation-z-sources}). The GPU time per solve at $W = 1$
+drops from about $0.63$ to $0.35$\,ms and from $0.84$ to $0.51$\,ms
+(Figure~\ref{fig:deflation-z-sources-time}). $\mathbf{Z}$ costs nothing to
+build for the joint/control block and little for the strength rows.
+
+\paragraph{Weaknesses.}
+\begin{itemize}
+  \item \textbf{The direct alternative wins on Helhest.} The body-space
+    Cholesky solve (Section~\ref{sec:body-space-idea}) is $3.9$ to $5.6$
+    times faster than the best PCR variant at $W = 1$. A reviewer will ask
+    why one should not simply factorize $\mathbf{K}$.
+  \item \textbf{The parts are known.} Unit-vector $\mathbf{Z}$ is static
+    condensation, the strength rule is the Ruge--St\"uben C/F criterion,
+    and AGX and \citet{peiret2019schur} solve joints directly and
+    contacts iteratively. Only the combination in a differentiable GPU
+    simulator appears to be new.
+  \item \textbf{The gain is modest}, about $1.6$ to $1.8$ times at
+    $W = 1$, and the iteration counts of Figure~\ref{fig:deflation-z-sources}
+    are in double precision while the engine runs in single precision.
+\end{itemize}
+
+\paragraph{What it would take.}
+Scenes where body space is impossible or expensive: many bodies (long
+chains, quadrupeds, piles) so that $(6N_b)^3$ is too large, or rigid rows
+with $c_i = 0$. Baselines: Jacobi PCR, a block-Jacobi preconditioner with
+the exact joint block (not yet measured; the most obvious competitor),
+body-space Cholesky, and a Kamino-style dense solve \citep{tsounis2026kamino}.
+The most original element is the observation that both rows of a strongly
+coupled pair must be eliminated (Section~\ref{sec:z-strength}); a cheap
+selection rule with a bound on the remaining condition number would give
+the paper a theoretical contribution.
+
+\paragraph{Venue.}
+A simulation workshop at RSS, ICRA or CoRL with the current material plus
+two or three scenes; RA-L or IROS with scenes where body space loses.
+
+\clearpage
+\subsection{Hybrid Body/Constraint Space for Accurate Adjoint Gradients}
+\label{sec:idea-hybrid-adjoint}
+
+\paragraph{Idea.}
+A differentiable simulator that eliminates the velocities and solves for
+the constraint forces computes the gradient carried to the previous step
+as $\mathbf{w}_u = \mathbf{d} - \tilde{\mathbf{M}}^{-1}\mathbf{J}^\top\mathbf{w}$
+\eqref{eq:adjoint-pcr}. This is the Woodbury formula for
+$\mathbf{K}^{-1}\mathbf{f}$, and its subtraction amplifies the relative
+error of $\mathbf{w}$ by $\|\tilde{\mathbf{M}}^{-1}\mathbf{J}^\top\mathbf{w}\| / \|\mathbf{w}_u\|$.
+The hybrid eliminates a group of rows $S$ in body space,
+$\hat{\mathbf{M}} = \tilde{\mathbf{M}} + \mathbf{J}_S^\top\mathbf{C}_S^{-1}\mathbf{J}_S$,
+and keeps the remaining rows $F$ in constraint space,
+$\mathbf{A}_F = \mathbf{J}_F\hat{\mathbf{M}}^{-1}\mathbf{J}_F^\top + \mathbf{C}_F$.
+It is exact in exact arithmetic and, for $S$ = joint/control rows, its
+forward system is the same Schur complement that joint/control deflation
+iterates on. The claim: the hybrid restores, in maximal coordinates with
+compliant constraints, what minimal-coordinate engines get for free, the
+elimination of the joints from the constraint system, and so makes
+budget-limited single-precision adjoints accurate.
+
+\paragraph{Evidence so far.}
+Offline, single step, single precision, against the double-precision
+solution of the same linear system
+(\texttt{test\_scripts/deflation/adjoint\_hybrid.py}):
+\begin{itemize}
+  \item The amplification is about $30$ (median) for the engine's formula
+    and $2.5$ with the joint/control rows in body space.
+  \item With the engine's PCR budget ($16$ iterations), the share of
+    draws with more than $10\%$ gradient error drops from $42\%$ to $2\%$
+    (obstacle) and from $25.5\%$ to $2\%$ (terrain), and to $0\%$ with
+    one refinement step.
+  \item Iterative refinement, the textbook fix of the Woodbury
+    instability \citep{yip1986note,hashemi2025instability}, does not
+    rescue the engine's formula under the cap ($42\% \to 38.5\%$): the
+    error contracts by amplification $\times$ inner error per step, which
+    exceeds $1$. With direct solves, one refinement step makes every
+    variant accurate to about $10^{-7}$.
+\end{itemize}
+
+\paragraph{Scope and prior art.}
+The same structure appears in Simple \citep{lelidec2024highly} (forward
+mode) and Nimble \citep{werling2021fast}, but both solve the constraint
+part directly, probably in double precision, and use minimal coordinates,
+in which the joints are not constraint rows. The amplification becomes
+harmful only with an inexact constraint solve (an iteration cap, single
+precision) and stiff constraints that absorb most of the loss push. The
+contribution is therefore the regime where GPU engines are heading:
+maximal coordinates, single precision and budgeted matrix-free iterative
+solves, where the textbook fix fails.
+
+\paragraph{What it would take.}
+\begin{itemize}
+  \item Evidence at the gradient level: finite-difference agreement and a
+    trajectory optimization with both adjoints inside the engine. This
+    needs the hybrid in \texttt{src/} and coordination with the authors
+    of the engine.
+  \item A second engine: running Simple's derivative formula with an
+    iterative single-precision solve would show the effect outside
+    ostrich.
+  \item A general bound for the amplification in terms of
+    $\tilde{\mathbf{M}}$, $\mathbf{J}$ and $\mathbf{C}$, and a rule for
+    rows with $c_i = 0$, which cannot enter body space.
+\end{itemize}
+
+\paragraph{Venue.}
+A differentiable-simulation workshop with the offline results and an
+in-engine finite-difference check; a full paper (RA-L, SCA) with
+optimization results and a second engine.
+
+\clearpage
+\subsection{Selecting the Solver per Scene}
+\label{sec:idea-solver-selection}
+
+\paragraph{Idea.}
+No single linear solver is expected to be best for every scene. Pure
+iterative PCR scales to large systems, a direct body-space solve wins when
+there are few bodies and all rows are compliant, and the hybrid of
+Sections~\ref{sec:idea-deflation} and~\ref{sec:idea-hybrid-adjoint} covers
+the region in between. The idea is to choose the solver automatically,
+per scene or robot type, so as to reach the highest accuracy, including
+the accuracy of the adjoint gradient, within a given time budget. The
+choice could be made by handcrafted rules or learned, for example with a
+decision-tree or MLP classifier.
+
+\paragraph{Prior art.}
+Learning to choose a linear solver is established in scientific
+computing. \citet{sood2019iterative} labels sparse systems by the fastest
+of many PETSc solver--preconditioner pairs and trains classifiers on cheap
+matrix features; later work uses graph neural networks on the sparsity
+pattern and large SuiteSparse benchmarks. These works select for speed
+only, one matrix at a time. Not covered so far: a choice that includes
+gradient accuracy, batched GPU simulation, and a hybrid option between the
+direct and the iterative extreme.
+
+\paragraph{Concerns.}
+\begin{itemize}
+  \item \textbf{Something to select.} On Helhest the body-space solve
+    wins everywhere, so a classifier would always give one answer. The
+    idea needs scenes in which each option wins: many bodies, rigid rows
+    with $c_i = 0$, contacts between bodies.
+  \item \textbf{Cost model versus learning.} The deciding features are
+    few and largely analytic: $N_b$, $n$, the size of the joint block,
+    $\min_i c_i$, the batch size $W$, the precision and whether gradients
+    are needed. The costs follow known formulas ($(6N_b)^3/3$ for a dense
+    $\mathbf{K}$, iterations $\times$ cost per iteration for PCR). A cost
+    model with a few measured constants may match a classifier. A decision
+    tree is defensible because it yields the rule; an MLP for about five
+    features is hard to justify.
+  \item \textbf{Measuring instead of predicting.} A simulation runs
+    millions of steps, so it can run a few steps with every solver at
+    startup and keep the best, exactly and for the actual hardware. A
+    predictor beats this only if the best choice changes during a
+    rollout, for example from few rows in the air to many contacts after
+    landing, or to contacts between bodies in a grasp. Switching per step
+    or per world conflicts with captured CUDA graphs and with all worlds
+    of a batch running the same kernels.
+\end{itemize}
+
+\paragraph{What it would take.}
+First the regime map: which solver wins on which scene, offline from
+rescaled masses and compliances, then on real scenes. Then a constrained
+choice over a configuration space, $\{\text{PCR}, \text{hybrid with } k_c
+\text{ rows}, \text{body-space Cholesky}\} \times \{\text{iteration cap}\}$,
+maximizing accuracy subject to time $\le$ budget. Three selectors to
+compare: an analytic cost model, a decision tree fitted to measurements,
+and benchmarking at startup. The novel case is switching during a rollout
+from cheap per-step features (number of active rows, share of contact
+rows, number of contacts between bodies).
+
+\paragraph{Assessment.}
+Weak as a standalone paper, because of the prior art and the strong
+startup-benchmarking baseline. Strong as the closing section of a paper
+on choosing the linear solver in differentiable contact simulation, where
+the decision tree turns the regime map into a rule readers can use.

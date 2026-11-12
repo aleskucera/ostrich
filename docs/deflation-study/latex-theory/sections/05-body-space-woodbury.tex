@@ -274,8 +274,13 @@ does not remove the large errors. The fourth row isolates the cause. It
 solves for $\mathbf{w}$ accurately in body space (relative error about
 $3 \cdot 10^{-3}$) but keeps the subtraction of \eqref{eq:adjoint-pcr}, and
 it is the worst row: in the worst case the gradient even points the wrong
-way (cosine $-0.51$). The formula, not the solver, limits the accuracy. The
-body-space adjoint \eqref{eq:adjoint-body} has at most $0.5\%$ error on
+way (cosine $-0.51$). The subtraction amplifies the relative error of
+$\mathbf{w}$ by a factor of about $20$ to $60$ in the recorded systems, so
+the accuracy is limited by the inexact solve and this amplification
+together, not by the solver alone.
+% Amplification ‖M⁻¹Jᵀw‖/‖w_u‖, p50–p90 over both scenes (current dataset):
+% test_scripts/deflation/adjoint_hybrid.py, see research_findings.md.
+The body-space adjoint \eqref{eq:adjoint-body} has at most $0.5\%$ error on
 every draw and a worst cosine of $1.0000$. Together with
 Section~\ref{sec:body-space-idea}, the same Cholesky factor of $\mathbf{K}$
 thus gives a faster forward solve and an essentially exact adjoint step at

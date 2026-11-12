@@ -95,8 +95,9 @@ methods) or §4 (next to the joint/control Z source).
 
 ## Idea: body-space / constraint-space hybrid for better adjoint gradients
 
-Discussed 2026-11-02. **Untested idea, not a finding yet.** Nothing below
-has been measured, except the §5.3 numbers it builds on.
+Discussed 2026-11-02. Tested offline 2026-11-12: see **Results** at the end
+of this entry, which correct parts of the reasoning below (the role of the
+subtraction, the ρ split rule, and which rows cause the amplification).
 
 **Motivation.** The ostrich adjoint (`base_engine.step_backward`) computes
 d = M̃⁻¹f, solves A w = J d with capped PCR and forms w_u = d − M̃⁻¹Jᵀw.
@@ -190,3 +191,164 @@ regimes where full body space, the hybrid and constraint space each win.
 **Possible use:** the core of a paper on "choosing the linear solver in
 differentiable contact simulation", with the hybrid as the middle regime
 that targets gradient quality (deflation only targets solve speed).
+
+**Results (offline, 2026-11-12).** Script:
+`test_scripts/deflation/adjoint_hybrid.py` (~20 s, CPU). The setup is the
+same as in §5.3 / `adjoint_accuracy.py`: 25 systems per scene (the last NR
+iteration of each step), 8 random loss vectors f each, all solvers in
+float32 (the engine's precision). The reference is the float64 solution of
+the same linear system, w_u = K⁻¹f. So this measures only the error the
+linear solve adds to one adjoint step, not the true gradient of the
+simulation (no linearization errors, no Newton truncation, no horizon, no
+FD comparison). "Amplification" is the exact factor ‖M̂⁻¹J_Fᵀw_F‖/‖w_u‖.
+
+Share of draws with > 10% error in w_u (median error in brackets),
+obstacle scene:
+
+| A_F solver | engine (S = none), amp ≈ 30 | hybrid S = joint/ctrl (18 rows), amp ≈ 2.5 |
+|---|---|---|
+| PCR cap 16 (engine today) | 42% (5.4e-2) | 2% (2.6e-4) |
+| PCR cap 16 + 1 IR step | 38.5% (1.5e-2) | 0% (1.0e-5) |
+| PCR cap 16 + 2 IR steps | 37.5% (1.1e-2) | 0% (8.4e-6) |
+| PCR cap 32, no IR | 38.5% (1.1e-2) | 0% (3.0e-6) |
+| PCR cap 48, no IR | 2.5% (3.3e-3; 42% > 1%) | 0% (3.0e-6) |
+| Cholesky | 0% (8.2e-6) | 0% (2.3e-6) |
+| Cholesky + 1 IR step | 0% (1.0e-7) | 0% (1.0e-7) |
+
+Terrain scene, same rows: engine 25.5% → 4.5% → 4.0% | cap 32 4.0% |
+cap 48 2.0% | Cholesky 0%; hybrid 2% → 0% → 0% | 0% | 0% | 0%. Other
+splits (both scenes): S = all contacts (amp ≈ 10–12) and S = ρ > 1e2
+(amp ≈ 7–8) give 0% with capped PCR. S = contact normals only changes
+nothing (amp stays ≈ 30). Full body space (Cholesky of K) has median
+2.8e-4 on obstacle, worse than the hybrid, because the sticking friction
+rows put 1/c ≈ 5e5 into K.
+
+Iterative refinement (IR) here works on the full adjoint KKT system
+M w_u + Jᵀw = f, J w_u − C w = 0. The residual r1 = f − M w_u − Jᵀw,
+r2 = −(J w_u − C w) needs only products (no C⁻¹, so it also works for
+c = 0 rows). The correction is solved with the same split and solver and
+added. A step contracts the error by η ≈ amplification × (relative
+error of the inner solve), and converges only if η < 1.
+
+Findings:
+- **The subtraction alone is not the problem.** With an exact w (float32
+  Cholesky of A), the engine's formula gives ~1e-5, and one IR step brings
+  every variant to the float32 floor (~1e-7). This matches the known
+  instability of the Sherman–Morrison–Woodbury formula and its known cure
+  (see prior art below). The §5.3 sentence "The formula, not the solver,
+  limits the accuracy" overstates it: the subtraction amplifies the solver
+  error by ~20–60, and the capped solve combined with that amplification
+  limits the accuracy.
+- **IR does not rescue the engine under the iteration cap.** With capped
+  PCR, η = 30 × (PCR error 0.1–0.4) > 1, so the corrections are as wrong
+  as the original. IR is no better than giving PCR the same number of
+  iterations, and worse than one long run (each IR step restarts PCR and
+  discards its Krylov subspace, like restarted GMRES).
+- **The hybrid makes the iterative regime work.** It lowers the
+  amplification (30 → 2.5) and leaves a well-conditioned A_F (PCR
+  converges in ~16–20 iterations, while the engine's A is not converged
+  at 48). Result: 2% at the engine's budget, 0% with one IR step or cap 32.
+- **Corrected split rule.** What matters is the share of the loss push a
+  row group absorbs, not the per-row ρ_i. In Helhest the joints, which hold
+  each wheel to the chassis in 5 of 6 directions, absorb most of a random
+  push: moving the 18 joint/control rows cuts the amplification ~12×, more
+  than any ρ threshold. Moving the contact normals does nothing. (A 1D toy
+  with a single bar suggested the opposite, because the bar constrains only
+  one direction.) The structural joint/control split is also the best in
+  float32 precision: the joints' moderate c (≈ 0.011) keeps M̂ well
+  conditioned, while the sticking friction rows (c ≈ 2e-6) are better left
+  in constraint space, where a tiny c only adds to the diagonal.
+- Caveat: the PCR helper stops at an absolute tolerance of 1e-5, so small
+  IR corrections in the hybrid sometimes run 0 iterations. This understates
+  IR there, and does not affect the engine rows (corrections ran all 16).
+
+**Prior art for the amplification (found 2026-11-12).** The engine's
+adjoint evaluates K⁻¹f = M̃⁻¹f − M̃⁻¹Jᵀ(C + JM̃⁻¹Jᵀ)⁻¹JM̃⁻¹f, i.e. the
+Woodbury formula with base M̃, so the mechanism is known:
+- E. L. Yip, "A note on the stability of solving a rank-p modification of
+  a linear system by the Sherman–Morrison–Woodbury formula", SIAM J. Sci.
+  Stat. Comput. 7 (1986) 507–513.
+- B. Hashemi, Y. Nakatsukasa, "Instability of the Sherman–Morrison formula
+  and stabilization by iterative refinement", arXiv:2510.01696 (2025). It
+  gives the same mechanism: large intermediates and a small solution
+  produce cancellation. Its fix is fixed-precision IR, where one step
+  restores backward stability. Our data agree for direct solves.
+- L. Shu et al., "Same Physics, Different Gradients: A State-of-the-Art
+  Report on Differentiable Physics Simulation", arXiv:2611.12162
+  (Nov 2026). It names convergence-aware adjoints (tolerance, conditioning,
+  precision) as an open problem. In the part read, it does not discuss the
+  dual (constraint-space) adjoint formula or this amplification.
+- Not checked yet: whether Delassus-based differentiable engines (e.g. Le
+  Lidec et al. 2024, Kamino) recover velocity gradients with the same
+  subtraction. That decides how general the issue is.
+
+**Updated publication view.** The amplification mechanism itself is not
+novel, and for direct solvers the answer is "add one IR step". The open
+problem is the budget-limited iterative adjoint: the textbook fix fails
+(η > 1), and a structural split fixes it by making η small. Still missing:
+the FD and optimization evidence inside the engine (a `src/` change), and
+the check of other engines.
+
+**Which simulators have the amplification, and when it hurts (2026-11-12).**
+Checked from the papers: Simple (Le Lidec, Carpentier et al. 2024,
+arXiv:2409.07107) and Nimble (Werling et al. 2021, arXiv:2103.16021) use
+the same Woodbury-form structure as ostrich. Engines that solve the full
+KKT system (Dojo, Belbute-Peres et al. 2018), work in primal space (MJX,
+MuJoCo Warp, Brax), or differentiate solver iterations (Warp XPBD,
+DiffTaichi, Qiao et al. 2021 reverse PGS) do not. Kamino is not
+differentiable.
+
+The structure is present when all three hold:
+1. **The gradient is the derivative of the converged step solution**, not
+   of the solver's iterations.
+2. **The velocities are eliminated.** The engine solves a Schur-complement
+   (Delassus) system for the constraint forces, then reconstructs the
+   velocities or their derivatives as free motion + M⁻¹Jᵀ × (constraint
+   quantity). Writing the system with constraint forces is not enough:
+   solving the full KKT system jointly has no such subtraction.
+3. **The derivative passes through that elimination.** The mode does not
+   matter: ostrich does it in reverse mode (adjoint w_u = d − M⁻¹Jᵀw),
+   Simple in forward mode (dv⁺/dθ = dv⁺/dθ|_λ − Δt M⁻¹J_cᵀ C A⁻¹ B(…)).
+   The method does not matter either: reverse-mode AD of a forward pass
+   λ = A⁻¹b, v = v_free + M⁻¹Jᵀλ produces the same adjoint formula.
+   Rigid or compliant constraints do not matter (Nimble is rigid, ostrich
+   compliant).
+
+It damages the gradient only if, in addition:
+4. **The constraint solve is inexact**: an iterative solver stopped by a
+   cap or tolerance, low precision (float32), or both. Its relative error ε
+   is what gets amplified.
+5. **The amplification ‖M⁻¹Jᵀw‖/‖w_u‖ is large in the scene**: stiff
+   constraints that absorb most of the loss push (joints in Helhest,
+   clamping/sticking contacts). It depends on the scene and on the loss
+   direction; ~20–60 on our systems.
+
+The gradient error is then ≈ amplification × ε, and one IR step repairs it
+only if that product is < 1.
+
+| | 1 | 2 | 3 | 4 inexact solve | 5 large amp. | harmful? |
+|---|---|---|---|---|---|---|
+| Ostrich | ✓ | ✓ | ✓ adjoint | ✓ capped PCR, float32, GPU | ✓ joints | yes: 42% / 25% bad single-step gradients |
+| Simple | ✓ | ✓ Delassus | ✓ forward mode | ✗ direct QR, likely float64 | possible | probably not |
+| Nimble | ✓ | ✓ A = JM⁻¹Jᵀ | ✓ | ✗ direct pseudoinverse, likely float64 | ✓ clamping contacts (true value exactly 0) | probably not |
+
+Not verified: the precision Simple and Nimble actually use (inferred from
+their CPU C++ code bases, Pinocchio and DART), and other dual engines
+(e.g. Jade). Publication angle: the structure is common in dual-formulation
+differentiable engines and harmless with direct float64 solves. It becomes
+harmful when such an engine moves to the GPU setting (float32, budgeted
+matrix-free iterative solves), which is where ostrich is and where
+Kamino-style engines are heading. A convincing demonstration outside
+ostrich would run Simple's derivative formula with an iterative float32
+solve.
+
+**Claim for a paper (2026-11-12).** The hybrid combination of body space
+and constraint space restores, in maximal coordinates with compliant
+constraints, what minimal-coordinate engines get for free: the elimination
+of the joints from the constraint system. And it does so without giving up
+the maximal coordinates that GPU parallelism favours.
+(Context: Simple and Nimble work in minimal coordinates, so their
+constraint systems hold only contact rows. The joint-space mass matrix is
+the rigid limit, c_joint → 0, of the hybrid's M̂ = M̃ + J_Sᵀ C_S⁻¹ J_S.
+Engines that could benefit are maximal-coordinate dual engines: ostrich,
+Kamino if made differentiable, SPOOK/AGX-style engines.)
