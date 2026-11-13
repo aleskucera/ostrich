@@ -352,3 +352,183 @@ constraint systems hold only contact rows. The joint-space mass matrix is
 the rigid limit, c_joint → 0, of the hybrid's M̂ = M̃ + J_Sᵀ C_S⁻¹ J_S.
 Engines that could benefit are maximal-coordinate dual engines: ostrich,
 Kamino if made differentiable, SPOOK/AGX-style engines.)
+
+**In-engine trajectory test of the adjoint solve (2026-11-13).** Script:
+`test_scripts/deflation/adjoint_trajectory.py` (~25 s per scene, GPU +
+CPU). It runs the real engine on the obstacle and terrain scenes (same
+setup as `dump_linear_systems.py`: dt 0.03, 25 steps, wheel target 6.0,
+default config), saves the rollout in a `TrajectoryBuffer`, and repeats
+the backward pass on that one trajectory with different adjoint solvers.
+Only the linear solve inside `step_backward` is swapped (the script
+replaces `engine.cr_solver.solve`, rebuilds the dense active-set system
+from `A.data`, solves it on the CPU and writes the result back). No change
+in `src/`. The gradient is dL/d(wheel target velocity) at every step
+before an end step T ∈ {5, 10, 15, 20, 25}. Losses: 8 random velocity
+weight vectors at T (40 gradients per scene) and chassis x / y position
+at T (10 gradients per scene).
+
+Background: rerunning `tests/differentiable_simulator` at the production
+PCR budget (16 iterations, tol 1e-5) passed 13 of 13 scripts with
+unchanged gradients, but the adjoint PCR never reached the cap there (at
+most 7 iterations), so those tests do not exercise the capped regime.
+
+Harness checks (all pass): dense A vs the engine's matrix-free operator
+3e-8; CPU port of PCR vs the engine's GPU PCR, gradient difference 2e-6;
+elimination run to convergence in float64 vs the dense reference 7e-7.
+
+*Result 1: error against the converged adjoint* (dense float64 solve of
+the same adjoint systems). Whole horizon (all steps before T), default
+forward pass, relative error p50 / p90, share of gradients with > 10%
+error, worst cosine:
+
+| adjoint solver | obstacle, velocity loss | obstacle, position loss | terrain, velocity loss | terrain, position loss |
+|---|---|---|---|---|
+| engine (GPU PCR, cap 16) | 2.2e-1 / 6.5e-1, 60%, 0.75 | 3.0e-2 / 3.7e-1, 30%, 0.91 | 1.4e-1 / 3.1e-1, 65%, 0.93 | 7.4e-2 / 4.9e-1, 40%, 0.93 |
+| PCR cap 32 | 6.0e-2 / 3.2e-1, 45%, 0.84 | 9.3e-3 / 8.6e-2, 10%, 0.98 | 2.3e-2 / 7.5e-2, 5%, 0.99 | 2.1e-2 / 1.1e-1, 10%, 0.98 |
+| joint/ctrl eliminated, P = diag(A), cap 16 | 9.3e-3 / 1.3e-1, 12%, 0.93 | 5.5e-4 / 5.3e-2, 10%, 0.995 | 1.6e-2 / 3.9e-2, 0%, 0.998 | 1.5e-2 / 9.8e-2, 10%, 0.98 |
+| joint/ctrl eliminated, P = diag(A_F), cap 16 | 6.0e-4 / 1.6e-2, 0%, 0.997 | 2.7e-4 / 2.6e-3, 0%, 0.9998 | 4.4e-3 / 1.6e-2, 0%, 0.9995 | 8.8e-3 / 6.0e-2, 0%, 0.998 |
+
+The engine's adjoint PCR reached the cap in 59% (obstacle) and 61%
+(terrain) of the solves; with the elimination and diag(A_F) in 25% and
+40%. A tight forward pass (`--forward tight`) gives the same picture.
+Against the thresholds fixed before the run: claim 1 (the capped solve
+makes the gradient materially wrong) holds, 30–65% of the gradients are
+off by more than 10%. Claim 2 (the elimination repairs it at the same
+budget) holds: no gradient above 10%, better than PCR with twice the
+budget in every cell, median error lower by a factor 370 / 110 / 32 / 8
+(the last, terrain position loss, misses the 10× mark; 10 gradients).
+Single run; the forward pass is not bit-reproducible on the GPU, so
+repeated runs change the numbers slightly.
+
+*Result 2: error against finite differences* (`--fd`, tight forward pass,
+one wheel target perturbed for all steps, eps 1e-2 and 1e-3, gradient
+summed over steps). This was meant as a sanity check of the reference and
+turned out to be the more important result:
+
+- While the forward Newton loop converges (2–3 iterations per step), the
+  converged adjoint matches FD to 0.1% for velocity losses. Control on
+  the gradient tests' flat-ground scene
+  (`--scene flat --fd --dt 0.01 --drive-velocity 3`): 0.0–0.1% up to
+  T = 15. Correction (same day): these steps are free flight. The robot
+  starts at z = 0.6 and the contacts detected before landing carry less
+  than 0.005 N, so this does not validate the adjoint through contact.
+- From the first step where Newton hits its iteration cap, which is the
+  landing (step 5 at
+  dt 0.03 and wheel target 6.0, in the obstacle scene and on flat ground
+  alike; step 19 in the flat control), the converged adjoint departs from
+  FD: 15–47% at T = 6, 57–65% at T = 8, 84–145% at T = 10–12 in the
+  obstacle scene, where FD is still stable (eps 1e-2 and 1e-3 agree to
+  12% or better). Later, and from T = 8 in the terrain scene, FD itself is unstable
+  and cannot serve as a reference.
+- The adjoint solver makes no visible difference there: reference, engine
+  PCR and the elimination have the same error against FD (e.g. T = 8:
+  0.569 / 0.540 / 0.569).
+- Raising the Newton cap from 20 to 100 lowered the forward residual by
+  a factor 10–100 but did not change the mismatch (ad-hoc run, not in the
+  repo). So unconverged Newton iterations alone do not explain it. The
+  cause is in the next entry.
+- Position-loss gradients could not be validated: over these short
+  horizons the FD values are at single-precision resolution (eps 1e-2 and
+  1e-3 disagree), and where they agree (flat control, T = 15) the adjoint
+  is 32% off.
+
+Consequences for idea 7.2:
+- The numerical claim is confirmed in the engine at trajectory level: the
+  capped adjoint solve loses 20–60% against the converged adjoint, and
+  the elimination with diag(A_F) removes that at the same budget. The
+  diag(A_F) preconditioner is needed; deflation with diag(A) leaves
+  10–12% bad gradients in three of four cells.
+- The practical claim is not supported on these scenes. In the regime
+  where PCR is capped, the converged adjoint is itself 50–100% away from
+  FD, so repairing the linear solve does not bring the gradient closer to
+  the true derivative. The capped-PCR regime and the regime where the
+  adjoint is unreliable appear to coincide (both start when the wheels
+  load up and Newton stops converging).
+- Before 7.2 can claim better gradients, either the larger error has to
+  be understood and removed, or a scene has to be found where the
+  converged adjoint matches FD while PCR is still cut off by the cap.
+
+Housekeeping: the two scratch scripts behind `tab:adjoint-elimination`
+are now in the repo as `test_scripts/deflation/adjoint_equivalence.py`
+and `test_scripts/deflation/deflation_forward_precond.py`; rerun
+2026-11-13, numbers unchanged.
+
+**Why the adjoint disagrees with FD once contacts carry load (2026-11-13).**
+Investigation with ad-hoc scripts (session scratch, not in the repo), on
+the flat-ground scene and the obstacle scene at dt 0.03, wheel target 6.0,
+tight solver settings (200 PCR iterations, tol 1e-8, 20 Newton
+iterations), single time steps, loss L = w·u⁺ with random w, gradient
+w.r.t. the three wheel targets.
+
+1. *The onset is the landing.* The first step with a loaded contact
+   (480–580 N normal force) is step 5 at dt 0.03 and step 19 at dt 0.01;
+   before it the largest normal force is below 0.005 N. All agreement
+   with FD reported above is free flight. `test_helhest_gradient.py`
+   (1 and 5 steps of 0.01 s from z = 0.6) runs entirely in free flight.
+2. *The matrix of the Newton step is not the Jacobian of the residual
+   once constraint forces are nonzero*, and the adjoint reuses that
+   matrix. Test: reproduce one Newton step with an exact linear solve and
+   compare the residual change along the step with the predicted −R. At
+   λ = 0 the prediction is exact. At the exit iterates of loaded steps
+   the dynamics rows are off by 41–77% of |R| (the mismatch vanishes when
+   the pose is held fixed, so it is the dependence of the force
+   directions and lever arms on the new pose, a term ∝ dt²·λ), and the
+   normal rows by 15–28% (cause not isolated).
+3. *Friction rows treat the weight w as a constant* (the code comments
+   call this Picard / frozen), but for a sliding contact w is
+   proportional to the slip speed. For the loaded sliding contacts at
+   flat step 6, the velocity block of a friction row pair has singular
+   values (1.064, 1.063) in the engine's matrix and (1.063, 0.000) in the
+   FD Jacobian: the true rows do not respond to a change of slip speed
+   along the slip direction, the engine's rows model sliding friction as
+   viscous.
+4. *Forward pass.* With this matrix Newton converges linearly and stalls:
+   exit residual 1e-2 to 1e-3 after 20 iterations, 1e-3 after 100, 5e-5
+   after 3000, never the 1e-6 requested. Exact dense linear solves give
+   the identical residual history, so the linear solver is not the
+   cause. With the FD Jacobian (friction lag frozen at the engine's exit
+   lag) Newton reaches 1e-5 from the engine's exit iterate in 2–4
+   iterations.
+5. *Adjoint.* At that root, relative error against the gradient obtained
+   by re-solving the step with perturbed targets:
+
+   | step | IFT, FD Jacobian | IFT, engine matrix | engine `step_backward` | FD through `engine.step` |
+   |---|---|---|---|---|
+   | flat 4 (free flight) | 0.0% | 0.0% | 0.0% | 0.0% |
+   | flat 5 | 0.1% | 58% | 58% | 26% |
+   | flat 6 | 0.1% | 48% | 48% | 6% |
+   | flat 7 | 0.2% | 70% | 70% | 77% |
+   | obstacle 5 | 0.1% | 4.3% | 4.3% | 8.9% |
+   | obstacle 6 | 0.1% | 6.5% | 6.5% | 10% |
+
+   The implicit-function-theorem gradient is right when the matrix is
+   the Jacobian. The engine's adjoint equals what its matrix implies, so
+   its error comes from the matrix, not from the unconverged state. FD
+   through the engine is also off, because the forward step is not
+   converged; it is not a ground truth under load. Replacing one row
+   group of the engine matrix by the true rows (flat 5 / 6 / 7): friction
+   rows → 18 / 14 / 12%, normal rows → 29 / 32 / 51%, dynamics rows →
+   54 / 46 / 68%. For this gradient the friction rows matter most.
+6. *Friction above the Coulomb limit.* At the exit of loaded steps the
+   contacts carry |λ_f| = 1.1 to 2.0 × μλ_n in all configurations, and
+   still after 3000 iterations. Scaling |λ_f| of these contacts by 0.8 to
+   1.2 leaves the friction-row residual unchanged to three digits: above
+   the limit the rows constrain only the direction of the friction force
+   (`gap` clamps at 0 and the weight divides by the unclamped lagged
+   magnitude). The system with the lag tied is therefore degenerate
+   there, which is why item 5 uses the lag-frozen system.
+7. *Ruled out:* the adjoint linear solver, the forward linear solver, the
+   `pose_vjp` switch. The `frozen` friction mode of the adjoint is worse
+   (40–70% single-step error at flat step 5).
+8. *Limits.* Five loaded steps in two scenes, one loss type, one
+   parameter. Steps with all contacts sticking (flat 8, 9) could not be
+   analysed this way: the FD-Jacobian root search diverged, although the
+   single-step adjoint is also 28–45% off FD there. The cause of the
+   normal-row mismatch is open. An A/B with `relaxation.friction =
+   bilateral_patch` was inconclusive (adjoint off before landing too).
+
+Consequence for idea 7.2: under load the dominant error of the gradient
+is the linearization that the Newton step and the adjoint share, not the
+adjoint's linear solve. The same linearization makes Newton hit its
+iteration cap. The solver error that 7.2 removes stays second-order until
+that is fixed.

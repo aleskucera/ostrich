@@ -69,62 +69,229 @@ two or three scenes; RA-L or IROS with scenes where body space loses.
 A differentiable simulator that eliminates the velocities and solves for
 the constraint forces computes the gradient carried to the previous step
 as $\mathbf{w}_u = \mathbf{d} - \tilde{\mathbf{M}}^{-1}\mathbf{J}^\top\mathbf{w}$
-\eqref{eq:adjoint-pcr}. This is the Woodbury formula for
-$\mathbf{K}^{-1}\mathbf{f}$, and its subtraction amplifies the relative
-error of $\mathbf{w}$ by $\|\tilde{\mathbf{M}}^{-1}\mathbf{J}^\top\mathbf{w}\| / \|\mathbf{w}_u\|$.
-The hybrid eliminates a group of rows $S$ in body space,
-$\hat{\mathbf{M}} = \tilde{\mathbf{M}} + \mathbf{J}_S^\top\mathbf{C}_S^{-1}\mathbf{J}_S$,
-and keeps the remaining rows $F$ in constraint space,
-$\mathbf{A}_F = \mathbf{J}_F\hat{\mathbf{M}}^{-1}\mathbf{J}_F^\top + \mathbf{C}_F$.
-It is exact in exact arithmetic and, for $S$ = joint/control rows, its
-forward system is the same Schur complement that joint/control deflation
-iterates on. The claim: the hybrid restores, in maximal coordinates with
-compliant constraints, what minimal-coordinate engines get for free, the
-elimination of the joints from the constraint system, and so makes
-budget-limited single-precision adjoints accurate.
+\eqref{eq:adjoint-pcr}. If the solve for $\mathbf{w}$ stops with the
+residual $\mathbf{r} = \mathbf{J}\mathbf{d} - \mathbf{A}\mathbf{w}$, the
+error of the computed gradient is exactly
+\begin{equation}
+  \delta\mathbf{w}_u
+  = \tilde{\mathbf{M}}^{-1}\mathbf{J}^\top\mathbf{A}^{-1}\mathbf{r}
+  = \mathbf{K}^{-1}\mathbf{J}^\top\mathbf{C}^{-1}\mathbf{r} ,
+  \label{eq:adjoint-error}
+\end{equation}
+where the second form needs $c_i > 0$ for every row. The residual on row
+$i$ is weighted by $1/c_i$ before $\mathbf{K}^{-1}$ is applied, so the
+unweighted $\|\mathbf{r}\|_2$ of the PCR stopping test does not measure
+the gradient error. The forward solve tolerates a large residual, because
+the next Newton iteration corrects it. The adjoint solve is a single
+solve, and its residual goes into the gradient by \eqref{eq:adjoint-error}.
+
+The idea is to eliminate a group of rows $S$ exactly, so that the residual
+vanishes on them, and to iterate only on the remaining rows $F$, i.e.\ on
+the Schur complement
+$\mathbf{A}_F = \mathbf{A}_{FF} - \mathbf{A}_{FS}\mathbf{A}_{SS}^{-1}\mathbf{A}_{SF}$.
+There are two ways to do it:
+\begin{itemize}
+  \item \textbf{Projection.} Deflation with unit vectors on $S$
+    (Section~\ref{sec:z-joint-control}), followed by the engine's formula
+    \eqref{eq:adjoint-pcr}. It factorizes $\mathbf{A}_{SS}$
+    ($|S| \times |S|$) and also works for rows with $c_i = 0$.
+  \item \textbf{Body space.} The rows $S$ are moved into a stiffened mass
+    matrix,
+    $\hat{\mathbf{M}} = \tilde{\mathbf{M}} + \mathbf{J}_S^\top\mathbf{C}_S^{-1}\mathbf{J}_S$,
+    which gives the same matrix as
+    $\mathbf{A}_F = \mathbf{J}_F\hat{\mathbf{M}}^{-1}\mathbf{J}_F^\top + \mathbf{C}_F$
+    by the Woodbury identity. The gradient is
+    $\mathbf{w}_u = \hat{\mathbf{d}} - \hat{\mathbf{M}}^{-1}\mathbf{J}_F^\top\mathbf{w}_F$
+    with $\hat{\mathbf{d}} = \hat{\mathbf{M}}^{-1}\mathbf{f}$ and
+    $\mathbf{A}_F\mathbf{w}_F = \mathbf{J}_F\hat{\mathbf{d}}$. It factorizes
+    $\hat{\mathbf{M}}$ ($6N_b \times 6N_b$) and needs $c_i > 0$ on $S$.
+\end{itemize}
+Both are exact in exact arithmetic. In the adjoint solve they iterate on
+the same matrix $\mathbf{A}_F$ with the same right-hand side, and by
+\eqref{eq:adjoint-error} the same residual gives the same gradient error.
+They differ only in the preconditioner and in rounding. This idea and
+the one of Section~\ref{sec:idea-deflation} are therefore one method: the
+elimination that lowers the forward iteration count is the one that makes
+the adjoint accurate. The claim: eliminating the joint rows restores, in
+maximal coordinates with compliant constraints, what minimal-coordinate
+engines get for free, and so makes budget-limited single-precision
+adjoints accurate.
 
 \paragraph{Evidence so far.}
 Offline, single step, single precision, against the double-precision
-solution of the same linear system
-(\texttt{test\_scripts/deflation/adjoint\_hybrid.py}):
+solution of the same linear system, on $25$ systems $\times$ $8$ random
+loss gradients per scene. Table~\ref{tab:adjoint-elimination} compares
+the two implementations at the engine's PCR budget.
+
+% Data: current dataset (2026-10-25), float32, tol 1e-5, cap 16, one CPU run.
+% Rows 1 and 4: test_scripts/deflation/adjoint_hybrid.py. Rows 2 and 3, the
+% PCG and cap-32 numbers and the check of eq:adjoint-error:
+% test_scripts/deflation/adjoint_equivalence.py. Forward iteration counts:
+% test_scripts/deflation/deflation_forward_precond.py. Rerun 2026-11-13.
+\begin{table}[h]
+  \centering
+  \small
+  \begin{tabular}{@{}lcccc@{}}
+    \toprule
+    & \multicolumn{2}{c}{obstacle scene} & \multicolumn{2}{c}{terrain scene} \\
+    \cmidrule(lr){2-3} \cmidrule(l){4-5}
+    Adjoint solve & $>10\%$ & p50 & $>10\%$ & p50 \\
+    \midrule
+    Jacobi PCR, \eqref{eq:adjoint-pcr} (engine today) & $42\%$ & $5 \cdot 10^{-2}$ & $25.5\%$ & $4 \cdot 10^{-2}$ \\
+    Projection, $\mathbf{P} = \operatorname{diag}(\mathbf{A})$, \eqref{eq:adjoint-pcr} & $15\%$ & $8 \cdot 10^{-3}$ & $2.5\%$ & $5 \cdot 10^{-5}$ \\
+    Projection, $\mathbf{P} = \operatorname{diag}(\mathbf{A}_F)$, \eqref{eq:adjoint-pcr} & $2\%$ & $3 \cdot 10^{-4}$ & $1.5\%$ & $8 \cdot 10^{-6}$ \\
+    Body space, $\mathbf{P} = \operatorname{diag}(\mathbf{A}_F)$ & $2\%$ & $3 \cdot 10^{-4}$ & $2\%$ & $1 \cdot 10^{-5}$ \\
+    \bottomrule
+  \end{tabular}
+  \caption{Relative error of $\mathbf{w}_u$ after one adjoint step with
+    $S$ = joint/control rows, PCR capped at $16$ iterations, single
+    precision: share of draws with more than $10\%$ error and median
+    (p50).}
+  \label{tab:adjoint-elimination}
+\end{table}
+
 \begin{itemize}
-  \item The amplification is about $30$ (median) for the engine's formula
-    and $2.5$ with the joint/control rows in body space.
-  \item With the engine's PCR budget ($16$ iterations), the share of
-    draws with more than $10\%$ gradient error drops from $42\%$ to $2\%$
-    (obstacle) and from $25.5\%$ to $2\%$ (terrain), and to $0\%$ with
-    one refinement step.
+  \item The error formula \eqref{eq:adjoint-error} agrees with the
+    measured error to a relative difference of $10^{-11}$ (median),
+    evaluated in double precision.
+  \item With the same preconditioner the two implementations agree (last
+    two rows). The third row still uses the subtraction of
+    \eqref{eq:adjoint-pcr}, so the subtraction is not what limits the
+    accuracy. The ratio
+    $\|\tilde{\mathbf{M}}^{-1}\mathbf{J}^\top\mathbf{w}\| / \|\mathbf{w}_u\|$,
+    about $30$ for the engine's formula and $2.5$ for the body-space
+    form, bounds how much a relative error of $\mathbf{w}$ can grow, but
+    it does not predict the error: after the elimination, the errors of
+    $\mathbf{w}_S$ and $\mathbf{w}_F$ largely cancel in
+    $\mathbf{J}^\top\mathbf{w}$.
+  \item The preconditioner matters. Deflation as in
+    Section~\ref{sec:dpcr} keeps $\mathbf{P} = \operatorname{diag}(\mathbf{A})$;
+    the diagonal of the Schur complement lowers the share of bad draws
+    from $15\%$ to $2\%$ in the obstacle scene. For the forward solve the
+    effect is mixed: the median iteration count stays at $7$ (obstacle)
+    and drops from $9$ to $6$ (terrain), but the 90th percentile in the
+    obstacle scene rises from $7$ to $14$.
+  \item The body-space form has the lower rounding floor. With a cap of
+    $32$ no draw exceeds $10\%$ in either form, and the median error in
+    the obstacle scene is $3 \cdot 10^{-6}$ in body space against
+    $2 \cdot 10^{-5}$ with the projection.
+  \item Replacing PCR by PCG is not a fix: without elimination it is
+    slightly worse ($48.5\%$ and $38.5\%$), with elimination slightly
+    better ($0\%$ in both scenes).
   \item Iterative refinement, the textbook fix of the Woodbury
     instability \citep{yip1986note,hashemi2025instability}, does not
     rescue the engine's formula under the cap ($42\% \to 38.5\%$): the
-    error contracts by amplification $\times$ inner error per step, which
-    exceeds $1$. With direct solves, one refinement step makes every
-    variant accurate to about $10^{-7}$.
+    capped solve is too inaccurate for a refinement step to contract the
+    error. After the elimination one refinement step brings the share to
+    $0\%$. With direct solves, one refinement step makes every variant
+    accurate to about $10^{-7}$.
 \end{itemize}
+
+\paragraph{Evidence in the engine.}
+The offline errors carry over to the gradient of a trajectory. The test
+runs the engine on both scenes ($25$ steps of $0.03$\,s, default
+configuration) and repeats the backward pass on the same trajectory with
+different adjoint solves. Everything else in the adjoint step is
+unchanged. The gradient is that of a loss on the body velocities at an
+end step, with respect to the wheel target velocities at all earlier
+steps. The reference is the same backward pass with a dense
+double-precision solve (Table~\ref{tab:adjoint-trajectory}).
+
+% Data: test_scripts/deflation/adjoint_trajectory.py, 2026-11-13, one run,
+% default forward pass, velocity losses, window "all steps before T"
+% (5 end steps x 8 random loss vectors = 40 gradients per scene). Details
+% and the position-loss numbers: research_findings.md.
+\begin{table}[h]
+  \centering
+  \small
+  \begin{tabular}{@{}lcccc@{}}
+    \toprule
+    & \multicolumn{2}{c}{obstacle scene} & \multicolumn{2}{c}{terrain scene} \\
+    \cmidrule(lr){2-3} \cmidrule(l){4-5}
+    Adjoint solve & $>10\%$ & p50 & $>10\%$ & p50 \\
+    \midrule
+    Jacobi PCR, cap $16$ (engine today) & $60\%$ & $2 \cdot 10^{-1}$ & $65\%$ & $1 \cdot 10^{-1}$ \\
+    Jacobi PCR, cap $32$ & $45\%$ & $6 \cdot 10^{-2}$ & $5\%$ & $2 \cdot 10^{-2}$ \\
+    Projection, $\mathbf{P} = \operatorname{diag}(\mathbf{A})$, cap $16$ & $12\%$ & $9 \cdot 10^{-3}$ & $0\%$ & $2 \cdot 10^{-2}$ \\
+    Projection, $\mathbf{P} = \operatorname{diag}(\mathbf{A}_F)$, cap $16$ & $0\%$ & $6 \cdot 10^{-4}$ & $0\%$ & $4 \cdot 10^{-3}$ \\
+    \bottomrule
+  \end{tabular}
+  \caption{Relative error of the trajectory gradient against the same
+    backward pass with an exact adjoint solve, $40$ gradients per scene:
+    share with more than $10\%$ error and median (p50). Single
+    precision, $S$ = joint/control rows.}
+  \label{tab:adjoint-trajectory}
+\end{table}
+
+The engine's adjoint solve reaches the cap in about $60\%$ of the steps.
+The elimination removes the resulting error at the same budget and does
+better than PCR with twice the budget. Losses on the chassis position
+give the same ranking.
+
+This comparison isolates the linear solve. It does not show that the
+repaired gradient is correct, and a finite-difference check says that it
+is not. While the robot is in free flight, the gradient with the exact
+adjoint solve agrees with central finite differences to $0.1\%$. From
+the step in which the wheels land and the contacts carry load (step $5$
+in both scenes), it departs from the finite differences: by $15$ to
+$50\%$ one step later and by about $100\%$ five steps later in the
+obstacle scene. The adjoint solve makes no visible difference to this
+error.
+
+% Data: ad-hoc single-step scripts of 2026-11-13, not in the repo; see
+% "Why the adjoint disagrees with FD" in research_findings.md.
+The cause is the linearization, not the solver. Once the constraint
+forces are nonzero, the matrix of the Newton step is not the Jacobian of
+the residual: it treats the friction weight as a constant, so a sliding
+contact is linearized as viscous friction, and it omits the dependence
+of the force directions on the new pose. The adjoint uses the same
+matrix. On single loaded steps, the gradient from the engine's matrix is
+$4$ to $70\%$ off, while the same formula with a finite-difference
+Jacobian is within $0.2\%$. The same defect makes the forward Newton
+iteration converge only linearly, so that it reaches its iteration limit
+in every loaded step, also with exact linear solves. In the recorded
+scenes, the steps in which PCR is cut off by the cap are therefore steps
+in which the adjoint is wrong for a larger reason.
 
 \paragraph{Scope and prior art.}
 The same structure appears in Simple \citep{lelidec2024highly} (forward
 mode) and Nimble \citep{werling2021fast}, but both solve the constraint
 part directly, probably in double precision, and use minimal coordinates,
-in which the joints are not constraint rows. The amplification becomes
-harmful only with an inexact constraint solve (an iteration cap, single
-precision) and stiff constraints that absorb most of the loss push. The
-contribution is therefore the regime where GPU engines are heading:
-maximal coordinates, single precision and budgeted matrix-free iterative
-solves, where the textbook fix fails.
+in which the joints are not constraint rows. The error
+\eqref{eq:adjoint-error} becomes harmful only with an inexact constraint
+solve (an iteration cap, single precision) and stiff rows that are left
+unconverged. The contribution therefore targets dual-formulation GPU
+engines in maximal coordinates, which use single precision and budgeted
+matrix-free iterative solves, and where the textbook fix fails. Primal
+GPU engines such as MJX do not eliminate the velocities and so do not
+have this error. Kamino
+\citep{tsounis2026kamino} is in this regime (joints as constraint rows,
+Jacobi-preconditioned CR with a fixed budget of $9$ iterations), but it is
+not differentiable yet. Residual-based error bounds for implicit
+gradients with inexact linear solves exist in bilevel optimization
+\citep{ehrhardt2023analyzing}, so \eqref{eq:adjoint-error} is new only in
+its structure: which rows carry the error, and an elimination that removes
+it at no extra cost.
 
 \paragraph{What it would take.}
 \begin{itemize}
-  \item Evidence at the gradient level: finite-difference agreement and a
-    trajectory optimization with both adjoints inside the engine. This
-    needs the hybrid in \texttt{src/} and coordination with the authors
-    of the engine.
+  \item Evidence that the gradient improves. Repeating the existing
+    gradient tests of the engine at the default budget does not help: PCR converges within $7$ iterations there, so
+    the cap is never reached. The trajectory test above shows the error
+    and its repair against the converged adjoint, but not against the
+    true derivative. Needed first: a correct linearization of loaded
+    contacts in the engine (a matter for its authors), or a scene in
+    which the converged adjoint agrees with finite differences while PCR
+    is still cut off by the cap. Only then are the elimination in
+    \texttt{src/} and a trajectory optimization with both adjoints worth
+    doing.
   \item A second engine: running Simple's derivative formula with an
     iterative single-precision solve would show the effect outside
-    ostrich.
-  \item A general bound for the amplification in terms of
-    $\tilde{\mathbf{M}}$, $\mathbf{J}$ and $\mathbf{C}$, and a rule for
-    rows with $c_i = 0$, which cannot enter body space.
+    ostrich. Kamino's robots ($21$ to $151$ bodies) would supply systems
+    with many bodies.
+  \item A stopping test for the adjoint solve derived from
+    \eqref{eq:adjoint-error}, computable from quantities PCR already has,
+    and a rule for choosing $S$.
 \end{itemize}
 
 \paragraph{Venue.}
