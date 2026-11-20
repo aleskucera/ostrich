@@ -3,6 +3,15 @@ import warp as wp
 from ostrich.tiled import TiledDot
 from warp.optim.linear import LinearOperator
 
+# Smallest normal float32. Once the solve has converged to float32 precision
+# and keeps iterating (tolerance out of reach), z decays until z.Az and y.Ap
+# underflow. CUDA flushes those to exactly zero, which the divisions below
+# already treat as "stop". The CPU keeps them as denormals with one or two
+# significant bits, so alpha and beta become noise of order one and the
+# recurrence grows without bound (inf after ~150 further iterations).
+# Treating denormals as zero gives both devices the same behaviour.
+_FLT_MIN = wp.constant(wp.float32(1.1754944e-38))
+
 
 @wp.kernel
 def _cr_update_xrz(
@@ -26,9 +35,10 @@ def _cr_update_xrz(
     zAz_val = zAz[world_idx]
     yAp_val = yAp[world_idx]
 
-    # Safe division
+    # Safe division. Below FLT_MIN the scalars are denormal and their ratio is
+    # noise; see _FLT_MIN.
     alpha = float(0.0)
-    if yAp_val > 0.0:
+    if yAp_val > _FLT_MIN:
         alpha = zAz_val / yAp_val
 
     # Update state (Read/Write)
@@ -54,9 +64,9 @@ def _cr_update_pAp(
     zAz_old_val = zAz_old[world_idx]
     zAz_new_val = zAz_new[world_idx]
 
-    # Safe division
+    # Safe division (denormal guard, see _FLT_MIN)
     beta = float(0.0)
-    if zAz_old_val > 0.0:
+    if zAz_old_val > _FLT_MIN:
         beta = zAz_new_val / zAz_old_val
 
     # Update search vectors

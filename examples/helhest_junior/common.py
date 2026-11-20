@@ -216,6 +216,7 @@ def create_helhest_junior_model(
     friction_rear: float = 0.4,
     friction_long_left_right: float = None,
     friction_long_rear: float = None,
+    effort_limit: float = None,
     ke: float = None,
     kd: float = None,
     kf: float = None,
@@ -244,6 +245,9 @@ def create_helhest_junior_model(
         friction_long_rear: Longitudinal (rolling-direction) friction
             coefficient for the rear wheel. None disables anisotropic
             friction (isotropic at friction_rear).
+        effort_limit: Torque cap of each wheel motor [Nm]; the velocity
+            constraint's torque ke * speed error is clamped to it. None keeps
+            newton's default (1e6, never binds). The real robot sustains >= 105.
         mu_stiction_scale: Stribeck low-speed/high-speed mu ratio for the wheel
             collision shapes. None disables the feature.
         v_stribeck: Stribeck slip-speed scale (m/s) for the wheel collision
@@ -325,6 +329,7 @@ def create_helhest_junior_model(
         axis=Y_AXIS,
         target_ke=k_p,
         target_kd=k_d,
+        effort_limit=effort_limit,
         label="left_wheel_j",
         custom_attributes={
             "joint_dof_mode": [mode],
@@ -339,6 +344,7 @@ def create_helhest_junior_model(
         axis=Y_AXIS,
         target_ke=k_p,
         target_kd=k_d,
+        effort_limit=effort_limit,
         label="right_wheel_j",
         custom_attributes={
             "joint_dof_mode": [mode],
@@ -353,6 +359,7 @@ def create_helhest_junior_model(
         axis=Y_AXIS,
         target_ke=k_p,
         target_kd=k_d,
+        effort_limit=effort_limit,
         label="rear_wheel_j",
         custom_attributes={
             "joint_dof_mode": [mode],

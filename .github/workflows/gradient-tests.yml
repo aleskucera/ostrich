@@ -32,7 +32,12 @@ jobs:
       # `sim` carries the actual dependencies; the bare project has none.
       # It deliberately excludes torch (only ostrich.learning needs it), which
       # keeps this env at ~2.4 GB instead of ~8.9 GB of CUDA wheels.
+      # openmesh 1.2.1 has no cp312 wheel and builds from source; its
+      # CMakeLists declares cmake_minimum_required < 3.5, which CMake 4 (now on
+      # the hosted runner) refuses outright. This lets it configure.
       - name: Sync environment
+        env:
+          CMAKE_POLICY_VERSION_MINIMUM: "3.5"
         run: uv sync --frozen --extra sim
 
       # `uv run` puts the synced venv on PATH, so the bare `python` inside
