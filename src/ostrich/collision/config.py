@@ -29,7 +29,8 @@ class ContactReductionConfig:
             - ``"hull"``: 2D convex hull on the contact plane, keep
               boundary points, up to K.
         max_per_pair: K — upper bound on contacts kept per (b0, b1) pair.
-            Ignored when ``policy="none"``. K=4 matches Bullet's default.
+            Ignored when ``policy="none"``. Default 8 matches the tuned
+            wheeled-robot configuration; Bullet uses 4.
         cluster_normal_dot_thresh: Two contact normals are considered
             "the same direction" when their dot product exceeds this value
             (~0.996 ≈ 5°). Only consumed by ``policy="cluster"``.
@@ -38,8 +39,8 @@ class ContactReductionConfig:
             Only consumed by ``policy="cluster"``.
     """
 
-    policy: ContactReductionPolicy = "none"
-    max_per_pair: int = 4
+    policy: ContactReductionPolicy = "fps"
+    max_per_pair: int = 8
     cluster_normal_dot_thresh: float = 0.996
     cluster_pos_thresh: float = 5e-3
 

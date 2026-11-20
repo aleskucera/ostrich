@@ -270,6 +270,34 @@ class OstrichDifferentiableSimulator(DifferentiableSimulator, ABC):
             if self.solver.config.adjoint.gradient_normalization and i > 0:
                 self.trajectory.normalize_gradients(i)
 
+    def forward_step(self):
+        """Forward pass only, no adjoint: the states, the trajectory buffer and
+        the loss are filled as in diff_step, gradients are not. Captured in
+        its own CUDA graph on the first call. For data generation and
+        sampling-based estimators, where the backward pass is wasted."""
+        if self.use_cuda_graph:
+            if getattr(self, "_forward_graph", None) is None:
+                with wp.ScopedCapture() as capture:
+                    self._forward_only()
+                self._forward_graph = capture.graph
+            wp.capture_launch(self._forward_graph)
+        else:
+            self._forward_only()
+
+    def _forward_only(self):
+        for i in range(self.clock.total_sim_steps):
+            self.collision_pipeline.collide(self.states[i], self.contacts)
+            self.solver.step(
+                state_in=self.states[i],
+                state_out=self.states[i + 1],
+                control=self.controls[i],
+                contacts=self.contacts,
+                dt=self.clock.dt,
+            )
+            self.trajectory.save_step(i, self.solver.data, self.solver.ostrich_contacts)
+        self.solver.reset_timestep_counter()
+        self.compute_loss()
+
     def run_target_episode(self):
         for i in range(self.clock.total_sim_steps):
             self.collision_pipeline.collide(self.target_states[i], self.contacts)

@@ -106,10 +106,26 @@ class NewtonRaphsonConfig:
     max_iters: int = 16
     backtrack_min_iter: int = 2
     atol: float = 1e-3
+    # Under-relaxation theta of the friction weight w across NR iterations:
+    #   w_used = (1 - theta) * w_prev + theta * w_raw
+    # with w_prev a persistent per-contact buffer zeroed at each step start
+    # (EngineData.friction_w). Damps the w oscillation of sliding contacts
+    # near the cone boundary at truncated NR iteration counts. 1.0 recovers
+    # the unrelaxed solver bit-exactly; 0.5 (default) is the measured sweet
+    # spot (spin residual 0.28 -> 0.11, cone p90 5 -> 1.6 at nr 16, forward
+    # driving also improves). Threaded to the kernels as a
+    # plain float argument (CUDA-graph-safe, per-engine-instance). The
+    # batched linesearch-candidate kernels ignore it (known gap; they always
+    # run unrelaxed).
+    w_relaxation: float = 0.5
 
     def __post_init__(self):
         if self.max_iters < 1:
             raise ValueError(f"nr.max_iters must be >= 1, got {self.max_iters}")
+        if not (0.0 < self.w_relaxation <= 1.0):
+            raise ValueError(
+                f"nr.w_relaxation must be in (0, 1], got {self.w_relaxation}"
+            )
         if self.backtrack_min_iter < 0:
             raise ValueError(
                 f"nr.backtrack_min_iter must be >= 0, got {self.backtrack_min_iter}"
@@ -164,7 +180,12 @@ class ComplianceConfig:
     """Per-constraint-type compliance (regularization on the FB block)."""
 
     joint: float = 1e-5
-    contact: float = 1e-4
+    # Newton-step damper on the normal rows (the residual does not contain
+    # it). 1e-4 stalled Newton on loaded contacts (0.3 mm residual penetration
+    # at 20 iterations, 41 mm and a 1.6 m/s spurious rebound on a 5 m box
+    # drop); 1e-6 converges in <=10 iterations, is stable to dt=0.1, and is
+    # what conf/engine/ostrich.yaml already uses.
+    contact: float = 1e-6
     friction: float = 1e-6
     # Smoothing parameter inside the contact-FB norm:
     #   φ_ε(a, b) = α·a + β·b − √((α·a)² + (β·b)² + fb_smooth_eps_sq).
@@ -425,6 +446,17 @@ class AdjointConfig:
     regularization: float = 0.0
     gradient_normalization: bool = False
 
+    # Contact compliance used in the adjoint's normal rows instead of
+    # compliance.contact, which in the forward is only a Newton-step damper
+    # (the residual does not contain it); reusing it made the adjoint
+    # differentiate a spring contact. Against a tightly converged forward
+    # (nr.atol ~1e-9) the exact value 0 matches per-step FD best (0.3-1.3%);
+    # at the default nr.atol=1e-3 Newton stops early and the forward behaves
+    # slightly soft. 1e-6 is kept: on the real tasks, with their 16-iteration
+    # backward solve, it differs from 0 by 4-12% (cos >= 0.9997) and the
+    # backward solve converges better.
+    contact_compliance: float = 1e-6
+
     def __post_init__(self):
         if self.friction_linearization not in ("true", "frozen"):
             raise ValueError(
@@ -440,6 +472,11 @@ class AdjointConfig:
             raise ValueError(
                 "adjoint.regularization must be >= 0, "
                 f"got {self.regularization}"
+            )
+        if self.contact_compliance < 0:
+            raise ValueError(
+                "adjoint.contact_compliance must be >= 0, "
+                f"got {self.contact_compliance}"
             )
 
     @classmethod

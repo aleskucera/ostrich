@@ -124,6 +124,7 @@ def compute_control_properties(
     kd: float,
     dt: float,
     is_angular: bool,
+    effort_max: float,
 ):
     error = 0.0
     alpha = 0.0
@@ -157,6 +158,11 @@ def compute_control_properties(
 
     elif mode == JointMode.TARGET_VELOCITY:
         error = qd - target
+        # Torque cap: the constraint force is ke * error, so clamping the error to +-effort_max / ke bounds the
+        # torque at the joint's effort limit (newton joint_effort_limit; its default 1e6 never binds).
+        if effort_max > 0.0 and ke > 1e-6:
+            lim = effort_max / ke
+            error = wp.clamp(error, -lim, lim)
         denom = dt * ke
         if denom > 1e-6:
             alpha = 1.0 / denom
@@ -188,6 +194,7 @@ def compute_control_local(
     kd: float,
     current_lambda: float,
     dt: float,
+    effort_max: float,
 ):
     J_p = wp.spatial_vector()
     J_c = wp.spatial_vector()
@@ -211,7 +218,7 @@ def compute_control_local(
 
     # Compliance & Error (Unified)
     error_vel, alpha = compute_control_properties(
-        current_q, current_qd, target, mode, ke, kd, dt, is_angular
+        current_q, current_qd, target, mode, ke, kd, dt, is_angular, effort_max
     )
 
     return (
@@ -247,6 +254,7 @@ def control_constraint_kernel(
     joint_target_vel: wp.array(dtype=wp.float32, ndim=2),
     joint_target_ke: wp.array(dtype=wp.float32, ndim=2),
     joint_target_kd: wp.array(dtype=wp.float32, ndim=2),
+    joint_effort_limit: wp.array(dtype=wp.float32, ndim=2),
     dt: wp.float32,
     constraint_active_mask: wp.array(dtype=wp.float32, ndim=2),
     h_d: wp.array(dtype=wp.spatial_vector, ndim=2),
@@ -303,6 +311,7 @@ def control_constraint_kernel(
     ke = joint_target_ke[world_idx, qd_start_idx]
     # wp.printf("Joint target ke: %f", ke)
     kd = joint_target_kd[world_idx, qd_start_idx]
+    effort_max = joint_effort_limit[world_idx, qd_start_idx]
     # wp.printf("Joint target kd: %f", kd)
     current_lambda = body_lambda_ctrl[world_idx, ctrl_offset]
 
@@ -324,6 +333,7 @@ def control_constraint_kernel(
         kd,
         current_lambda,
         dt,
+        effort_max,
     )
 
     if p_idx >= 0:
@@ -356,6 +366,7 @@ def control_residual_kernel(
     joint_target_vel: wp.array(dtype=wp.float32, ndim=2),
     joint_target_ke: wp.array(dtype=wp.float32, ndim=2),
     joint_target_kd: wp.array(dtype=wp.float32, ndim=2),
+    joint_effort_limit: wp.array(dtype=wp.float32, ndim=2),
     dt: wp.float32,
     h_d: wp.array(dtype=wp.spatial_vector, ndim=2),
     h_ctrl: wp.array(dtype=wp.float32, ndim=2),
@@ -407,6 +418,7 @@ def control_residual_kernel(
 
     ke = joint_target_ke[world_idx, qd_start_idx]
     kd = joint_target_kd[world_idx, qd_start_idx]
+    effort_max = joint_effort_limit[world_idx, qd_start_idx]
     current_lambda = body_lambda_ctrl[world_idx, ctrl_offset]
 
     (res_hdp, res_hdc, res_hctrl, skip_jp, skip_jc, skip_alpha) = compute_control_local(
@@ -427,6 +439,7 @@ def control_residual_kernel(
         kd,
         current_lambda,
         dt,
+        effort_max,
     )
 
     if p_idx >= 0:
@@ -456,6 +469,7 @@ def batch_control_residual_kernel(
     joint_target_vel: wp.array(dtype=wp.float32, ndim=2),
     joint_target_ke: wp.array(dtype=wp.float32, ndim=2),
     joint_target_kd: wp.array(dtype=wp.float32, ndim=2),
+    joint_effort_limit: wp.array(dtype=wp.float32, ndim=2),
     dt: wp.float32,
     h_d: wp.array(dtype=wp.spatial_vector, ndim=3),
     h_ctrl: wp.array(dtype=wp.float32, ndim=3),
@@ -509,6 +523,7 @@ def batch_control_residual_kernel(
 
     ke = joint_target_ke[world_idx, qd_start_idx]
     kd = joint_target_kd[world_idx, qd_start_idx]
+    effort_max = joint_effort_limit[world_idx, qd_start_idx]
     current_lambda = body_lambda_ctrl[batch_idx, world_idx, ctrl_offset]
 
     (b_hdp, b_hdc, b_hctrl, skip_jp, skip_jc, skip_alpha) = compute_control_local(
@@ -529,6 +544,7 @@ def batch_control_residual_kernel(
         kd,
         current_lambda,
         dt,
+        effort_max,
     )
 
     if p_idx >= 0:
@@ -558,6 +574,7 @@ def fused_batch_control_residual_kernel(
     joint_target_vel: wp.array(dtype=wp.float32, ndim=2),
     joint_target_ke: wp.array(dtype=wp.float32, ndim=2),
     joint_target_kd: wp.array(dtype=wp.float32, ndim=2),
+    joint_effort_limit: wp.array(dtype=wp.float32, ndim=2),
     dt: wp.float32,
     num_batches: int,
     h_d: wp.array(dtype=wp.spatial_vector, ndim=3),
@@ -604,6 +621,7 @@ def fused_batch_control_residual_kernel(
 
     ke = joint_target_ke[world_idx, qd_start_idx]
     kd = joint_target_kd[world_idx, qd_start_idx]
+    effort_max = joint_effort_limit[world_idx, qd_start_idx]
 
     for b in range(num_batches):
         X_w_c, r_c, pos_c = compute_joint_transforms(
@@ -639,6 +657,7 @@ def fused_batch_control_residual_kernel(
             kd,
             current_lambda,
             dt,
+            effort_max,
         )
 
         if p_idx >= 0:

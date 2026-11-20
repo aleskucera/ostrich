@@ -220,6 +220,7 @@ class OstrichModel:
             self.joint_enabled = model.joint_enabled.reshape((model.world_count, -1))
             self.joint_target_ke = model.joint_target_ke.reshape((model.world_count, -1))
             self.joint_target_kd = model.joint_target_kd.reshape((model.world_count, -1))
+            self.joint_effort_limit = model.joint_effort_limit.reshape((model.world_count, -1))
             self.joint_target_ke.requires_grad = True
             self.joint_target_kd.requires_grad = True
             self.joint_compliance = model.joint_compliance.reshape((model.world_count, -1))

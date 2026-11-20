@@ -168,6 +168,7 @@ def _compute_batched_residual(
             data.joint_target_vel,
             model.joint_target_ke,
             model.joint_target_kd,
+            model.joint_effort_limit,
             data.dt,
             dims.linesearch_step_count,
         ],

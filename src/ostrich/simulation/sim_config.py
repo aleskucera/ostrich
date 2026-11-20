@@ -36,6 +36,12 @@ class SimulationConfig:
 class RenderingConfig:
     """Parameters for rendering the simulation to a USD file.
 
+    ``viewer_width``/``viewer_height`` size the ``gl`` window. They default to
+    1280x720 rather than newton's 1920x1080 because the per-frame present cost
+    scales with pixels, and on a host-memory framebuffer (Xvfb, VNC) that
+    dominates: measured on an RTX 3090, 1920x1080 held a sim to 0.88x real time
+    and 1280x720 reached 0.98x, while 1024x576 gained nothing further.
+
     ``real_time`` only affects the ``gl`` viewer: it paces the interactive
     loop so one rendered frame takes as long in wall-clock as it covers in
     sim time. Off, the loop runs as fast as the solver does, which for a
@@ -48,6 +54,8 @@ class RenderingConfig:
     usd_scaling: float | None = 100.0
     start_paused: bool = True
     real_time: bool = True
+    viewer_width: int = 1280
+    viewer_height: int = 720
     world_offset_x: float = 20.0
     world_offset_y: float = 20.0
 
@@ -66,7 +74,7 @@ class RenderingConfig:
                 num_frames=num_segments,
             )
         elif self.vis_type == "gl":
-            return newton.viewer.ViewerGL()
+            return newton.viewer.ViewerGL(width=self.viewer_width, height=self.viewer_height)
         elif self.vis_type == "null" or self.vis_type is None:
             return newton.viewer.ViewerNull(num_segments)
         else:
@@ -87,8 +95,14 @@ def _keep_glx_off_the_compute_gpu():
 
     The process only notices one readback later, as **CUDA error 719** -- which
     reads as a physics divergence, not a driver fault, and has cost real
-    debugging time. Any GL example dies within ~60 s of starting; headless runs
-    never do.
+    debugging time. Headless runs never hit it.
+
+    How quickly it bites depends on how much CUDA is running alongside: with a
+    second heavy consumer (an elevation node) a GL example dies in under a
+    minute, but examples/helhest_junior/control.py alone soaked 5 minutes and
+    25k steps on the discrete GPU with a state readback every step and no Xid at
+    all. So the pin is a real risk, not a certainty -- see the doc before
+    assuming the iGPU is the only option.
 
     Clearing the variable sends GL to the integrated GPU and leaves the discrete
     one for compute. CUDA is unaffected: it never goes through libglvnd, and
@@ -100,22 +114,23 @@ def _keep_glx_off_the_compute_gpu():
     """
     if os.environ.get("__GLX_VENDOR_LIBRARY_NAME") != "nvidia":
         return
-    if not _has_non_nvidia_gl_vendor():
-        # Single-GPU NVIDIA box: clearing the pin would leave libglvnd with no
-        # usable vendor, so the contention is the lesser problem. Say so and
-        # leave it alone.
+    if not _has_non_nvidia_render_gpu():
+        # NVIDIA-only machine: clearing the pin would drop GL onto llvmpipe and
+        # render in software, which costs far more than the contention risk.
         print(
-            "WARNING: __GLX_VENDOR_LIBRARY_NAME=nvidia and no other GL vendor is "
-            "installed, so OpenGL and CUDA must share the GPU. Watch for NVIDIA "
-            "Xid 13 surfacing as a misleading 'CUDA error 719'. "
+            "WARNING: __GLX_VENDOR_LIBRARY_NAME=nvidia and no non-NVIDIA render "
+            "GPU is present, so OpenGL and CUDA must share the GPU. Keeping the "
+            "pin -- clearing it would fall back to software rendering. Watch for "
+            "NVIDIA Xid 13 surfacing as a misleading 'CUDA error 719'. "
             "See docs/gl_viewer_gpu_contention.md."
         )
         return
     if os.environ.get("OSTRICH_ALLOW_NVIDIA_GLX") == "1":
         print(
             "WARNING: __GLX_VENDOR_LIBRARY_NAME=nvidia with OSTRICH_ALLOW_NVIDIA_GLX=1. "
-            "GL and CUDA share the discrete GPU; expect Xid 13 surfacing as "
-            "'CUDA error 719' within ~60s. See docs/gl_viewer_gpu_contention.md."
+            "GL and CUDA share the discrete GPU. Risk of Xid 13 surfacing as "
+            "'CUDA error 719' -- likeliest with another heavy CUDA process on the "
+            "same card. See docs/gl_viewer_gpu_contention.md."
         )
         return
     del os.environ["__GLX_VENDOR_LIBRARY_NAME"]
@@ -127,17 +142,35 @@ def _keep_glx_off_the_compute_gpu():
     )
 
 
-def _has_non_nvidia_gl_vendor() -> bool:
-    """Whether libglvnd has a vendor other than NVIDIA to fall back on.
+def _has_non_nvidia_render_gpu() -> bool:
+    """Whether a non-NVIDIA GPU that can actually render is present.
 
-    Clearing the GLX pin only helps if something else can drive the display.
-    Each installed vendor drops a JSON into glvnd's vendor directory, so a
-    non-NVIDIA entry there means there is an integrated or second GPU to render
-    on. Absent the directory we assume there is, since the pin is normally only
-    set on hybrid machines in the first place.
+    Clearing the GLX pin only helps if something else can drive the rendering.
+    DRM exposes a render node (``renderD*``) for every GPU with a 3D engine, so
+    a non-NVIDIA vendor id among them means a real second GPU -- an integrated
+    Intel or AMD one, typically.
+
+    Checking libglvnd's installed vendors instead is not enough, and that was
+    the earlier bug here: Mesa ships nearly everywhere, so its vendor file is
+    present even on a machine whose only GPUs are NVIDIA -- where dropping the
+    pin lands on llvmpipe and renders in software. Measured on a 2x RTX 3090
+    box driving an Xvfb display, that took a sim from real time to 0.09x.
+
+    Display-only devices, such as a server's ASPEED BMC, have no render node
+    and are correctly ignored. Absent the DRM directory we assume a second GPU
+    exists, since the pin is normally only set on hybrid machines anyway.
     """
-    vendor_dir = pathlib.Path("/usr/share/glvnd/egl_vendor.d")
-    if not vendor_dir.is_dir():
+    NVIDIA = "0x10de"
+    try:
+        nodes = sorted(pathlib.Path("/sys/class/drm").glob("renderD*"))
+    except OSError:
         return True
-    entries = [f.name for f in vendor_dir.glob("*.json")]
-    return any("nvidia" not in name.lower() for name in entries) if entries else True
+    if not nodes:
+        return True
+    for node in nodes:
+        try:
+            if (node / "device" / "vendor").read_text().strip().lower() != NVIDIA:
+                return True
+        except OSError:
+            continue
+    return False

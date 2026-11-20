@@ -99,8 +99,9 @@ def compute_wheel_vel_gradient(model, engine, target_vel, w, dt=0.01):
     # reference, not the adjoint, the inaccurate side: it reported 23% error on
     # the rear wheel while the analytic gradient was unchanged. Measured across
     # 1e-6..1e-2, agreement is monotonically better with larger eps -- 0.8/0.4/3.2%
-    # at 1e-3, 0.1/0.05/0.45% at 1e-2. 1e-3 keeps truncation error negligible.
-    eps = 1e-3
+    # at 1e-3, 0.1/0.05/0.45% at 1e-2. Truncation error is still not visible at
+    # 1e-2 (per-scenario maxima 0.20/0.04/0.25% on 2026-09-07), so 1e-2 is used.
+    eps = 1e-2
     grad_fd = np.zeros(dims.joint_dof_count, dtype=np.float32)
     for dof in range(WHEEL_DOF_OFFSET, WHEEL_DOF_OFFSET + NUM_WHEEL_DOFS):
         tv_p = target_vel.copy()
@@ -260,8 +261,9 @@ def test_multi_step():
     # reference, not the adjoint, the inaccurate side: it reported 23% error on
     # the rear wheel while the analytic gradient was unchanged. Measured across
     # 1e-6..1e-2, agreement is monotonically better with larger eps -- 0.8/0.4/3.2%
-    # at 1e-3, 0.1/0.05/0.45% at 1e-2. 1e-3 keeps truncation error negligible.
-    eps = 1e-3
+    # at 1e-3, 0.1/0.05/0.45% at 1e-2. Truncation error is still not visible at
+    # 1e-2 (per-scenario maxima 0.20/0.04/0.25% on 2026-09-07), so 1e-2 is used.
+    eps = 1e-2
     grad_fd = np.zeros(dims.joint_dof_count, dtype=np.float32)
     for dof in range(WHEEL_DOF_OFFSET, WHEEL_DOF_OFFSET + NUM_WHEEL_DOFS):
         for sign, tv_arr in [(1, None), (-1, None)]:
