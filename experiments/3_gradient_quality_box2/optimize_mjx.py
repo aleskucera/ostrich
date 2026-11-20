@@ -37,6 +37,21 @@ except ImportError as e:
     _HAVE_JAX = False
     _JAX_IMPORT_ERROR = e
 
+# The params import chain (sweep_mujoco -> common_box -> replay_real) pulls in
+# newton/warp, which are absent from the JAX env. common_box only imports three
+# names from replay_real and none are used on this code path — stub the module.
+try:
+    import examples.helhest_junior.replay_real  # noqa: F401
+except ModuleNotFoundError:
+    import types
+    for _name in ("examples", "examples.helhest_junior"):
+        sys.modules.setdefault(_name, types.ModuleType(_name))
+    _stub = types.ModuleType("examples.helhest_junior.replay_real")
+    _stub.PRISM_OFFSET = None
+    _stub.best_time_shift = None
+    _stub.prism_track = None
+    sys.modules["examples.helhest_junior.replay_real"] = _stub
+
 from sweep_mujoco import BASE_PARAMS, JUNIOR_BOX_XML  # noqa: E402
 from optimize_mjx import MJX_PARAMS, _patch_wheels_for_mjx  # noqa: E402
 
@@ -76,8 +91,8 @@ class SplineAdam:
         return params - self._cosine_lr() * mh / (np.sqrt(vh) + self.eps)
 
 
-def build_mjx_model(box):
-    fmt = {**BASE_PARAMS, **MJX_PARAMS, "dt": 5e-3,
+def build_mjx_model(box, dt=5e-3):
+    fmt = {**BASE_PARAMS, **MJX_PARAMS, "dt": dt,
            "ground_friction": MJX_PARAMS["mu"], "box_friction": MJX_PARAMS["mu"],
            "front_friction": MJX_PARAMS["mu"], "rear_friction": MJX_PARAMS["mu"],
            "ground_torsional": MJX_PARAMS["tor"], "front_torsional": MJX_PARAMS["tor"],
@@ -308,6 +323,8 @@ def main():
     ap.add_argument("--iterations", type=int, default=100)
     ap.add_argument("--lr", type=float, default=0.05)
     ap.add_argument("--num-trials", type=int, default=25)
+    ap.add_argument("--trial-offset", type=int, default=0,
+                    help="skip this many task draws first (for splitting trials across workers; seeds stay identical to a single 25-trial run)")
     ap.add_argument("--seed-base", type=int, default=42)
     ap.add_argument("--horizon-s", type=float, default=6.0)
     ap.add_argument("--dt", type=float, default=5e-3)
@@ -363,15 +380,17 @@ def main():
 
     # Build MJX model ONCE — reused across trials. Only dx0 (initial state)
     # changes per trial.
-    mx, mj_model = build_mjx_model(gt["box"])
+    mx, mj_model = build_mjx_model(gt["box"], args.dt)
     finalize_nvml = _nvml_poller()
 
     trials = []
     task_rng = np.random.default_rng(args.seed_base)
-    for k in range(args.num_trials):
+    for _ in range(args.trial_offset):
+        sample_ic_target(task_rng, ic_perturb, target_perturb)  # burn draws
+    for k in range(args.trial_offset, args.trial_offset + args.num_trials):
         ic, target = sample_ic_target(task_rng, ic_perturb, target_perturb)
         spline_seed = args.seed_base + k + 1000
-        print(f"\n--- trial {k + 1}/{args.num_trials}  "
+        print(f"\n--- trial {k + 1}/{args.trial_offset + args.num_trials}  "
               f"IC=({ic['xy'][0]:+.2f},{ic['xy'][1]:+.2f},{np.rad2deg(ic['yaw']):+.1f}°)  "
               f"target=({target['xy'][0]:.2f},{target['xy'][1]:+.2f},{np.rad2deg(target['yaw']):+.1f}°) ---")
         t = run_trial(spline_seed, args.K, args.lr, args.iterations,
@@ -382,6 +401,10 @@ def main():
         print(f"  -> pos_err={m['pos_error_m']:.3f}m  vel={m['terminal_speed_mps']:.2f}m/s  "
               f"jerk={m['control_jerk']:.1f}  {'OK' if m['success'] else 'FAIL'}", flush=True)
         trials.append(t)
+        if args.save:  # incremental checkpoint: a crashed worker keeps its finished trials
+            pathlib.Path(args.save + ".partial").write_text(json.dumps(
+                {"dt": args.dt, "trial_offset": args.trial_offset,
+                 "trials": trials}, indent=1))
 
     nvml_abs, nvml_delta = (finalize_nvml() if finalize_nvml is not None else (None, None))
 

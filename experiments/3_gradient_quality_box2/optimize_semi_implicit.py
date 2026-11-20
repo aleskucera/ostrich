@@ -514,6 +514,8 @@ def main():
     ap.add_argument("--iterations", type=int, default=100)
     ap.add_argument("--lr", type=float, default=0.02)
     ap.add_argument("--num-trials", type=int, default=25)
+    ap.add_argument("--trial-offset", type=int, default=0,
+                    help="skip this many task draws first (for splitting trials across workers; seeds stay identical to a single run)")
     ap.add_argument("--seed-base", type=int, default=42)
     ap.add_argument("--horizon-s", type=float, default=6.0)
     ap.add_argument("--dt", type=float, default=5e-4)
@@ -560,10 +562,12 @@ def main():
 
     trials = []
     task_rng = np.random.default_rng(args.seed_base)
-    for k in range(args.num_trials):
+    for _ in range(args.trial_offset):
+        sample_ic_target(task_rng, ic_perturb, target_perturb)  # burn draws
+    for k in range(args.trial_offset, args.trial_offset + args.num_trials):
         ic, target = sample_ic_target(task_rng, ic_perturb, target_perturb)
         spline_seed = args.seed_base + k + 1000
-        print(f"\n--- trial {k + 1}/{args.num_trials}  "
+        print(f"\n--- trial {k + 1}/{args.trial_offset + args.num_trials}  "
               f"IC=({ic['xy'][0]:+.2f},{ic['xy'][1]:+.2f},{np.rad2deg(ic['yaw']):+.1f}°)  "
               f"target=({target['xy'][0]:.2f},{target['xy'][1]:+.2f},{np.rad2deg(target['yaw']):+.1f}°) ---")
         t = run_trial(spline_seed, args.K, args.lr, args.iterations,

@@ -4,8 +4,8 @@ with the representative held-out sample from the 14-run dataset.
 
 Sample: ostrich9 (joint-median held-out run under both engines' identified
 configs). Engines: Ostrich (identified constant-mu), MuJoCo (c3-identified =
-frozen c1 with rear/tor from the c3 grid), Semi-Implicit (frozen c1; shown on
-this run where it survives, off-scale in the bar with its divergence note).
+frozen c1 with rear/tor from the c3 grid), Semi-Implicit (c3-identified:
+h=0.25 ms, flat-optimum stiffness = c1 values, recalibrated cmd scale).
 
     .venv/bin/python experiments/1_sim_to_real_box/paper_fig_boxc3.py
 """
@@ -30,9 +30,9 @@ from plot_best14 import _run_mj_c3
 SAMPLE = "ostrich9"
 OSTRICH_CFG = dict(k_p=10000.0, mu_front=0.6, mu_rear=0.6,
                    mu_long_front=0.8, mu_long_rear=1.2)
-# all-14 means at identified configs; SI diverges (6/14) at its frozen config
-BAR = {"Ostrich": (0.206, 0.05), "MuJoCo": (0.330, 0.002)}
-SI_NOTE = r"diverges on 6/14 runs"
+# held-out (10-run) means at identified configs (SI: si_c3_final.json)
+BAR = {"Ostrich": (0.208, 0.05), "MuJoCo": (0.315, 0.002),
+       "Semi-Implicit": (0.268, 0.00025)}
 
 SIM_COLORS = {"Ostrich": "#2196F3", "MuJoCo": "#E91E63",
               "Semi-Implicit": "#FF9800"}
@@ -53,10 +53,14 @@ plt.rcParams.update({
 })
 
 _orig_init = rr.HelhestJuniorReplaySimulator.__init__
+_PATCH_ACTIVE = [False]
 
 
 def _patched_init(self, *a, **kw):
-    kw.update(OSTRICH_CFG)
+    # OSTRICH_CFG applies only while the Ostrich runner is active --
+    # a blanket patch would silently override the other engines' configs.
+    if _PATCH_ACTIVE[0]:
+        kw.update(OSTRICH_CFG)
     _orig_init(self, *a, **kw)
 
 
@@ -69,15 +73,24 @@ def _display(name):
     return {"Semi-Implicit": "Semi-Impl."}.get(name, name)
 
 
+SI_C3 = dict(dt=0.00025, ke=8e4, kd=2e3)  # si_c3_final.json
+SI_SCALE = 0.9193
+
+
 def load_trajs(gt):
     trajs = {}
-    so = ec._score_run(*ec.run_ostrich(gt, 0.937), gt)
+    _PATCH_ACTIVE[0] = True
+    try:
+        so = ec._score_run(*ec.run_ostrich(gt, 0.937), gt)
+    finally:
+        _PATCH_ACTIVE[0] = False
     trajs["Ostrich"] = (np.asarray(so["sim_rel"]),
                         np.asarray(so["sim_t_aligned"]))
     sm = ec._score_run(*_run_mj_c3(gt), gt)
     trajs["MuJoCo"] = (np.asarray(sm["sim_rel"]),
                        np.asarray(sm["sim_t_aligned"]))
-    ss = ec._score_run(*ec.run_semi_implicit(gt, 0.8963), gt)
+    ec.C1_SI = dict(ec.C1_SI, **SI_C3)
+    ss = ec._score_run(*ec.run_semi_implicit(gt, SI_SCALE), gt)
     trajs["Semi-Implicit"] = (np.asarray(ss["sim_rel"]),
                               np.asarray(ss["sim_t_aligned"]))
     return trajs
@@ -94,7 +107,17 @@ def panel_xy(ax, trajs, gt):
                     [-hx, -hy]]) @ R.T) + [cx, cy]
     ax.fill(cc[:, 0], cc[:, 1], color="gray", alpha=0.18, zorder=1)
     ax.plot(cc[:, 0], cc[:, 1], color="dimgray", lw=0.7, ls="--", zorder=1)
-    ax.text(cx, cy + hy - 0.10, "obstacle", ha="center", va="top",
+    # label above the shape, parallel to the box side (rotation normalized
+    # to [-90, 90] deg so the text stays upright). Anchored at the midpoint
+    # of the two highest corners = visually centered above the obstacle.
+    # Hand-tune with the offsets below (meters, world frame).
+    LABEL_DX = 0.0
+    LABEL_DY = 0.08
+    top2 = cc[np.argsort(cc[:, 1])[-2:]]
+    rot = (np.degrees(yb) + 90.0) % 180.0 - 90.0
+    ax.text(top2[:, 0].mean() + LABEL_DX, cc[:, 1].max() + LABEL_DY,
+            "obstacle", ha="center", va="bottom",
+            rotation=rot, rotation_mode="anchor",
             fontsize=10, color="dimgray", style="italic", zorder=2)
 
     real_x = np.asarray(gt["real"]["x"])
@@ -105,10 +128,12 @@ def panel_xy(ax, trajs, gt):
         zord = 9 if sim == "MuJoCo" else 5
         ax.plot(sr[:, 0], sr[:, 1], "-", color=SIM_COLORS[sim], lw=1.1,
                 label=_display(sim), zorder=zord)
-    ax.set_xlabel("x (m)")
-    ax.set_ylabel("y (m)")
+    ax.set_xlabel("x [m]")
+    ax.set_ylabel("y [m]")
     ax.set_xlim(-0.1, max(real_x.max(), cc[:, 0].max()) + 0.3)
-    ax.set_ylim(-1.3, 0.7)
+    ax.set_ylim(-0.9, 0.6)
+    # equal data scale so the (rotated) obstacle rectangle stays orthogonal
+    ax.set_aspect("equal", adjustable="datalim")
     ax.grid(True, alpha=0.3)
 
 
@@ -127,8 +152,8 @@ def panel_z(ax, trajs, gt):
         zord = 9 if sim == "MuJoCo" else 5
         ax.plot(st[sel], z[sel] - baseline, "-", color=SIM_COLORS[sim],
                 lw=1.1, label=_display(sim), zorder=zord)
-    ax.set_xlabel("time (s)")
-    ax.set_ylabel(r"base $z$ rise (m)")
+    ax.set_xlabel("time [s]")
+    ax.set_ylabel(r"base $z$ rise [m]")
     ax.set_xlim(t_lo, t_hi)
     ax.set_ylim(-0.07, 0.24)
     ax.grid(True, alpha=0.3)
@@ -139,22 +164,15 @@ def panel_bar(ax):
     xmax = 0.62
     y_pos = np.arange(len(sims))
     for y, sim in zip(y_pos, sims):
-        if sim in BAR:
-            err, dt = BAR[sim]
-            ax.barh(y, err, color=SIM_COLORS[sim], height=0.5,
-                    edgecolor="black", linewidth=0.8, zorder=3)
-            ax.text(err + 0.02, y, rf" {err:.3f}  ($\Delta t={dt}$\,s)",
-                    va="center", ha="left", fontsize=11)
-        else:
-            ax.barh(y, xmax, color=SIM_COLORS[sim], height=0.5,
-                    edgecolor="black", linewidth=0.8, zorder=3,
-                    hatch="//", alpha=0.55, clip_on=True)
-            ax.text(0.02, y, SI_NOTE, va="center", ha="left", fontsize=10,
-                    zorder=4)
+        err, dt = BAR[sim]
+        ax.barh(y, err, color=SIM_COLORS[sim], height=0.5,
+                edgecolor="black", linewidth=0.8, zorder=3)
+        ax.text(err + 0.02, y, rf" {err:.3f}  ($h={dt}$\,s)",
+                va="center", ha="left", fontsize=11)
     ax.set_yticks(y_pos)
     ax.set_yticklabels([_display(s) for s in sims])
-    ax.set_xlabel(r"Combined $L_2$ error (m)")
-    ax.set_title("Accuracy over 14 runs (lower is better)", pad=18)
+    ax.set_xlabel(r"Combined pos. + yaw error [m]")
+    ax.set_title("Accuracy over held-out runs (lower is better)", pad=18)
     ax.grid(True, axis="x", alpha=0.3, zorder=0)
     ax.set_ylim(-0.5, len(sims) - 0.5)
     ax.set_xlim(0, xmax)

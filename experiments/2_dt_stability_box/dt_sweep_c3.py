@@ -28,7 +28,7 @@ GRIDS = {
     "mujoco": [0.0005, 0.001, 0.002, 0.005, 0.01, 0.02, 0.03, 0.05],
     "semi_implicit": [1e-4, 2e-4, 5e-4, 1e-3, 2e-3],
 }
-CMD = {"ostrich": 0.937, "mujoco": 0.9448, "semi_implicit": 0.8963}
+CMD = {"ostrich": 0.937, "mujoco": 0.9448, "semi_implicit": 0.9193}
 
 
 def main():
