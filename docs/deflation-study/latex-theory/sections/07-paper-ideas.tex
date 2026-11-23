@@ -253,6 +253,50 @@ in every loaded step, also with exact linear solves. In the recorded
 scenes, the steps in which PCR is cut off by the cap are therefore steps
 in which the adjoint is wrong for a larger reason.
 
+\paragraph{A scene without contacts.}
+A chain of rigid links keeps the joints, which cause the error
+\eqref{eq:adjoint-error}, and has no contact rows whose linearization
+could be wrong. The test uses $12$ links connected by revolute joints,
+with masses alternating by a factor of $100$, a fixed pivot, gravity and
+velocity control on every joint ($40$ steps of $0.01$\,s). Newton
+converges in $2$ to $4$ iterations in every step. With an exact adjoint
+solve, the gradient agrees with central finite differences to the
+resolution of the finite differences themselves (median $2.0\%$; two step
+sizes, $10^{-2}$ and $10^{-3}$, differ by $9$ to $45\%$ in single
+precision). The engine's adjoint PCR still reaches the cap in $86\%$ of
+the solves. This is the regime in which a better adjoint solve can give a
+better gradient, and Figure~\ref{fig:adjoint-chain-fd} shows that it
+does. DPCR eliminates only the joint rows and iterates on the control
+rows, as it would on contact rows, in a median of $6$ iterations (cap
+reached in $3\%$ of the solves). Its median
+error ($2.1\%$) is close to that of the exact solve ($2.0\%$), and its
+maximum error is less than half of the engine's. The largest engine errors are at the longest
+horizon, where the error of the capped solve has accumulated over $40$
+steps.
+
+% Data: docs/deflation-study/latex-theory/figure_scripts/adjoint_chain_fd_error.py
+% (experiment: test_scripts/deflation/adjoint_articulated.py --links 12
+% --mass-ratio 100 --fd), rerun 2026-11-23 by the figure script. Details: research_findings.md,
+% "Scene check: contact-free articulated chains".
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.6\textwidth]{latex-theory/figures/adjoint_chain_fd_error.pdf}
+  \caption{Relative error of the trajectory gradient against central finite
+    differences on a contact-free chain ($12$ links, masses alternating
+    by $100$), median and maximum over $22$ gradients: random velocity
+    losses and tip position losses at end steps $T$ from $5$ to $40$, with
+    respect to the target velocities of all joints. Both adjoint solves are
+    capped at $16$ iterations in single precision. The engine uses Jacobi PCR
+    and the formula \eqref{eq:adjoint-pcr}. DPCR eliminates the joint rows and
+    uses $\mathbf{P} = \operatorname{diag}(\mathbf{A}_F)$. Gradients whose
+    finite-difference reference is unusable (step sizes $10^{-2}$ and
+    $10^{-3}$ disagree by $45\%$ or more, or the finite difference is
+    exactly zero) are left out. An exact adjoint
+    solve has a median error of $2.0\%$, which is the resolution of the
+    finite differences.}
+  \label{fig:adjoint-chain-fd}
+\end{figure}
+
 \paragraph{Scope and prior art.}
 The same structure appears in Simple \citep{lelidec2024highly} (forward
 mode) and Nimble \citep{werling2021fast}, but both solve the constraint
@@ -289,6 +333,38 @@ it at no extra cost.
     iterative single-precision solve would show the effect outside
     ostrich. Kamino's robots ($21$ to $151$ bodies) would supply systems
     with many bodies.
+  \item Reuse of the forward factor. If the forward pass also uses DPCR,
+    its last Newton iteration already holds the Cholesky factor of
+    $\mathbf{A}_{SS}$, and the adjoint needs the same block. Reusing that
+    factor would make the elimination in the backward pass almost free. The
+    factor is slightly stale, though: the forward pass factors
+    $\mathbf{A}_{SS}$ at the last Newton iterate, before the final
+    update, while the adjoint assembles $\mathbf{A}$ at the saved state
+    after it. The two differ by about the size of the last Newton
+    update, and by more if backtracking keeps an earlier iterate. A stale
+    factor no longer solves the rows $S$ exactly, and that exactness is
+    what removes the error \eqref{eq:adjoint-error}. The safe alternative
+    is to refactor $\mathbf{A}_{SS}$ at the saved state in the backward
+    pass, which costs one small Cholesky factorization per step ($18$ rows
+    for Helhest). Whether reuse is accurate enough, and how much it saves
+    against refactoring, is still to be measured.
+  \item A structured factorization of $\mathbf{A}_{SS}$. A dense
+    Cholesky factorization costs $O(k^3)$ for $k = |S|$ rows. That is
+    negligible for Helhest, but it dominates the step once a robot has
+    hundreds of joint rows. Two joint rows interact in
+    $\mathbf{A}_{SS} = \mathbf{J}_S\tilde{\mathbf{M}}^{-1}\mathbf{J}_S^\top + \mathbf{C}_S$
+    only if they act on a common body. For a chain, $\mathbf{A}_{SS}$ is
+    therefore block tridiagonal, and a banded Cholesky factorization costs
+    $O(k)$. For a kinematic tree, the joints at one body form a small dense
+    block, and the blocks are linked as the tree is. Eliminating them from
+    the leaves toward the root costs $O(k)$ as long as every body has a
+    bounded number of children. The underlying result is linear-time
+    articulated dynamics: \citet{baraff1996linear} orders the combined
+    system of bodies and constraints, whose graph is a tree, so that the
+    factorization has no fill-in at all. Factoring that combined system is
+    an alternative to factoring $\mathbf{A}_{SS}$ directly. Both would keep the elimination, the forward
+    refactor and the backward refactor cheap for large robots. The test
+    scripts use a dense factorization.
   \item A stopping test for the adjoint solve derived from
     \eqref{eq:adjoint-error}, computable from quantities PCR already has,
     and a rule for choosing $S$.

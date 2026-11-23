@@ -532,3 +532,73 @@ is the linearization that the Newton step and the adjoint share, not the
 adjoint's linear solve. The same linearization makes Newton hit its
 iteration cap. The solver error that 7.2 removes stays second-order until
 that is fixed.
+
+**Scene check: contact-free articulated chains (2026-11-20).** Script:
+`test_scripts/deflation/adjoint_articulated.py` (same harness as
+`adjoint_trajectory.py`; ~2 min per comparison, ~25 min for the 12-link FD
+check). Question: is there a scene where (a) the converged adjoint agrees
+with FD and (b) the engine's adjoint PCR still hits the cap? Only there can
+a better adjoint solve give a better gradient. Scene: N links in a row,
+revolute joints (axis world x, so the chain swings in the y–z plane), pivot
+fixed, no collision shapes, gravity, every joint velocity-controlled
+(ke = 100), link masses alternating by a factor 1 or 100, dt 0.01, 40
+steps, default config. Gradient: dL/d(joint target velocity) of every joint
+at every step before T ∈ {5, 10, 20, 30, 40}. Losses: 8 random velocity
+weights, tip y and tip z position (tip x has zero gradient; an earlier run
+with tip x produced meaningless rows).
+
+New solver variant: `joints_*` eliminates only the joint rows and iterates
+on the control rows. Without contacts S = joint/control rows is every row,
+so `elim_*` degenerates to a direct solve (0 iterations); `joints_*` is the
+non-degenerate analogue of keeping contact rows in F.
+
+*Result 1: against the converged adjoint*, velocity losses, whole horizon
+(40 gradients), rel. error p50, share > 10%, adjoint PCR cap hits:
+
+| adjoint solver | 6 links, ratio 1 | 6 links, ratio 100 | 12 links, ratio 1 | 12 links, ratio 100 |
+|---|---|---|---|---|
+| engine (PCR cap 16) | 5.7e-2, 20%, cap 99% | 3.1e-2, 2%, cap 86% | 7.1e-2, 32%, cap 100% | 5.4e-2, 18%, cap 86% |
+| PCR cap 32 | 6.4e-3, 0% | 7.5e-3, 0% | 1.7e-2, 0% | 7.3e-3, 0% |
+| joints eliminated, diag(A_F) | 9e-6, 0% (6 its) | 1.3e-3, 0% (5 its) | 1.4e-3, 0% (14 its) | 1.6e-3, 0% (6 its) |
+| joint + control eliminated (direct) | 1e-6 | 1e-6 | 2e-6 | 1e-6 |
+
+Forward Newton converges in 2–4 iterations at every step (no contacts).
+
+*Result 2: against FD* (12 links, ratio 100, tight forward, eps 1e-2;
+FD spread between eps 1e-2 and 1e-3 is 7–38%, so FD resolves a few %).
+Velocity losses, relative error of the step-summed gradient:
+
+| T | reference | engine | joints eliminated |
+|---|---|---|---|
+| 5–20 | 1.0–5.3% | 1.5–6.2% | 1.0–5.3% |
+| 30 | 1.9–2.7% | 5.0–5.2% | 1.8–2.7% |
+| 40 | 2.7–5.3% | 11.6–13.8% | 2.7–5.4% |
+
+Tip z: reference 0.8–3.7% vs engine 1.8–7.4% (T ≥ 10). Tip y at T ≤ 10 and
+tip z at T = 5: FD unusable (spread ≥ 0.45, or FD = 0). The 6-link FD
+check gave the same picture at a smaller gap (reference ~1%, engine 1–4%).
+
+Findings:
+- **The gate passes.** Without contacts the linearization is right
+  (converged adjoint within FD resolution), and the engine's adjoint PCR
+  hits the cap in 86–100% of solves. At T = 40 the engine is 12–14% off
+  FD, against 3–5% for the exact adjoint, so the solver error is visible
+  against the true derivative and grows with the horizon.
+- **Eliminating only the joint rows is as good as the exact adjoint
+  against FD**, at 5–14 iterations. The engine's error grows with chain
+  length (6 → 12 links: p50 5.7e-2 → 7.1e-2); the joints-only variant
+  needs more iterations for the longer uniform chain (6 → 14), so the
+  control block is not free either.
+- **Position losses are limited by the absolute tolerance, not the cap.**
+  Their adjoint right-hand sides are small (‖b‖ 5e-4 to 2e-2, vs ~0.4 for
+  velocity losses), so atol = 1e-5 stops PCR at a relative accuracy of
+  only 1e-2 to 1e-3: PCR cap 32 gives exactly the cap-16 numbers (12
+  links, ratio 100: p50 3.5e-2, max 0.37, 20% > 10%). With deflation some
+  right-hand sides fall below atol entirely and the joints-only variant
+  returns a zero gradient (cosine 0). The engine uses the same atol. An
+  absolute stopping test does not fit an adjoint solve, whose right-hand
+  side scales with the loss; this is the "adjoint stopping test" item of
+  §7.2 and needs a relative (or C⁻¹-weighted) criterion.
+- Limits: one chain topology, one control gain, single runs, FD at
+  float32 resolution (a few %). No contacts, so this shows the joint part
+  of the claim only.
