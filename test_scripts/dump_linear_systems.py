@@ -86,7 +86,7 @@ def build_helhest_obstacle_model(friction: float = 0.5):
     return builder.finalize_replicated(num_worlds=1, gravity=-9.81)
 
 
-def build_helhest_surface_model(friction: float = 0.5):
+def build_helhest_surface_model(friction: float = 0.5, num_worlds: int = 1):
     """Mirror HelhestSurfaceBenchmark.build_model (surface_drive_benchmark.py):
     Helhest driving over the surface.obj triangle-mesh terrain."""
     import openmesh
@@ -121,7 +121,7 @@ def build_helhest_surface_model(friction: float = 0.5):
     )
 
     return builder.finalize_replicated(
-        num_worlds=1, gravity=-9.81, global_builder=globals_builder
+        num_worlds=num_worlds, gravity=-9.81, global_builder=globals_builder
     )
 
 

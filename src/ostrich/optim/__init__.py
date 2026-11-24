@@ -1,3 +1,7 @@
+from .deflation import DeflatedPCRSolver
+from .deflation import DeflatedSystemOperator
+from .deflation import DeflationPreconditioner
+from .deflation import RowDeflation
 from .full_system_operator import FullSystemLinearData
 from .full_system_operator import FullSystemOperator
 from .pcr_solver import PCRSolver
@@ -12,4 +16,8 @@ __all__ = [
     "FullSystemOperator",
     "FullSystemLinearData",
     "JacobiPreconditioner",
+    "RowDeflation",
+    "DeflatedSystemOperator",
+    "DeflationPreconditioner",
+    "DeflatedPCRSolver",
 ]

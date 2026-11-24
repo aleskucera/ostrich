@@ -136,6 +136,14 @@ class LinearSolverConfig:
     atol: float = 1e-5
     preconditioner_type: str = "jacobi"  # "jacobi" | "per_body_pair"
     regularization: float = 1e-6
+    # Deflated PCR (DPCR): solve the joint + control rows exactly (Cholesky of
+    # A_SS) and run PCR on the Schur complement of the remaining rows.
+    deflation: str = "none"  # "none" | "joint_control"
+    # Contact rows added to the exactly solved set, picked per system by the
+    # AMG strength of connection max_{j!=r} |A_rj| / sqrt(A_rr A_jj).
+    deflation_strength_rows: int = 0
+    # Jacobi diagonal under deflation: "schur" = diag(A_F), "full" = diag(A).
+    deflation_jacobi: str = "schur"
 
     def __post_init__(self):
         if self.max_iters < 1:
@@ -153,6 +161,23 @@ class LinearSolverConfig:
                 "linear.preconditioner_type must be 'jacobi' | 'per_body_pair', "
                 f"got {self.preconditioner_type!r}"
             )
+        if self.deflation not in ("none", "joint_control"):
+            raise ValueError(
+                "linear.deflation must be 'none' | 'joint_control', "
+                f"got {self.deflation!r}"
+            )
+        if self.deflation_strength_rows < 0:
+            raise ValueError(
+                "linear.deflation_strength_rows must be >= 0, "
+                f"got {self.deflation_strength_rows}"
+            )
+        if self.deflation_jacobi not in ("schur", "full"):
+            raise ValueError(
+                "linear.deflation_jacobi must be 'schur' | 'full', "
+                f"got {self.deflation_jacobi!r}"
+            )
+        if self.deflation != "none" and self.preconditioner_type != "jacobi":
+            raise ValueError("linear.deflation requires linear.preconditioner_type='jacobi'")
 
     @classmethod
     def coerce(cls, obj):
@@ -424,6 +449,10 @@ class AdjointConfig:
     soft_blending_temperature: float = 0.05
     regularization: float = 0.0
     gradient_normalization: bool = False
+    # With linear.deflation: reuse the forward pass's Cholesky factor of A_SS
+    # (stored per step in the TrajectoryBuffer) instead of refactoring A_SS at
+    # the saved state. The forward factor is one Newton update stale.
+    reuse_deflation_factor: bool = False
 
     def __post_init__(self):
         if self.friction_linearization not in ("true", "frozen"):

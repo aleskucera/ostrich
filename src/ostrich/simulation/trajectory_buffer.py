@@ -160,6 +160,10 @@ class TrajectoryBuffer:
         self._constr_force = _alloc_buffer(data._constr_force)
         self._constr_force_prev_iter = _alloc_buffer(data._constr_force)
 
+        # Deflated PCR: S and the factor of A_SS per step, for adjoint.reuse_deflation_factor
+        self.deflation_rows = _alloc_buffer(data.deflation_rows)
+        self.deflation_L = _alloc_buffer(data.deflation_L)
+
         # =========================================================================
         # 4. Contact Data
         # =========================================================================
@@ -222,6 +226,10 @@ class TrajectoryBuffer:
         wp.copy(self._constr_force[step_idx], data._constr_force)
         wp.copy(self._constr_force_prev_iter[step_idx], data._constr_force_prev_iter)
 
+        if self.deflation_L is not None:
+            wp.copy(self.deflation_rows[step_idx], data.deflation_rows)
+            wp.copy(self.deflation_L[step_idx], data.deflation_L)
+
         # --- Contacts ---
         wp.copy(self.contact_count[step_idx], contacts.contact_count)
         wp.copy(self.contact_point0[step_idx], contacts.contact_point0)
@@ -257,6 +265,10 @@ class TrajectoryBuffer:
         # --- Lambdas ---
         wp.copy(data._constr_force, self._constr_force[step_idx])
         wp.copy(data._constr_force_prev_iter, self._constr_force_prev_iter[step_idx])
+
+        if self.deflation_L is not None:
+            wp.copy(data.deflation_rows, self.deflation_rows[step_idx])
+            wp.copy(data.deflation_L, self.deflation_L[step_idx])
 
         # --- Contacts ---
         wp.copy(contacts.contact_count, self.contact_count[step_idx])

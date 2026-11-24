@@ -4,8 +4,11 @@ import numpy as np
 import warp as wp
 from ostrich.collision import build_reducer
 from ostrich.collision.warm_start import ContactWarmStarter
+from ostrich.optim import DeflatedPCRSolver
+from ostrich.optim import DeflationPreconditioner
 from ostrich.optim import JacobiPreconditioner
 from ostrich.optim import PCRSolver
+from ostrich.optim import RowDeflation
 from ostrich.optim import SystemLinearData
 from ostrich.optim import SystemOperator
 from newton import Contacts
@@ -170,6 +173,32 @@ class OstrichEngineBase(SolverBase):
             vec_dim=self.dims.N_c,
             device=self.device,
         )
+
+        # The warm-start solves zero C and are not deflated; they keep plain PCR.
+        self.warm_start_preconditioner = self.preconditioner
+        self.warm_start_solver = self.cr_solver
+        self.deflation = None
+        if self.config.linear.deflation != "none":
+            self.deflation = RowDeflation(
+                self,
+                num_fixed_rows=self.dims.offset_n,
+                strength_rows=self.config.linear.deflation_strength_rows,
+                regularization=self.config.linear.regularization,
+            )
+            self.preconditioner = DeflationPreconditioner(
+                self,
+                self.config.linear.regularization,
+                self.deflation,
+                schur=self.config.linear.deflation_jacobi == "schur",
+            )
+            self.cr_solver = DeflatedPCRSolver(
+                self.A_op,
+                self.deflation,
+                max_iters=self.config.linear.max_iters,
+                batch_dim=self.dims.num_worlds,
+                vec_dim=self.dims.N_c,
+                device=self.device,
+            )
 
         self.contact_reducer = build_reducer(
             self.config.contacts.reduction,
@@ -357,12 +386,12 @@ class OstrichEngineBase(SolverBase):
             self.ostrich_model, self.ostrich_contacts, self.data, self.config, self.dims
         )
         self.data.C_values.zero_()
-        self.preconditioner.update()
-        self.cr_solver.solve(
+        self.warm_start_preconditioner.update()
+        self.warm_start_solver.solve(
             A=self.A_op,
             b=self.data.rhs,
             x=self.data._constr_force,
-            preconditioner=self.preconditioner,
+            preconditioner=self.warm_start_preconditioner,
             iters=self.config.linear.max_iters,
             tol=self.config.linear.tol,
             atol=self.config.linear.atol,
@@ -380,12 +409,12 @@ class OstrichEngineBase(SolverBase):
             self.ostrich_model, self.ostrich_contacts, self.data, self.config, self.dims
         )
         self.data.C_values.zero_()
-        self.preconditioner.update()
-        self.cr_solver.solve(
+        self.warm_start_preconditioner.update()
+        self.warm_start_solver.solve(
             A=self.A_op,
             b=self.data.rhs,
             x=self.data._constr_force,
-            preconditioner=self.preconditioner,
+            preconditioner=self.warm_start_preconditioner,
             iters=self.config.linear.max_iters,
             tol=self.config.linear.tol,
             atol=self.config.linear.atol,
@@ -639,7 +668,11 @@ class OstrichEngineBase(SolverBase):
             ],
             device=self.device,
         )
-        self.preconditioner.update()
+        if self.deflation is not None and self.config.adjoint.reuse_deflation_factor:
+            # S and the factor of A_SS come from the forward pass (TrajectoryBuffer)
+            self.preconditioner.update(refactor=False)
+        else:
+            self.preconditioner.update()
 
         self.data.w.c.full.zero_()
         _ = self.cr_solver.solve(

@@ -145,6 +145,17 @@ class EngineData:
         # =========================================================================
         # Adjoint Arrays
         # =========================================================================
+        # =========================================================================
+        # Deflated PCR: the exactly solved rows S and the Cholesky factor of A_SS.
+        # Kept here (not in the solver) so the TrajectoryBuffer can store them per step.
+        # =========================================================================
+        self.deflation_rows = None
+        self.deflation_L = None
+        if config.linear.deflation != "none":
+            k = dims.offset_n + config.linear.deflation_strength_rows
+            self.deflation_rows = _alloc((k,), wp.int32)
+            self.deflation_L = _alloc((k, k), wp.float32)
+
         if alloc_grad_arrays:
             # The adjoint vector
             self._w = _alloc((dims.N_u + dims.num_constraints,), wp.float32)

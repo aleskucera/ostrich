@@ -61,7 +61,7 @@ SOLVERS = {**SOLVERS, "joints_diagA": joints_only(16, schur=False),
            "joints_schur": joints_only(16, schur=True)}
 
 
-def build_chain(links, mass_ratio):
+def build_chain(links, mass_ratio, num_worlds=1):
     builder = OstrichModelBuilder()
     rot = wp.quat_from_axis_angle(wp.vec3(0.0, 0.0, 1.0), -wp.pi * 0.5)
     joints, parent = [], -1
@@ -81,7 +81,7 @@ def build_chain(links, mass_ratio):
             custom_attributes={"joint_dof_mode": [JointMode.TARGET_VELOCITY]}))
         parent = link
     builder.add_articulation(joints, label="chain")
-    return builder.finalize_replicated(num_worlds=1, gravity=-9.81, requires_grad=True)
+    return builder.finalize_replicated(num_worlds=num_worlds, gravity=-9.81, requires_grad=True)
 
 
 def targets_for(model, links, seed=0):

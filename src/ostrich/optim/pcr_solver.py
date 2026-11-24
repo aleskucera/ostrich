@@ -177,11 +177,16 @@ class PCRSolver:
         tol: float = 1e-5,
         atol: float = 1e-5,
         log: bool = False,
+        b_ref_sq: wp.array = None,
     ):
         """
         Solves Ax = b.
 
         Args:
+            b_ref_sq (wp.array, optional):
+                Per-world |b_ref|^2 that the relative tolerance refers to instead
+                of |b|^2. Deflated PCR solves the projected system P A x = P b but
+                keeps the target relative to the original right-hand side.
             log (bool):
                 If False (Fast Mode): Returns 'iter_count' as wp.array. No CPU sync.
                 If True (Debug Mode): Returns dict with 'iterations' (int) and 'residuals' (numpy).
@@ -191,6 +196,7 @@ class PCRSolver:
         assert b.shape == (self.batch_dim, self.vec_dim)
         assert iters <= self.max_iters
 
+        b_target_sq = self.b_sq if b_ref_sq is None else b_ref_sq
         tol_sq = float(tol**2) if tol >= 0 else -1.0
         atol_sq = float(atol**2) if atol >= 0 else -1.0
 
@@ -271,7 +277,7 @@ class PCRSolver:
                 kernel=_check_residuals_kernel,
                 dim=(self.batch_dim),
                 device=self.device,
-                inputs=[self.r_sq, self.b_sq, tol_sq, atol_sq, self.keep_running],
+                inputs=[self.r_sq, b_target_sq, tol_sq, atol_sq, self.keep_running],
             )
 
             # Safely manage iter count with exactly 1 thread
