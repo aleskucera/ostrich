@@ -24,8 +24,8 @@
 #   3. `make figures`. Nothing to edit in this file.
 #
 # CHECK PROVENANCE of a PDF:  pdfinfo figures/NAME.pdf | grep Subject
-#   -> "<script> @ <git hash>"; a "+dirty" suffix means the script had
-#   uncommitted changes when the figure was made.
+#   -> "<script> @ <git hash>"; a "+dirty" suffix means figure_scripts/,
+#   test_scripts/ or src/ had uncommitted changes when the figure was made.
 
 SCRIPTS := $(wildcard figure_scripts/[!_]*.py)
 FIGURES := $(patsubst figure_scripts/%.py,figures/%.pdf,$(SCRIPTS))
