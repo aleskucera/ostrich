@@ -20,6 +20,7 @@ Classes:
 The factor and S live in EngineData (`deflation_L`, `deflation_rows`) so the
 TrajectoryBuffer can store them per step for the adjoint.
 """
+import numpy as np
 import warp as wp
 from ostrich.mechanics import compute_spatial_momentum
 from warp.optim.linear import LinearOperator
@@ -276,6 +277,131 @@ def _einv_kernel(
 
 
 @wp.kernel
+def _assemble_E_kernel(
+    rows: wp.array(dtype=wp.int32, ndim=2),
+    constraint_active_mask: wp.array(dtype=wp.float32, ndim=2),
+    AZt: wp.array(dtype=wp.float32, ndim=3),
+    E: wp.array(dtype=wp.float32, ndim=3),
+):
+    """Dense E = A_SS (identity on unused slots), the input of the tile factorization."""
+    world_idx, a, b = wp.tid()
+    E[world_idx, a, b] = _E_entry(world_idx, a, b, rows, constraint_active_mask, AZt)
+
+
+@wp.kernel
+def _check_factor_kernel(
+    L: wp.array(dtype=wp.float32, ndim=3),
+    factor_failure: wp.array(dtype=wp.int32),
+):
+    """Flags a world whose tile Cholesky produced a non-positive or non-finite pivot."""
+    world_idx, i = wp.tid()
+    d = L[world_idx, i, i]
+    if not (d > 0.0) or not wp.isfinite(d):
+        factor_failure[world_idx] = 1
+
+
+# Tile kernels: one block per world factors and inverts the k x k matrix E in shared
+# memory (libmathdx). The tile shape must be a compile-time constant, so the kernels are
+# built per k by these factories.
+
+
+def _make_tile_factor_kernel(K: int):
+    """E -> L, L⁻¹, E⁻¹ = L⁻ᵀ L⁻¹ in one launch. Needs two K x K tiles in shared memory."""
+
+    @wp.kernel(module="unique", enable_backward=False)
+    def tile_factor(
+        E: wp.array(dtype=wp.float32, ndim=3),
+        I: wp.array(dtype=wp.float32, ndim=2),
+        L: wp.array(dtype=wp.float32, ndim=3),
+        Linv: wp.array(dtype=wp.float32, ndim=3),
+        Einv: wp.array(dtype=wp.float32, ndim=3),
+    ):
+        w = wp.tid()
+        a = wp.tile_load(E[w], shape=(K, K), storage="shared")
+        wp.tile_cholesky_inplace(a)
+        wp.tile_store(L[w], a)
+        x = wp.tile_load(I, shape=(K, K), storage="shared")
+        wp.tile_lower_solve_inplace(a, x)
+        wp.tile_store(Linv[w], x)
+        wp.tile_upper_solve_inplace(wp.tile_transpose(a), x)
+        wp.tile_store(Einv[w], x)
+
+    return tile_factor
+
+
+def _make_tile_inverse_kernel(K: int):
+    """L -> L⁻¹, E⁻¹ in one launch (refactor=False). Needs two K x K tiles."""
+
+    @wp.kernel(module="unique", enable_backward=False)
+    def tile_inverse(
+        L: wp.array(dtype=wp.float32, ndim=3),
+        I: wp.array(dtype=wp.float32, ndim=2),
+        Linv: wp.array(dtype=wp.float32, ndim=3),
+        Einv: wp.array(dtype=wp.float32, ndim=3),
+    ):
+        w = wp.tid()
+        a = wp.tile_load(L[w], shape=(K, K), storage="shared")
+        x = wp.tile_load(I, shape=(K, K), storage="shared")
+        wp.tile_lower_solve_inplace(a, x)
+        wp.tile_store(Linv[w], x)
+        wp.tile_upper_solve_inplace(wp.tile_transpose(a), x)
+        wp.tile_store(Einv[w], x)
+
+    return tile_inverse
+
+
+def _make_tile_cholesky_kernel(K: int):
+    """E -> L only. One K x K tile; used when two do not fit."""
+
+    @wp.kernel(module="unique", enable_backward=False)
+    def tile_cholesky(E: wp.array(dtype=wp.float32, ndim=3), L: wp.array(dtype=wp.float32, ndim=3)):
+        w = wp.tid()
+        a = wp.tile_load(E[w], shape=(K, K), storage="shared")
+        wp.tile_cholesky_inplace(a)
+        wp.tile_store(L[w], a)
+
+    return tile_cholesky
+
+
+def _make_tile_blocked_solve_kernels(K: int, NB: int):
+    """L⁻¹ and E⁻¹ in column blocks of width NB, one block per (world, column block).
+    Each launch needs one K x K tile and one K x NB tile."""
+
+    @wp.kernel(module="unique", enable_backward=False)
+    def tile_lower_inverse(
+        L: wp.array(dtype=wp.float32, ndim=3),
+        I: wp.array(dtype=wp.float32, ndim=2),
+        Linv: wp.array(dtype=wp.float32, ndim=3),
+    ):
+        w, blk = wp.tid()
+        a = wp.tile_load(L[w], shape=(K, K), storage="shared")
+        x = wp.tile_load(I, shape=(K, NB), offset=(0, blk * NB), storage="shared")
+        wp.tile_lower_solve_inplace(a, x)
+        wp.tile_store(Linv[w], x, offset=(0, blk * NB))
+
+    @wp.kernel(module="unique", enable_backward=False)
+    def tile_einv(
+        L: wp.array(dtype=wp.float32, ndim=3),
+        Linv: wp.array(dtype=wp.float32, ndim=3),
+        Einv: wp.array(dtype=wp.float32, ndim=3),
+    ):
+        w, blk = wp.tid()
+        a = wp.tile_load(L[w], shape=(K, K), storage="shared")
+        x = wp.tile_load(Linv[w], shape=(K, NB), offset=(0, blk * NB), storage="shared")
+        wp.tile_upper_solve_inplace(wp.tile_transpose(a), x)
+        wp.tile_store(Einv[w], x, offset=(0, blk * NB))
+
+    return tile_lower_inverse, tile_einv
+
+
+def _mathdx_enabled() -> bool:
+    try:
+        return bool(wp._src.context.runtime.core.wp_is_mathdx_enabled())
+    except AttributeError:
+        return False
+
+
+@wp.kernel
 def _einv_apply_kernel(
     Einv: wp.array(dtype=wp.float32, ndim=3),
     t: wp.array(dtype=wp.float32, ndim=2),
@@ -428,6 +554,49 @@ class RowDeflation:
             self.t = wp.zeros(shape_k, dtype=wp.float32)
             self.s = wp.zeros(shape_k, dtype=wp.float32)
             self.factor_failure = wp.zeros((dims.N_w,), dtype=wp.int32)
+        self._init_factorization(engine.device)
+
+    # Bytes of shared memory kept free for what Warp and libmathdx need besides the tiles.
+    # Without it k = 128 on a 64 KB device configures the kernel at the limit, fails, and
+    # silently returns a wrong factor.
+    _SMEM_MARGIN = 1024
+
+    def _init_factorization(self, device):
+        """Chooses how E is factored and inverted, from the shared memory of the device:
+
+            "tile"          one tile kernel per world: E -> L, L⁻¹, E⁻¹ (two k x k tiles)
+            "tile_blocked"  tile Cholesky, then L⁻¹ and E⁻¹ in column blocks of width NB
+            "loop"          one launch per column of L and per row of L⁻¹ (any k)
+
+        `factor_mode` may be set to "loop" afterwards (e.g. for A/B timing).
+        """
+        k, f = self.k, 4  # float32
+        self.factor_mode, self._nb = "loop", 0
+        limit = device.max_shared_memory_per_block - self._SMEM_MARGIN if device.is_cuda else 0
+        if device.is_cuda and _mathdx_enabled():
+            if 2 * f * k * k <= limit:
+                self.factor_mode = "tile"
+            elif f * k * k <= limit:
+                nb = next((nb for nb in range(k, 0, -1) if k % nb == 0 and f * (k * k + k * nb) <= limit), 0)
+                if nb > 0:
+                    self.factor_mode, self._nb = "tile_blocked", nb
+        if self.factor_mode == "loop":
+            return
+
+        # Threads per block, measured on a GTX 1650 (k = 18 ... 120). libmathdx is very
+        # sensitive to it: the k = 120 Cholesky takes 32 us with 256 threads and 810 us
+        # with 128; the solves are fastest with 128 (64 for k <= 32).
+        self._block_dim = 64 if k <= 32 else 128
+        self._block_dim_cholesky = 256
+        with wp.ScopedDevice(device):
+            self.E = wp.zeros((self.engine.dims.N_w, k, k), dtype=wp.float32)
+            self.I = wp.array(np.eye(k, dtype=np.float32), dtype=wp.float32)
+        if self.factor_mode == "tile":
+            self._tile_factor = _make_tile_factor_kernel(k)
+            self._tile_inverse = _make_tile_inverse_kernel(k)
+        else:
+            self._tile_cholesky = _make_tile_cholesky_kernel(k)
+            self._tile_lower_inverse, self._tile_einv = _make_tile_blocked_solve_kernels(k, self._nb)
 
     def _system_inputs(self):
         data, model = self.engine.data, self.engine.ostrich_model
@@ -445,8 +614,8 @@ class RowDeflation:
 
         refactor=False keeps S and the factor currently in EngineData (e.g. loaded
         from the TrajectoryBuffer) and only rebuilds AZ and E⁻¹ from that factor.
-        The Cholesky factor and L⁻¹ take one launch per column or row, each
-        parallel over the rows of S; E⁻¹ is then applied as a dense product.
+        The factor, L⁻¹ and E⁻¹ come from `_factor` (see `_init_factorization`);
+        E⁻¹ is then applied as a dense product.
         """
         dims, dev = self.engine.dims, self.engine.device
         J, bidx, mask, C, minv, Iinv = self._system_inputs()
@@ -477,17 +646,51 @@ class RowDeflation:
             inputs=[self.rows, J, bidx, mask, C, minv, Iinv, self.regularization],
             outputs=[self.AZt], device=dev,
         )
+        self._factor(refactor)
+
+    def _factor(self, refactor: bool):
+        """L (if refactor), L⁻¹ and E⁻¹ for the current S and AZ."""
+        dims, dev = self.engine.dims, self.engine.device
+        mask = self.engine.data.constr_active_mask.full
+        if self.factor_mode == "loop":
+            if refactor:
+                self.factor_failure.zero_()
+                for j in range(self.k):
+                    wp.launch(
+                        _cholesky_column_kernel, dim=(dims.N_w, self.k),
+                        inputs=[j, self.rows, mask, self.AZt], outputs=[self.L, self.factor_failure], device=dev,
+                    )
+            for i in range(self.k):
+                wp.launch(_lower_inverse_row_kernel, dim=(dims.N_w, self.k), inputs=[i, self.L], outputs=[self.Linv],
+                          device=dev)
+            wp.launch(_einv_kernel, dim=(dims.N_w, self.k, self.k), inputs=[self.Linv], outputs=[self.Einv],
+                      device=dev)
+            return
+
+        bd = self._block_dim
+        if refactor:
+            wp.launch(_assemble_E_kernel, dim=(dims.N_w, self.k, self.k), inputs=[self.rows, mask, self.AZt],
+                      outputs=[self.E], device=dev)
+        if self.factor_mode == "tile":
+            if refactor:
+                wp.launch_tiled(self._tile_factor, dim=[dims.N_w], inputs=[self.E, self.I],
+                                outputs=[self.L, self.Linv, self.Einv], block_dim=bd, device=dev)
+            else:
+                wp.launch_tiled(self._tile_inverse, dim=[dims.N_w], inputs=[self.L, self.I],
+                                outputs=[self.Linv, self.Einv], block_dim=bd, device=dev)
+        else:
+            if refactor:
+                wp.launch_tiled(self._tile_cholesky, dim=[dims.N_w], inputs=[self.E], outputs=[self.L],
+                                block_dim=self._block_dim_cholesky, device=dev)
+            blocks = [dims.N_w, self.k // self._nb]
+            wp.launch_tiled(self._tile_lower_inverse, dim=blocks, inputs=[self.L, self.I], outputs=[self.Linv],
+                            block_dim=bd, device=dev)
+            wp.launch_tiled(self._tile_einv, dim=blocks, inputs=[self.L, self.Linv], outputs=[self.Einv],
+                            block_dim=bd, device=dev)
         if refactor:
             self.factor_failure.zero_()
-            for j in range(self.k):
-                wp.launch(
-                    _cholesky_column_kernel, dim=(dims.N_w, self.k),
-                    inputs=[j, self.rows, mask, self.AZt], outputs=[self.L, self.factor_failure], device=dev,
-                )
-        for i in range(self.k):
-            wp.launch(_lower_inverse_row_kernel, dim=(dims.N_w, self.k), inputs=[i, self.L], outputs=[self.Linv],
+            wp.launch(_check_factor_kernel, dim=(dims.N_w, self.k), inputs=[self.L], outputs=[self.factor_failure],
                       device=dev)
-        wp.launch(_einv_kernel, dim=(dims.N_w, self.k, self.k), inputs=[self.Linv], outputs=[self.Einv], device=dev)
 
     def schur_inv_diag(self, P_inv_diag: wp.array):
         """Write 1/diag(A_F) (diag(A) on the rows of S) into P_inv_diag."""

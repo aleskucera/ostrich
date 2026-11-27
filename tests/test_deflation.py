@@ -143,6 +143,27 @@ def test_schur_jacobi_diagonal(model):
     np.testing.assert_allclose(1.0 / p_inv - 1e-6, schur, rtol=1e-3)
 
 
+@pytest.mark.parametrize("strength_rows", [0, 4])
+def test_tile_factorization_matches_loop(model, strength_rows):
+    engine = make_engine(model, 10, LinearSolverConfig(deflation="joint_control",
+                                                       deflation_strength_rows=strength_rows))
+    rollout(model, engine, 10)
+    df = engine.deflation
+    if df.factor_mode == "loop":
+        pytest.skip("no tile factorization on this device (CPU, no libmathdx, or too little shared memory)")
+    results = {}
+    for mode in (df.factor_mode, "loop"):
+        df.factor_mode = mode
+        df.update()
+        results[mode] = {n: getattr(df, n).numpy().copy() for n in ("L", "Linv", "Einv")}
+        assert int(df.factor_failure.numpy().max()) == 0
+    loop = results.pop("loop")
+    tile = results.popitem()[1]
+    for n in ("L", "Linv", "Einv"):
+        np.testing.assert_allclose(np.tril(tile[n]) if n == "L" else tile[n],
+                                   np.tril(loop[n]) if n == "L" else loop[n], rtol=1e-4, atol=1e-5, err_msg=n)
+
+
 @pytest.mark.skipif(not wp.get_device("cuda:0").is_cuda if wp.get_cuda_device_count() else True,
                     reason="needs a CUDA device")
 def test_step_under_graph_capture(model):
